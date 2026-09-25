@@ -43,7 +43,8 @@
     ],
     'BCM': [
       { id: 'BCM-351', model: 'RM-80 Ballast Cleaning Machine', division: 'UBL', depot: 'UBL', year: 2015, status: 'FIT' },
-      { id: 'BCM-400', model: 'RM-80 High Output Ballast Cleaner', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' }
+      { id: 'BCM-400', model: 'RM-80 High Output Ballast Cleaner', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
+      { id: 'BCM-56824', model: 'RM-80 Ballast Cleaning Machine 56824', division: 'SBC', depot: 'SBC / BYPL', year: 2021, status: 'FIT' }
     ],
     'SBCM/FRM': [
       { id: 'FRM-1889', model: 'Formation Rehabilitation Machine FRM-80', division: 'MYS', depot: 'MYS', year: 2016, status: 'FIT' },
@@ -57,10 +58,15 @@
     'T28': [],
     'DGS': [],
     'UTV': [
-      { id: 'UTV-001', model: 'Utility Track Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' }
+      { id: 'UTV-001', model: 'Utility Track Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
+      { id: 'UTV-002', model: 'Utility Track Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' }
     ],
-    'RBMV': [],
-    'RMBV': [],
+    'RBMV': [
+      { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
+    ],
+    'RMBV': [
+      { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
+    ],
     'MDU': [
       { id: 'MDU-57218', model: 'Mobile Diagnostic Unit 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
       { id: 'MDU-57220', model: 'Mobile Diagnostic Unit 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
@@ -77,10 +83,10 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v9 authentic fleet, dedicated Mechanical Failures tab)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V9_MECH_TAB';
-  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V9_MECH';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V4';
+  // Local Storage Keys (v12 authentic fleet with UTV-002, RBMV-006 & BCM-56824)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL';
+  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V6_SBC_ALL';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -132,6 +138,10 @@
     updateMachineDropdown();
     setupEventListeners();
     renderAll();
+    // Pre-warm SheetJS in background
+    if (typeof ensureXLSX === 'function') {
+      ensureXLSX().catch(e => console.warn('Pre-warming SheetJS deferred:', e));
+    }
   }
 
   // Helper: Find machine info by ID
@@ -159,7 +169,9 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V6_STRICT_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V6_STRICT',
         'TM_FAILURE_SURVEILLANCE_DATA_V7_STRICT_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V7_STRICT',
         'TM_FAILURE_SURVEILLANCE_DATA_V8_CRANE_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V8_CRANE',
-        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3'
+        'TM_FAILURE_SURVEILLANCE_DATA_V9_CRANE_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V9_CRANE',
+        'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
+        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -173,6 +185,16 @@
         FLEET_DIRECTORY = JSON.parse(JSON.stringify(DEFAULT_FLEET_DIRECTORY));
       }
 
+      // Always guarantee canonical machines from DEFAULT_FLEET_DIRECTORY exist
+      Object.keys(DEFAULT_FLEET_DIRECTORY).forEach(cat => {
+        if (!FLEET_DIRECTORY[cat]) FLEET_DIRECTORY[cat] = [];
+        DEFAULT_FLEET_DIRECTORY[cat].forEach(defM => {
+          if (!FLEET_DIRECTORY[cat].some(m => m.id === defM.id)) {
+            FLEET_DIRECTORY[cat].push(JSON.parse(JSON.stringify(defM)));
+          }
+        });
+      });
+
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         AppState.failures = JSON.parse(stored);
@@ -184,6 +206,19 @@
         saveDataset();
       }
 
+      // Guarantee any missing authentic machine failures are included
+      if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.failures) {
+        ['UTV-002', 'RBMV-006', 'BCM-56824'].forEach(mId => {
+          const hasMachine = AppState.failures.some(f => f.machineNo === mId);
+          if (!hasMachine) {
+            const mFails = window.REAL_SWR_FLEET_DATA.failures.filter(f => f.machineNo === mId);
+            if (mFails.length > 0) {
+              AppState.failures = AppState.failures.concat(JSON.parse(JSON.stringify(mFails)));
+            }
+          }
+        });
+      }
+
       // Load authentic HRM data (History Register Module)
       const storedHrm = localStorage.getItem(HRM_STORAGE_KEY);
       if (storedHrm) {
@@ -191,6 +226,15 @@
       } else if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
         HRM_DATA = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters));
         saveHrmData();
+      }
+
+      // Guarantee HRM data for UTV-002, RBMV-006, and BCM-56824 is present
+      if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
+        ['UTV-002', 'RBMV-006', 'BCM-56824'].forEach(mId => {
+          if (!HRM_DATA[mId] && window.REAL_SWR_FLEET_DATA.historyRegisters[mId]) {
+            HRM_DATA[mId] = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters[mId]));
+          }
+        });
       }
 
       // Sanitize remarks to ensure "NA" if empty, whitespace, hyphen, or literal "no"
@@ -324,7 +368,12 @@
       pill.className = `category-pill ${AppState.selectedCategory === cat ? 'active' : ''}`;
       pill.setAttribute('data-category', cat);
 
-      const count = AppState.failures.filter(f => f.category === cat).length;
+      const count = AppState.failures.filter(f => {
+        if (cat === 'RBMV' || cat === 'RMBV') {
+          return f.category === 'RBMV' || f.category === 'RMBV';
+        }
+        return f.category === cat;
+      }).length;
       pill.innerHTML = `<span>${cat}</span><span class="pill-badge">${count}</span>`;
       pill.addEventListener('click', () => selectCategory(cat));
       container.appendChild(pill);
@@ -513,9 +562,13 @@
   // Filter failures based on Category, Machine, Search, Subsystem, and Status
   function getFilteredFailures() {
     return AppState.failures.filter(f => {
-      // Category match
-      if (AppState.selectedCategory !== 'ALL' && f.category !== AppState.selectedCategory) {
-        return false;
+      // Category match (supporting both RBMV and RMBV aliases)
+      if (AppState.selectedCategory !== 'ALL') {
+        const isRbmvMatch = (AppState.selectedCategory === 'RBMV' || AppState.selectedCategory === 'RMBV') && 
+                            (f.category === 'RBMV' || f.category === 'RMBV');
+        if (f.category !== AppState.selectedCategory && !isRbmvMatch) {
+          return false;
+        }
       }
       // Machine match
       if (AppState.selectedMachine !== 'ALL' && f.machineNo !== AppState.selectedMachine) {
@@ -1301,7 +1354,58 @@
   // EXCEL IMPORT & EXPORT ENGINE (SheetJS)
   // ==========================================================================
 
-  // Helper: Retrieve fleet machines registered for a specific category
+  // Resilient SheetJS (XLSX) asynchronous loader & availability guarantee
+  function ensureXLSX() {
+    if (typeof XLSX !== 'undefined' && XLSX.read && XLSX.utils) {
+      return Promise.resolve(window.XLSX);
+    }
+    if (window._xlsxLoadingPromise) {
+      return window._xlsxLoadingPromise;
+    }
+    window._xlsxLoadingPromise = new Promise((resolve, reject) => {
+      if (typeof XLSX !== 'undefined' && XLSX.read && XLSX.utils) {
+        resolve(window.XLSX);
+        return;
+      }
+      const sources = [
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'assets/xlsx.full.min.js',
+        'xlsx.full.min.js'
+      ];
+      let idx = 0;
+      function tryNext() {
+        if (typeof XLSX !== 'undefined' && XLSX.read && XLSX.utils) {
+          resolve(window.XLSX);
+          return;
+        }
+        if (idx >= sources.length) {
+          window._xlsxLoadingPromise = null;
+          reject(new Error('SheetJS (XLSX) library could not be loaded from CDNs or local assets.'));
+          return;
+        }
+        const src = sources[idx++];
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+          if (typeof XLSX !== 'undefined' && XLSX.read && XLSX.utils) {
+            resolve(window.XLSX);
+          } else {
+            tryNext();
+          }
+        };
+        script.onerror = () => {
+          tryNext();
+        };
+        document.head.appendChild(script);
+      }
+      tryNext();
+    });
+    return window._xlsxLoadingPromise;
+  }
+
   // Helper: Retrieve fleet machines registered for a specific category
   function getMachinesForCategory(cat) {
     let list = [];
@@ -1478,7 +1582,7 @@
             const row = hData[r] || [];
             for (let c = 0; c < row.length; c++) {
               const cellStr = String(row[c]).trim();
-              const match = cellStr.match(/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|T-28|DGS|UTV|RMBV|MDU)[\s\-_]*\d+/i);
+              const match = cellStr.match(/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|T-28|DGS|UTV|RBMV|RMBV|MDU)[\s\-_]*\d+/i);
               if (match) {
                 chosenMachine = match[0].replace(/\s+/g, '-').toUpperCase();
                 break;
@@ -1492,7 +1596,7 @@
       // Check filename if still not found
       if (!chosenMachine && fileName) {
         const baseName = fileName.replace(/\.[^/.]+$/, '').trim();
-        if (/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|DGS|UTV|RMBV|MDU|\d)/i.test(baseName)) {
+        if (/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|DGS|UTV|RBMV|RMBV|MDU|\d)/i.test(baseName)) {
           chosenMachine = baseName.replace(/\s+/g, '-').toUpperCase();
         }
       }
@@ -1897,30 +2001,49 @@
   }
 
   // Process Excel File Upload
-  function processExcelFile(file) {
-    if (!file) return;
+  async function processExcelFile(file) {
+    if (!file) return 0;
 
-    if (typeof XLSX === 'undefined') {
-      showToast('Error: SheetJS Excel library is not available.', true);
-      return;
+    // Reset file input value so re-uploading the same file triggers change
+    const fileInput = document.getElementById('excelFileInput');
+    if (fileInput) fileInput.value = '';
+
+    if (typeof XLSX === 'undefined' || !XLSX.read) {
+      showToast('Loading SheetJS Excel engine...', false);
+      try {
+        await ensureXLSX();
+      } catch (err) {
+        console.error('Error loading SheetJS:', err);
+        showToast('Error: SheetJS Excel library is not available. Please check internet connection or reload.', true);
+        return 0;
+      }
     }
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const importedCount = parseWorkbookData(workbook, file.name);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          const importedCount = parseWorkbookData(workbook, file.name);
 
-        if (importedCount === 0) {
-          showToast('No valid failure records found in uploaded file. Please verify sheet structure.', true);
+          if (importedCount === 0) {
+            showToast('No valid failure records found in uploaded file. Please verify sheet structure.', true);
+          }
+          resolve(importedCount);
+        } catch (err) {
+          console.error('Error parsing Excel:', err);
+          showToast('Error reading Excel spreadsheet: ' + err.message, true);
+          reject(err);
         }
-      } catch (err) {
-        console.error('Error parsing Excel:', err);
-        showToast('Error reading Excel spreadsheet: ' + err.message, true);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+      };
+      reader.onerror = function (err) {
+        console.error('FileReader error:', err);
+        showToast('Error reading local file: ' + err.message, true);
+        reject(err);
+      };
+      reader.readAsArrayBuffer(file);
+    });
   }
 
   // Import directly from Google Sheets / Google Link
@@ -1953,9 +2076,13 @@
       }
       const csvText = await response.text();
 
-      if (typeof XLSX === 'undefined') {
-        showToast('SheetJS parser is not available.', true);
-        return;
+      if (typeof XLSX === 'undefined' || !XLSX.read) {
+        try {
+          await ensureXLSX();
+        } catch (e) {
+          showToast('SheetJS parser is not available.', true);
+          return;
+        }
       }
 
       const workbook = XLSX.read(csvText, { type: 'string' });
@@ -1997,10 +2124,15 @@
   }
 
   // Download Sample Excel Template (Multi-sheet authentic SWR workbook with 16 HRM items and 5 Failure Desks)
-  function downloadExcelTemplate() {
-    if (typeof XLSX === 'undefined') {
-      showToast('SheetJS not ready for template generation.', true);
-      return;
+  async function downloadExcelTemplate() {
+    if (typeof XLSX === 'undefined' || !XLSX.utils) {
+      showToast('Loading SheetJS template engine...', false);
+      try {
+        await ensureXLSX();
+      } catch (e) {
+        showToast('SheetJS not ready for template generation.', true);
+        return;
+      }
     }
 
     const modalCat = document.getElementById('modalTargetCategory')?.value;
@@ -2115,10 +2247,15 @@
   }
 
   // Export Filtered Failure History to Excel
-  function exportFilteredToExcel() {
-    if (typeof XLSX === 'undefined') {
-      showToast('SheetJS not ready for export.', true);
-      return;
+  async function exportFilteredToExcel() {
+    if (typeof XLSX === 'undefined' || !XLSX.utils) {
+      showToast('Loading SheetJS export engine...', false);
+      try {
+        await ensureXLSX();
+      } catch (e) {
+        showToast('SheetJS not ready for export.', true);
+        return;
+      }
     }
 
     const filtered = getFilteredFailures();
@@ -2700,7 +2837,9 @@
   // Core Search Engine: Scans all machines, 6 failure desks, and HRM
   function performUniversalSearch(rawQuery, filter = null) {
     if (filter) universalSearchState.activeFilter = filter;
-    const query = (rawQuery !== undefined && rawQuery !== null) ? String(rawQuery).trim() : universalSearchState.query;
+    const inputEl = document.getElementById('universalSearchInput');
+    const inputVal = inputEl ? inputEl.value.trim() : '';
+    const query = (rawQuery !== undefined && rawQuery !== null) ? String(rawQuery).trim() : (inputVal || universalSearchState.query);
     universalSearchState.query = query;
 
     const resultsArea = document.getElementById('universalSearchResultsArea');
@@ -3177,10 +3316,15 @@
   }
 
   // Export filtered search references to Excel
-  function exportSearchResultsToExcel() {
-    if (typeof XLSX === 'undefined') {
-      showToast('SheetJS library not ready for export.', true);
-      return;
+  async function exportSearchResultsToExcel() {
+    if (typeof XLSX === 'undefined' || !XLSX.utils) {
+      showToast('Loading SheetJS search export engine...', false);
+      try {
+        await ensureXLSX();
+      } catch (e) {
+        showToast('SheetJS library not ready for export.', true);
+        return;
+      }
     }
     if (!universalSearchState.results || universalSearchState.results.length === 0) {
       showToast('No search results to export.', true);
@@ -3448,7 +3592,7 @@
     }
   }
 
-  function exportCurrentHrm() {
+  async function exportCurrentHrm() {
     const mId = getActiveMachineId();
     const hrm = HRM_DATA[mId];
     if (!hrm) return;
@@ -3461,6 +3605,15 @@
       'Technical Remarks / Spares': it.presentRemarks,
       'Total Historical Records Logged': it.records ? it.records.length : 0
     }));
+
+    if (typeof XLSX === 'undefined' || !XLSX.utils) {
+      try {
+        await ensureXLSX();
+      } catch (e) {
+        showToast('SheetJS library not available for HRM export.', true);
+        return;
+      }
+    }
 
     if (typeof XLSX !== 'undefined') {
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -4090,7 +4243,7 @@
       setupCategoryPills();
       updateMachineDropdown();
       renderAll();
-      showToast('Database reset to official SWR track machine fleet records (strictly 19 authentic machines, 684 incidents).');
+      showToast('Database reset to official SWR track machine fleet records (21 authentic machines, 732 incidents).');
     }
   }
 
@@ -4112,6 +4265,7 @@
     importFromGoogleLink,
     processExcelFile,
     parseWorkbookData,
+    ensureXLSX,
     resetToDefaultData,
     getAppState: () => AppState,
     getFleetDirectory: () => FLEET_DIRECTORY,

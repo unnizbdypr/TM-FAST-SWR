@@ -1,5 +1,4 @@
-﻿// SWR Track Machine Real Fleet & Complete Subsystem Failure Incident Database
-window.REAL_SWR_FLEET_DATA = {
+﻿{
     "fleetDirectory":  {
                            "CSM":  [
                                        {
@@ -30308,5 +30307,4 @@ window.REAL_SWR_FLEET_DATA = {
                          "certifiedBy":  "SSE/TM/UBL"
                      }
                  ]
-};
-
+}

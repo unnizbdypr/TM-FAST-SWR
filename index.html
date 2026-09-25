@@ -11,8 +11,28 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <!-- SheetJS Local Asset -->
-  <script src="assets/xlsx.full.min.js"></script>
+  <!-- SheetJS (xlsx.full.min.js) - Loaded in <head> before any application scripts with multi-tier CDN and local fallbacks -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="assets/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="xlsx.full.min.js"><\/script>');
+    }
+  </script>
   
   <!-- Custom Pista Green & Golden Dark Theme Styles -->
   <link rel="stylesheet" href="style.css">
@@ -250,7 +270,7 @@
         <div class="universal-search-title">
           <span class="universal-search-glass-icon">🔍</span>
           <span class="gold-accent">Universal Fleet Search</span>
-          <span class="universal-search-subtitle">• Live search across all 19 machines, 6 subsystem failure desks &amp; History Register (HRM)</span>
+          <span class="universal-search-subtitle">• Live search across all authentic fleet machines, 6 subsystem failure desks &amp; History Register (HRM)</span>
         </div>
         <div class="universal-search-actions">
           <span class="universal-search-badge" id="universalSearchCountBadge" style="display: none;">0 matches</span>
