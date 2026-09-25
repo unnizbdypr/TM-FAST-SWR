@@ -43,7 +43,7 @@ window.REAL_SWR_FLEET_DATA = {
                            "UNI/PCTM":  [
                                             {
                                                 "id":  "UNIMAT-8269",
-                                                "model":  "Unimat 08-475 4S Points \u0026 Crossing Tamper",
+                                                "model":  "Unimat 08-475 3S Points \u0026 Crossing Tamper",
                                                 "division":  "SBC",
                                                 "depot":  "YPR / BYPL",
                                                 "year":  2017,
@@ -183,20 +183,10 @@ window.REAL_SWR_FLEET_DATA = {
                                             "status":  "FIT"
                                         }
                                     ],
-                           "RMBV":  [
-                                        {
-                                            "id":  "RBMV-006",
-                                            "model":  "Rail Borne Maintenance Vehicle RBMV-006",
-                                            "division":  "SBC",
-                                            "depot":  "SBC",
-                                            "year":  2025,
-                                            "status":  "FIT"
-                                        }
-                                    ],
                            "MDU":  [
                                        {
                                            "id":  "MDU-57218",
-                                           "model":  "Mobile Diagnostic Unit 57218",
+                                           "model":  "Muck Disposal Unit 57218",
                                            "division":  "UBL",
                                            "depot":  "UBL",
                                            "year":  2023,
@@ -204,7 +194,7 @@ window.REAL_SWR_FLEET_DATA = {
                                        },
                                        {
                                            "id":  "MDU-57220",
-                                           "model":  "Mobile Diagnostic Unit 57220",
+                                           "model":  "Muck Disposal Unit 57220",
                                            "division":  "UBL",
                                            "depot":  "UBL",
                                            "year":  2023,
@@ -212,7 +202,7 @@ window.REAL_SWR_FLEET_DATA = {
                                        },
                                        {
                                            "id":  "MDU-57222",
-                                           "model":  "Mobile Diagnostic Unit 57222",
+                                           "model":  "Muck Disposal Unit 57222",
                                            "division":  "UBL",
                                            "depot":  "UBL",
                                            "year":  2023,

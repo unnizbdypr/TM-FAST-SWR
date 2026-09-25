@@ -1,19 +1,19 @@
 /**
- * TM-FAILURE ANALYSIS AND SURVEILLANCE TOOL
- * High-performance Track Machine Surveillance, MTTR & Repetitive Failure Analytics
+ * TM-FAST (Failure Analysis & Surveillance Tool)
+ * High-performance Track Machine Surveillance, Fleet Reliability & Repetitive Defect Analytics
  * Indian Railways / SWR Specialized Track Machine Maintenance Module
  */
 
 (function () {
   'use strict';
 
-  // Available Categories (as specified, supporting both RBMV and RMBV)
+  // Available Categories (Canonical single RBMV category)
   const MACHINE_CATEGORIES = [
     'CSM', 'DTE', 'DUO', 'UNI/PCTM', 'MPT', 'BCM', 'SBCM/FRM',
-    'BRM', 'SQRS', 'T28', 'DGS', 'UTV', 'RBMV', 'RMBV', 'MDU'
+    'BRM', 'SQRS', 'T28', 'DGS', 'UTV', 'RBMV', 'MDU'
   ];
 
-  // Helper: check if machine or category belongs to Crane-equipped fleet (UTV / RBMV / RMBV)
+  // Helper: check if machine or category belongs to Crane-equipped fleet (UTV / RBMV)
   function isCraneMachine(identifier) {
     if (!identifier) return false;
     const str = String(identifier).trim().toUpperCase();
@@ -21,7 +21,41 @@
            str.startsWith('UTV') || str.startsWith('RBMV') || str.startsWith('RMBV');
   }
 
-  // Default SWR Machine Fleet Mapping (Exclusively the 19 authentic machines from SWR divisional folders)
+  // Universal Date Formatter: Strictly DD.MM.YYYY
+  function formatDateDisplay(val) {
+    if (!val || val === 'N/A' || val === '-' || val === '--' || val === 'NA' || val === 'Not Set') return '--';
+    const s = String(val).trim();
+    if (/^(active|under repair|nil|none|ongoing)$/i.test(s) || s.toLowerCase().includes('active')) {
+      return s;
+    }
+    // Match YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD (optionally with time)
+    const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    if (isoMatch) {
+      const yyyy = isoMatch[1];
+      const mm = isoMatch[2].padStart(2, '0');
+      const dd = isoMatch[3].padStart(2, '0');
+      return `${dd}.${mm}.${yyyy}`;
+    }
+    // Match DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optionally with time)
+    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    if (dmyMatch) {
+      const dd = dmyMatch[1].padStart(2, '0');
+      const mm = dmyMatch[2].padStart(2, '0');
+      const yyyy = dmyMatch[3];
+      return `${dd}.${mm}.${yyyy}`;
+    }
+    // Date object / timestamp fallback
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900 && parsed.getFullYear() < 2100) {
+      const dd = String(parsed.getDate()).padStart(2, '0');
+      const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+      const yyyy = parsed.getFullYear();
+      return `${dd}.${mm}.${yyyy}`;
+    }
+    return s;
+  }
+
+  // Default SWR Machine Fleet Mapping (Authentic fleet from SWR divisional folders)
   const DEFAULT_FLEET_DIRECTORY = {
     'CSM': [
       { id: 'CSM-945', model: '09-32 CSM Continuous Action Tamper', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' }
@@ -33,7 +67,7 @@
       { id: 'DUO-8128', model: '08-32 Duomatic Tamper (Ex-UBL)', division: 'MYS', depot: 'SKLR', year: 2016, status: 'FIT' }
     ],
     'UNI/PCTM': [
-      { id: 'UNIMAT-8269', model: 'Unimat 08-475 4S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' }
+      { id: 'UNIMAT-8269', model: 'Unimat 08-475 3S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' }
     ],
     'MPT': [
       { id: 'MPT-12015', model: 'Multi-Purpose Tamper 12015', division: 'SBC', depot: 'KJM', year: 2019, status: 'FIT' },
@@ -64,13 +98,10 @@
     'RBMV': [
       { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
     ],
-    'RMBV': [
-      { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
-    ],
     'MDU': [
-      { id: 'MDU-57218', model: 'Mobile Diagnostic Unit 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-57220', model: 'Mobile Diagnostic Unit 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-57222', model: 'Mobile Diagnostic Unit 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
+      { id: 'MDU-57218', model: 'Muck Disposal Unit 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57220', model: 'Muck Disposal Unit 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57222', model: 'Muck Disposal Unit 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
     ]
   };
 
@@ -83,10 +114,10 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v12 authentic fleet with UTV-002, RBMV-006 & BCM-56824)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL';
-  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V6_SBC_ALL';
+  // Local Storage Keys (v14 TM-FAST authentic fleet with single RBMV, Muck Disposal Unit, 3S Unimat)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST';
+  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V14_FAST';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -171,7 +202,8 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V8_CRANE_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V8_CRANE',
         'TM_FAILURE_SURVEILLANCE_DATA_V9_CRANE_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V9_CRANE',
         'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
-        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2'
+        'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
+        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -185,12 +217,27 @@
         FLEET_DIRECTORY = JSON.parse(JSON.stringify(DEFAULT_FLEET_DIRECTORY));
       }
 
+      // Purge any stale RMBV duplicate from fleet directory
+      delete FLEET_DIRECTORY['RMBV'];
+
       // Always guarantee canonical machines from DEFAULT_FLEET_DIRECTORY exist
       Object.keys(DEFAULT_FLEET_DIRECTORY).forEach(cat => {
         if (!FLEET_DIRECTORY[cat]) FLEET_DIRECTORY[cat] = [];
         DEFAULT_FLEET_DIRECTORY[cat].forEach(defM => {
           if (!FLEET_DIRECTORY[cat].some(m => m.id === defM.id)) {
             FLEET_DIRECTORY[cat].push(JSON.parse(JSON.stringify(defM)));
+          }
+        });
+      });
+
+      // Normalize models in FLEET_DIRECTORY
+      Object.keys(FLEET_DIRECTORY).forEach(cat => {
+        FLEET_DIRECTORY[cat].forEach(m => {
+          if (m.model && m.model.includes('Mobile Diagnostic Unit')) {
+            m.model = m.model.replace('Mobile Diagnostic Unit', 'Muck Disposal Unit');
+          }
+          if (m.model && m.model.includes('4S Points')) {
+            m.model = m.model.replace('4S Points', '3S Points');
           }
         });
       });
@@ -205,6 +252,11 @@
         AppState.failures = JSON.parse(JSON.stringify(INITIAL_FAILURES));
         saveDataset();
       }
+
+      // Normalize any RMBV category in failures
+      AppState.failures.forEach(f => {
+        if (f.category === 'RMBV') f.category = 'RBMV';
+      });
 
       // Guarantee any missing authentic machine failures are included
       if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.failures) {
@@ -551,7 +603,6 @@
         <span class="div-badge ${divBadgeClass}">${divIcon} ${divName} Division</span>
         <span class="meta-chip">${mInfo?.model || (fails[0]?.category || AppState.selectedCategory)}</span>
         <span class="meta-chip">Depot: <strong>${mInfo?.depot || divName + ' Base'}</strong></span>
-        <span class="meta-chip">Total Down Time: <strong>${totalDown.toFixed(1)} hrs</strong></span>
         <span class="meta-chip">Total Incidents: <strong>${fails.length}</strong></span>
         ${isRepair ? `<span class="meta-status-badge status-repair-pill">⚠️ UNDER SITE REPAIR</span>` : `<span class="meta-status-badge status-fit-pill">✅ CURRENTLY FIT</span>`}
         ${repeats > 0 ? `<span class="meta-status-badge status-repetitive-pill">🚨 ${repeats} Repetitive Defect Cases</span>` : ''}
@@ -623,15 +674,21 @@
     const activeRepairs = list.filter(f => f.status === 'UNDER REPAIR').length;
     const repeatFailures = list.filter(f => f.isRepetitive).length;
 
-    // Calculate MTTR (Mean Time to Repair in hours)
-    const fitRecords = list.filter(f => f.status === 'FIT' && parseFloat(f.downHours) > 0);
-    const totalDownHours = list.reduce((acc, f) => acc + (parseFloat(f.downHours) || 0), 0);
-    const mttr = fitRecords.length > 0 ? (totalDownHours / fitRecords.length).toFixed(1) : '0.0';
+    // Calculate Fleet Fit Rate % across monitored machines
+    let totalMonitoredMachines = new Set(list.map(f => f.machineNo)).size;
+    if (totalMonitoredMachines === 0) {
+      let count = 0;
+      Object.keys(FLEET_DIRECTORY).forEach(c => { count += FLEET_DIRECTORY[c].length; });
+      totalMonitoredMachines = count;
+    }
+    const fitRate = totalMonitoredMachines > 0 
+      ? (((totalMonitoredMachines - activeRepairs) / totalMonitoredMachines) * 100).toFixed(1) + '%'
+      : '100%';
 
     // Repetitive Failure Rate
     const repeatRate = totalFailures > 0 ? ((repeatFailures / totalFailures) * 100).toFixed(0) : '0';
 
-    // Bad Actor Machines (machines with 2 or more failures or > 10 down hours)
+    // Bad Actor Machines (machines with 2 or more failures)
     const machineFailCounts = {};
     list.forEach(f => {
       machineFailCounts[f.machineNo] = (machineFailCounts[f.machineNo] || 0) + 1;
@@ -642,10 +699,8 @@
     if (elTot) elTot.textContent = totalFailures;
     const elAct = document.getElementById('kpiActiveRepairs');
     if (elAct) elAct.textContent = activeRepairs;
-    const elMttr = document.getElementById('kpiMTTR');
-    if (elMttr) elMttr.textContent = mttr;
-    const elDown = document.getElementById('kpiTotalDowntime');
-    if (elDown) elDown.textContent = totalDownHours.toFixed(1);
+    const elFit = document.getElementById('kpiFleetFitRate');
+    if (elFit) elFit.textContent = fitRate;
     const elRep = document.getElementById('kpiRepeatIndex');
     if (elRep) elRep.textContent = `${repeatRate}% (${repeatFailures})`;
     const elBad = document.getElementById('kpiBadActors');
@@ -781,34 +836,126 @@
     // 4. Render the corresponding subsystem desk
     renderSubsystemDesk(deskKey, deskContainerId);
 
-    // 5. Scroll to and pulse the row
+    // 5. Scroll to and pulse the row + highlight complete cluster
     setTimeout(() => {
-      const rowId = `failureRow-${fId}`;
-      let rowEl = document.getElementById(rowId);
-      if (!rowEl && target) {
-        // Fallback: search row by matching text or description
+      // Clear any existing highlights across all desks
+      document.querySelectorAll('.highlight-pulse-row, .highlight-cluster-row').forEach(el => {
+        el.classList.remove('highlight-pulse-row', 'highlight-cluster-row');
+      });
+
+      // Find all related failures on that machine in that subsystem desk
+      const isCrane = isCraneMachine(machineNo) || isCraneMachine(AppState.selectedCategory);
+      const relatedFails = AppState.failures.filter(f => {
+        if (f.machineNo !== machineNo) return false;
+        
+        // Match desk
+        const fSub = (f.subsystem || '').toLowerCase();
+        let fDesk = 'Engine';
+        if (fSub.includes('tamp') || fSub.includes('crane') || fSub.includes('cutter')) {
+          fDesk = isCrane ? 'Crane' : 'Tamping Unit';
+        } else if (fSub.includes('mech')) {
+          fDesk = 'Mechanical';
+        } else if (fSub.includes('hyd')) {
+          fDesk = 'Hydraulic';
+        } else if (fSub.includes('pneum') || fSub.includes('air') || fSub.includes('brake')) {
+          fDesk = 'Pneumatic';
+        } else if (fSub.includes('elec')) {
+          fDesk = 'Electrical';
+        }
+
+        if (fDesk !== deskKey) return false;
+
+        // If exact target
+        if (target && f.id === target.id) return true;
+
+        // If repetitive flag is set on both
+        if (target && target.isRepetitive && f.isRepetitive) return true;
+
+        // If matching part number
+        if (target && target.partNo && target.partNo !== '-' && f.partNo && f.partNo !== '-' &&
+            target.partNo.trim().toLowerCase() === f.partNo.trim().toLowerCase()) {
+          return true;
+        }
+
+        // Check keyword overlap in failure nature / description
+        if (target) {
+          const tWords = ((target.natureOfFailure || '') + ' ' + (target.description || '')).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 3);
+          const fWords = ((f.natureOfFailure || '') + ' ' + (f.description || '')).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 3);
+          const common = tWords.filter(w => fWords.includes(w) && !['with', 'from', 'done', 'checked', 'replaced', 'working', 'failure', 'during'].includes(w));
+          if (common.length >= 2) return true;
+        }
+
+        return false;
+      });
+
+      // Highlight the entire cluster
+      let primaryRowEl = null;
+      relatedFails.forEach(rf => {
+        const rEl = document.getElementById(`failureRow-${rf.id}`);
+        if (rEl) {
+          rEl.classList.add('highlight-cluster-row');
+          if (target && rf.id === target.id) {
+            rEl.classList.add('highlight-pulse-row');
+            primaryRowEl = rEl;
+          }
+        }
+      });
+
+      // Fallback if primary row wasn't found by ID
+      if (!primaryRowEl && target) {
         const rows = document.querySelectorAll(`#${targetTab} tbody tr`);
         rows.forEach(r => {
-          if ((target.description && r.innerText.includes(target.description.substring(0, 30))) ||
-              (target.natureOfFailure && r.innerText.includes(target.natureOfFailure.substring(0, 30))) ||
-              (target.dateOfFailure && r.innerText.includes(target.dateOfFailure))) {
-            rowEl = r;
+          if ((target.description && r.innerText.includes(target.description.substring(0, 25))) ||
+              (target.natureOfFailure && r.innerText.includes(target.natureOfFailure.substring(0, 25)))) {
+            r.classList.add('highlight-pulse-row');
+            primaryRowEl = r;
           }
         });
       }
 
-      if (rowEl) {
-        // Clear any existing pulse highlights
-        document.querySelectorAll('.highlight-pulse-row').forEach(el => el.classList.remove('highlight-pulse-row'));
+      // Display the cluster banner
+      const bannerEl = document.getElementById(`clusterBanner-${deskKey}`);
+      if (bannerEl) {
+        bannerEl.style.display = 'flex';
+        bannerEl.className = 'cluster-banner active';
+        bannerEl.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">🔁</span>
+            <div>
+              <div style="font-weight: 700; color: #ffd700; font-size: 13px;">
+                Repetitive Defect Cluster: ${relatedFails.length} recurring cases highlighted for ${machineNo} (${deskKey})
+              </div>
+              <div style="font-size: 11px; color: #cbd8cf;">
+                All repetitive incidents sharing this failure pattern or component are highlighted below
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-dim" onclick="window.TM_APP.clearClusterHighlight('${deskKey}')" style="padding: 4px 10px; font-size: 11px; margin-left: auto;">
+            ✕ Clear Highlights
+          </button>
+        `;
+      }
 
-        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        rowEl.classList.add('highlight-pulse-row');
-
-        showToast(`Navigated & highlighted recurring defect on ${machineNo || 'selected machine'} (${deskKey})`);
+      if (primaryRowEl) {
+        primaryRowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast(`Highlighted complete list of ${relatedFails.length} repetitive failures on ${machineNo} (${deskKey})`);
       } else {
-        showToast(`Selected ${machineNo || 'machine'} ${deskKey} failure desk`);
+        showToast(`Selected ${machineNo} ${deskKey} failure desk (${relatedFails.length} cluster cases)`);
       }
     }, 180);
+  }
+
+  // Clear repetitive cluster highlights
+  function clearClusterHighlight(deskKey) {
+    document.querySelectorAll('.highlight-pulse-row, .highlight-cluster-row').forEach(el => {
+      el.classList.remove('highlight-pulse-row', 'highlight-cluster-row');
+    });
+    if (deskKey) {
+      const b = document.getElementById(`clusterBanner-${deskKey}`);
+      if (b) b.style.display = 'none';
+    } else {
+      document.querySelectorAll('.cluster-banner').forEach(b => b.style.display = 'none');
+    }
   }
 
   // Render Failure History Table
@@ -865,7 +1012,7 @@
           </div>
         </td>
         <td>
-          <div style="font-size: 12px; color: #cbd8cf;">${f.breakdownTime || f.dateOfFailure || 'N/A'}</div>
+          <div style="font-size: 12px; color: #cbd8cf;">${escapeHtml(formatDateDisplay(f.breakdownTime || f.dateOfFailure))}</div>
           <div style="font-size: 11px; color: #7f9587;">${f.section || 'Block Section'}</div>
         </td>
         <td>
@@ -934,10 +1081,10 @@
               <div class="detail-field-group">
                 <div class="detail-field-label">⏱️ Restoration Lifecycle Timestamps</div>
                 <div class="detail-field-content" style="font-family: var(--font-mono); font-size: 11.5px;">
-                  Breakdown: ${f.breakdownTime || 'N/A'}<br>
-                  Site Arrival / Troubleshooting: ${f.arrivalTroubleshootTime || 'N/A'}<br>
-                  Spares Arranged: ${f.sparesArrangedTime || 'N/A'}<br>
-                  Machine Fit Certified: ${f.fitTime || 'Awaiting final clearance'}<br>
+                  Breakdown: ${formatDateDisplay(f.breakdownTime)}<br>
+                  Site Arrival / Troubleshooting: ${formatDateDisplay(f.arrivalTroubleshootTime)}<br>
+                  Spares Arranged: ${formatDateDisplay(f.sparesArrangedTime)}<br>
+                  Machine Fit Certified: ${formatDateDisplay(f.fitTime)}<br>
                   Certified By: <strong style="color: var(--gold-400);">${f.certifiedBy || 'SSE/TM'}</strong>
                 </div>
               </div>
@@ -999,11 +1146,16 @@
     renderCategoryComparisonChart(list);
     renderDivisionDistributionChart(list);
     renderSubsystemChart(list);
-    renderMTTRTimelineChart(list);
     renderBadActorsRadarChart(list);
+
+    const activeM = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL')
+      ? AppState.selectedMachine
+      : getActiveMachineId();
+    renderMachineRadarChart(activeM);
+    renderMachinePercentDonutChart(activeM);
   }
 
-  // Chart 1: Category / Fleet Breakdown Comparison
+  // Chart 1: Category / Fleet Breakdown Comparison (Total Incidents)
   function renderCategoryComparisonChart(list) {
     const ctx = document.getElementById('chartCategoryComparison');
     if (!ctx) return;
@@ -1015,11 +1167,6 @@
     // Tally by category
     const catLabels = MACHINE_CATEGORIES;
     const counts = catLabels.map(c => AppState.failures.filter(f => f.category === c).length);
-    const downHours = catLabels.map(c => {
-      return AppState.failures
-        .filter(f => f.category === c)
-        .reduce((sum, f) => sum + (parseFloat(f.downHours) || 0), 0);
-    });
 
     AppState.charts.category = new Chart(ctx, {
       type: 'bar',
@@ -1032,20 +1179,7 @@
             backgroundColor: 'rgba(147, 197, 114, 0.75)',
             borderColor: '#93c572',
             borderWidth: 1.5,
-            borderRadius: 6,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Total Down Hours',
-            data: downHours,
-            type: 'line',
-            borderColor: '#d4af37',
-            backgroundColor: 'rgba(212, 175, 55, 0.2)',
-            pointBackgroundColor: '#ffd700',
-            pointRadius: 4,
-            borderWidth: 2.5,
-            tension: 0.3,
-            yAxisID: 'y1'
+            borderRadius: 6
           }
         ]
       },
@@ -1071,18 +1205,9 @@
             grid: { color: 'rgba(255, 255, 255, 0.05)' }
           },
           y: {
-            type: 'linear',
-            position: 'left',
             ticks: { color: '#93c572', stepSize: 1 },
-            title: { display: true, text: 'Failures', color: '#93c572' },
+            title: { display: true, text: 'Total Incidents', color: '#93c572' },
             grid: { color: 'rgba(255, 255, 255, 0.06)' }
-          },
-          y1: {
-            type: 'linear',
-            position: 'right',
-            ticks: { color: '#d4af37' },
-            title: { display: true, text: 'Hours Down', color: '#d4af37' },
-            grid: { drawOnChartArea: false }
           }
         }
       }
@@ -1219,36 +1344,98 @@
     });
   }
 
-  // Chart 3: Downtime & MTTR Lifecycle Trend
-  function renderMTTRTimelineChart(list) {
-    const ctx = document.getElementById('chartMTTRTimeline');
+  // Helper: Subsystem percentage contribution calculation for a machine
+  function getMachineSubsystemStats(mId) {
+    const isCrane = isCraneMachine(mId) || isCraneMachine(getMachineInfo(mId)?.category);
+    const subLabels = ['Engine', isCrane ? 'Crane' : 'Tamping Unit', 'Mechanical', 'Hydraulic', 'Pneumatic', 'Electrical'];
+    
+    let fails = (mId && mId !== 'ALL') 
+      ? AppState.failures.filter(f => f.machineNo === mId)
+      : AppState.failures;
+
+    const counts = {
+      'Engine': 0,
+      'Tamping/Crane': 0,
+      'Mechanical': 0,
+      'Hydraulic': 0,
+      'Pneumatic': 0,
+      'Electrical': 0
+    };
+
+    fails.forEach(f => {
+      const s = (f.subsystem || '').toLowerCase();
+      const sheet = (f.sheet || '').toLowerCase();
+      if (s.includes('engine') || s.includes('diesel') || s.includes('fuel')) {
+        counts['Engine']++;
+      } else if (s.includes('tamp') || s.includes('crane') || s.includes('cutter') || sheet.includes('crane')) {
+        counts['Tamping/Crane']++;
+      } else if (s.includes('mech') || sheet.includes('mech')) {
+        counts['Mechanical']++;
+      } else if (s.includes('hyd')) {
+        counts['Hydraulic']++;
+      } else if (s.includes('pneu') || s.includes('air') || s.includes('brake')) {
+        counts['Pneumatic']++;
+      } else if (s.includes('elec')) {
+        counts['Electrical']++;
+      } else {
+        counts['Mechanical']++;
+      }
+    });
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const percentages = subLabels.map((lbl, idx) => {
+      const key = idx === 1 ? 'Tamping/Crane' : lbl;
+      const count = counts[key] || 0;
+      return total > 0 ? parseFloat(((count / total) * 100).toFixed(1)) : 0;
+    });
+
+    const countsList = subLabels.map((lbl, idx) => {
+      const key = idx === 1 ? 'Tamping/Crane' : lbl;
+      return counts[key] || 0;
+    });
+
+    return {
+      subLabels,
+      percentages,
+      countsList,
+      total,
+      isCrane
+    };
+  }
+
+  // Machine-Wise Radar Graph: Multi-axis percentage contribution
+  function renderMachineRadarChart(mId) {
+    const ctx = document.getElementById('chartMachineRadar');
     if (!ctx) return;
 
-    if (AppState.charts.mttr) {
-      AppState.charts.mttr.destroy();
+    if (AppState.charts.machineRadar) {
+      AppState.charts.machineRadar.destroy();
     }
 
-    // Get last 10 incidents sorted chronologically
-    const sorted = [...list].sort((a, b) => new Date(a.breakdownTime) - new Date(b.breakdownTime)).slice(-10);
+    const stats = getMachineSubsystemStats(mId);
 
-    const labels = sorted.map(f => `${f.machineNo} (${f.breakdownTime.substring(5, 10)})`);
-    const hours = sorted.map(f => parseFloat(f.downHours) || 0);
+    // Update title
+    const titleEl = document.getElementById('titleMachineRadar');
+    if (titleEl) {
+      titleEl.textContent = `${mId || 'Fleet'} Subsystem Failure Contribution Radar`;
+    }
 
-    AppState.charts.mttr = new Chart(ctx, {
-      type: 'line',
+    AppState.charts.machineRadar = new Chart(ctx, {
+      type: 'radar',
       data: {
-        labels: labels,
+        labels: stats.subLabels,
         datasets: [{
-          label: 'Down Duration (Hours)',
-          data: hours,
+          label: `${mId || 'Selected Machine'} (% Contribution)`,
+          data: stats.percentages,
+          backgroundColor: 'rgba(147, 197, 114, 0.28)',
           borderColor: '#93c572',
-          backgroundColor: 'rgba(147, 197, 114, 0.15)',
-          fill: true,
-          pointBackgroundColor: '#d4af37',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#ffd700',
           pointBorderColor: '#fff',
-          pointRadius: 5,
-          tension: 0.35,
-          borderWidth: 2.5
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#ffd700',
+          pointRadius: 4.5,
+          pointHoverRadius: 6
         }]
       },
       options: {
@@ -1256,29 +1443,156 @@
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            labels: { color: '#c9dbd0', font: { size: 11 } }
+            labels: { color: '#c9dbd0', font: { size: 11, family: 'Segoe UI' } }
           },
           tooltip: {
             backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#d4af37',
-            bodyColor: '#fff',
+            titleColor: '#ffd700',
+            bodyColor: '#e5ece6',
             borderColor: '#93c572',
-            borderWidth: 1
+            borderWidth: 1,
+            callbacks: {
+              label: function (context) {
+                const idx = context.dataIndex;
+                const pct = stats.percentages[idx];
+                const cnt = stats.countsList[idx];
+                return ` ${context.label}: ${pct}% (${cnt} cases)`;
+              }
+            }
           }
         },
         scales: {
-          x: {
-            ticks: { color: '#8da494', font: { size: 10 } },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-          },
-          y: {
-            ticks: { color: '#8da494' },
-            title: { display: true, text: 'Restoration Hours', color: '#93c572' },
-            grid: { color: 'rgba(255, 255, 255, 0.06)' }
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
+            grid: { color: 'rgba(255, 255, 255, 0.08)' },
+            pointLabels: {
+              color: '#cbd8cf',
+              font: { size: 11, weight: '600', family: 'Segoe UI' }
+            },
+            ticks: {
+              color: '#8da494',
+              backdropColor: 'transparent',
+              stepSize: 20
+            },
+            suggestedMin: 0,
+            suggestedMax: Math.max(...stats.percentages, 50) + 10
           }
         }
       }
     });
+  }
+
+  // Machine-Wise Percentage Contribution Breakdown (Donut Chart)
+  function renderMachinePercentDonutChart(mId) {
+    const ctx = document.getElementById('chartMachinePercentDonut');
+    if (!ctx) return;
+
+    if (AppState.charts.machinePercentDonut) {
+      AppState.charts.machinePercentDonut.destroy();
+    }
+
+    const stats = getMachineSubsystemStats(mId);
+
+    // Update title
+    const titleEl = document.getElementById('titleMachinePercent');
+    if (titleEl) {
+      titleEl.textContent = `${mId || 'Selected Machine'} Category Failure Contribution (%)`;
+    }
+
+    const colors = [
+      '#ffa726', // Engine (Orange)
+      '#ffd700', // Tamping/Crane (Gold)
+      '#93c572', // Mechanical (Pista Green)
+      '#42a5f5', // Hydraulic (Blue)
+      '#26a69a', // Pneumatic (Teal)
+      '#ab47bc'  // Electrical (Purple)
+    ];
+
+    AppState.charts.machinePercentDonut = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: stats.subLabels.map((lbl, i) => `${lbl} (${stats.percentages[i]}%)`),
+        datasets: [{
+          data: stats.percentages,
+          backgroundColor: colors,
+          borderColor: '#121c16',
+          borderWidth: 2,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: '#cbd8cf',
+              font: { size: 11, family: 'Segoe UI' },
+              boxWidth: 12
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(12, 20, 16, 0.95)',
+            titleColor: '#ffd700',
+            bodyColor: '#e5ece6',
+            borderColor: '#93c572',
+            borderWidth: 1,
+            callbacks: {
+              label: function (context) {
+                const idx = context.dataIndex;
+                const pct = stats.percentages[idx];
+                const cnt = stats.countsList[idx];
+                return ` ${stats.subLabels[idx]}: ${pct}% (${cnt} of ${stats.total} incidents)`;
+              }
+            }
+          }
+        },
+        cutout: '58%'
+      }
+    });
+
+    // Update label & dropdown
+    const labelEl = document.getElementById('radarMachineLabel');
+    if (labelEl) labelEl.textContent = mId || 'Entire Fleet';
+
+    updateRadarMachineSelect(mId);
+  }
+
+  function updateRadarMachineSelect(selectedId) {
+    const selectEl = document.getElementById('radarMachineSelect');
+    if (!selectEl) return;
+    
+    // Check if options already populated
+    if (selectEl.options.length === 0) {
+      const allMachines = [];
+      Object.keys(FLEET_DIRECTORY).forEach(cat => {
+        FLEET_DIRECTORY[cat].forEach(m => {
+          if (!allMachines.some(x => x.id === m.id)) {
+            allMachines.push(m);
+          }
+        });
+      });
+
+      allMachines.sort((a, b) => a.id.localeCompare(b.id));
+
+      allMachines.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.id} (${m.division} • ${m.category || (m.model ? m.model.substring(0, 18) : '')})`;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    if (selectedId) {
+      selectEl.value = selectedId;
+    }
+  }
+
+  function onRadarMachineChange(mId) {
+    if (!mId) return;
+    renderMachineRadarChart(mId);
+    renderMachinePercentDonutChart(mId);
   }
 
   // Chart 4: Bad Actors & Recurrent Defect Radar / Bar
@@ -2430,12 +2744,12 @@
 
     const ageSubEl = document.getElementById('hrmDynamicAgeSubtext');
     if (ageSubEl) {
-      const displayDate = hrm.commissioningDate || hrm.commissioningRaw || 'N/A';
-      ageSubEl.textContent = `Commissioned on ${displayDate} • Dynamic age as on today (${new Date().toLocaleDateString('en-GB')})`;
+      const displayDate = formatDateDisplay(hrm.commissioningDate || hrm.commissioningRaw);
+      ageSubEl.textContent = `Commissioned on ${displayDate} • Dynamic age as on today (${formatDateDisplay(new Date().toISOString().substring(0, 10))})`;
     }
 
     const commDateEl = document.getElementById('hrmDisplayCommDate');
-    if (commDateEl) commDateEl.textContent = hrm.commissioningDate || hrm.commissioningRaw || 'Not Set';
+    if (commDateEl) commDateEl.textContent = formatDateDisplay(hrm.commissioningDate || hrm.commissioningRaw);
 
     const inputComm = document.getElementById('inputCommDateCalendar');
     if (inputComm) inputComm.value = hrm.commissioningDate || '';
@@ -2463,7 +2777,7 @@
         <td>
           <span class="hrm-date-badge">
             <span>📅</span>
-            <span>${escapeHtml(it.presentDate || 'NA')}</span>
+            <span>${escapeHtml(formatDateDisplay(it.presentDate))}</span>
           </span>
         </td>
         <td>
@@ -2512,7 +2826,7 @@
             <div class="hrm-history-item-card">
               <div>
                 <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 3px;">
-                  <span style="color: var(--pista-300); font-weight: 700; font-size: 11.5px;">📅 ${escapeHtml(rec.displayDate || rec.isoDate || rec.rawDate || 'N/A')}</span>
+                  <span style="color: var(--pista-300); font-weight: 700; font-size: 11.5px;">📅 ${escapeHtml(formatDateDisplay(rec.displayDate || rec.isoDate || rec.rawDate))}</span>
                   ${rec.engineHours ? `<span style="color: var(--gold-300); font-family: var(--font-mono); font-size: 11.5px;">⏱️ ${escapeHtml(rec.engineHours)} EH</span>` : ''}
                 </div>
                 <div style="font-size: 11px; color: #c4d7c8;">${escapeHtml((rec.remarks && rec.remarks.trim() !== '' && rec.remarks.trim() !== '-' && !/^(no|nil)$/i.test(rec.remarks.trim())) ? rec.remarks.trim() : 'NA')}</div>
@@ -2602,8 +2916,8 @@
     } else {
       subFailures.forEach((f, idx) => {
         const rowSl = f.slNo || (idx + 1);
-        const failDate = f.dateOfFailure || f.breakdownTime || 'N/A';
-        const fitDate = f.dateOfRectification || f.fitTime || '⚠️ Active';
+        const failDate = formatDateDisplay(f.dateOfFailure || f.breakdownTime);
+        const fitDate = (f.status === 'UNDER REPAIR' || (!f.dateOfRectification && !f.fitTime)) ? '⚠️ Active' : formatDateDisplay(f.dateOfRectification || f.fitTime);
         const dDays = (f.totalDownDays !== undefined && f.totalDownDays !== null) ? f.totalDownDays : ((parseFloat(f.downHours) || 0) / 24).toFixed(1);
         const inBlock = f.whetherInBlock || 'NO';
         const isBlockYes = (inBlock.toUpperCase() === 'YES' || inBlock.toUpperCase().includes('BLOCK'));
@@ -2648,7 +2962,7 @@
             </td>
             <td style="text-align: center;">
               ${f.isRepetitive ? `
-                <span class="badge-rep-yes" onclick="window.TM_APP.highlightFailure('${f.id}', '${effectiveSubsystem}')" title="Click to highlight recurring defect #${rowSl}">
+                <span class="badge-rep-yes" onclick="window.TM_APP.highlightFailure('${f.id}', '${effectiveSubsystem}', '${mId}')" title="Click to highlight recurring defect #${rowSl} cluster">
                   🔁 YES
                 </span>
               ` : `
@@ -2694,6 +3008,8 @@
             <div class="kpi-value-row"><span class="kpi-value alert-text">${repeatCount}</span><span class="kpi-unit">cases</span></div>
           </div>
         </div>
+
+        <div id="clusterBanner-${effectiveSubsystem}" class="cluster-banner" style="display: none; margin-bottom: 14px;"></div>
 
         <div class="table-responsive">
           <table class="custom-table" style="font-size: 12px;">
@@ -3095,8 +3411,8 @@
               <div class="search-field-block">
                 <div class="search-field-label">Failure &amp; Rectification Dates</div>
                 <div class="search-field-value">
-                  <div>📅 Breakdown: <strong>${highlightKeyword(r.dateOfFailure, query)}</strong></div>
-                  <div>📅 Restored: <strong style="color: ${r.dateOfRectification.includes('Active') ? '#e4c153' : '#93c572'};">${highlightKeyword(r.dateOfRectification, query)}</strong></div>
+                  <div>📅 Breakdown: <strong>${highlightKeyword(formatDateDisplay(r.dateOfFailure), query)}</strong></div>
+                  <div>📅 Restored: <strong style="color: ${String(r.dateOfRectification).includes('Active') ? '#e4c153' : '#93c572'};">${highlightKeyword(formatDateDisplay(r.dateOfRectification), query)}</strong></div>
                 </div>
               </div>
 
@@ -3157,7 +3473,7 @@
               <div class="search-field-block">
                 <div class="search-field-label">Present Attention Date</div>
                 <div class="search-field-value">
-                  <span class="hrm-date-badge"><span>📅</span><span>${highlightKeyword(r.presentDate, query)}</span></span>
+                  <span class="hrm-date-badge"><span>📅</span><span>${highlightKeyword(formatDateDisplay(r.presentDate), query)}</span></span>
                 </div>
               </div>
 
@@ -4292,6 +4608,12 @@
     renderSubsystemDesk,
     updateTabBadges,
     highlightFailure,
+    clearClusterHighlight,
+    // Machine Radar & Percentage Breakdown Methods
+    onRadarMachineChange,
+    renderMachineRadarChart,
+    renderMachinePercentDonutChart,
+    formatDateDisplay,
     // Universal Search Methods
     performUniversalSearch,
     renderUniversalSearchResults,

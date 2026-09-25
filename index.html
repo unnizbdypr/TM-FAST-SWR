@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TM-FAILURE ANALYSIS AND SURVEILLANCE TOOL | Indian Railways</title>
+  <title>TM-FAST (Failure Analysis &amp; Surveillance Tool) | Indian Railways</title>
   
   <!-- Favicon / Brand SVG -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚆</text></svg>">
@@ -59,12 +59,13 @@
             </div>
             <div class="brand-titles">
               <h1>
-                <span class="pista-highlight">TM-FAILURE</span> 
-                <span>ANALYSIS &amp;</span>
-                <span class="gold-highlight">SURVEILLANCE TOOL</span>
+                <span class="pista-highlight">TM-FAST</span> 
+                <span class="gold-highlight" style="font-size: 0.62em; font-weight: 600; display: block; margin-top: 4px; letter-spacing: 0.5px;">
+                  (Failure Analysis &amp; Surveillance Tool)
+                </span>
               </h1>
               <div class="brand-subtitle">
-                <span>TRACK MACHINE FLEET RELIABILITY, MTTR &amp; REPETITIVE DEFECT MONITORING</span>
+                <span>TRACK MACHINE FLEET RELIABILITY &amp; REPETITIVE DEFECT SURVEILLANCE</span>
                 <div class="live-indicator">
                   <span class="pulse-dot"></span>
                   <span>SURVEILLANCE ACTIVE</span>
@@ -79,9 +80,6 @@
             </button>
             <button class="btn btn-primary-gold" onclick="window.TM_APP.openLogModal()">
               <span>➕ Log / Update Failure</span>
-            </button>
-            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openUploadModalForSelectedMachine()">
-              <span>📤 Upload Machine Excel</span>
             </button>
             <button class="btn btn-dim" onclick="window.TM_APP.downloadExcelTemplate()">
               <span>📥 Sample Template</span>
@@ -120,26 +118,13 @@
 
           <div class="kpi-chip gold-edge">
             <div class="kpi-title">
-              <span>Fleet MTTR (Mean Repair Time)</span>
-              <span>⏱️</span>
+              <span>Fleet Fit Rate</span>
+              <span>🛡️</span>
             </div>
             <div class="kpi-value-row">
-              <span class="kpi-value gold-text" id="kpiMTTR">0.0</span>
-              <span class="kpi-unit">hours</span>
+              <span class="kpi-value gold-text" id="kpiFleetFitRate">100%</span>
             </div>
-            <div class="kpi-subtext">Breakdown to fitment average</div>
-          </div>
-
-          <div class="kpi-chip">
-            <div class="kpi-title">
-              <span>Cumulative Down Duration</span>
-              <span>⏳</span>
-            </div>
-            <div class="kpi-value-row">
-              <span class="kpi-value" id="kpiTotalDowntime">0.0</span>
-              <span class="kpi-unit">hrs</span>
-            </div>
-            <div class="kpi-subtext">Lost block / working hours</div>
+            <div class="kpi-subtext">Fit for block traffic operations</div>
           </div>
 
           <div class="kpi-chip alert-edge">
@@ -181,7 +166,7 @@
         </div>
       </div>
       <div class="category-scroll-container" id="categoryScrollContainer">
-        <!-- Dynamically injected category pills (CSM, DTE, DUO, UNI/PCTM, MPT, BCM, SBCM/FRM, BRM, SQRS, T28, DGS, UTV, RMBV, MDU) -->
+        <!-- Dynamically injected category pills (CSM, DTE, DUO, UNI/PCTM, MPT, BCM, SBCM/FRM, BRM, SQRS, T28, DGS, UTV, RBMV, MDU) -->
       </div>
     </nav>
 
@@ -199,11 +184,8 @@
           </select>
           <span class="select-arrow">▼</span>
         </div>
-        <button class="btn btn-primary-gold" id="btnCreateNewMachine" onclick="window.TM_APP.openUploadModalForCategory(window.TM_APP.getAppState().selectedCategory)" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Register a new machine under this category and upload its Excel workbook">
-          <span>➕ Create / Upload New Machine</span>
-        </button>
-        <button class="btn btn-secondary-pista" id="btnUploadForMachine" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload or update Excel history sheet for selected machine">
-          <span>📤 Upload Excel for Machine</span>
+        <button class="btn btn-primary-gold" id="btnSingleUploadExcel" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 18px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Track Machine Excel workbook (.xlsx/.xls)">
+          <span>📤 Upload Machine Excel Sheet</span>
         </button>
         <button class="btn btn-danger-dim" id="btnDeleteSelectedMachine" onclick="window.TM_APP.openDeleteMachineModal()" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Delete this machine and all its uploaded failure and HRM data if uploaded wrongly">
           <span>🗑️ Delete Machine Data</span>
@@ -253,9 +235,6 @@
             <div class="alert-subtitle">The following machines have shown 2 or more recurring subsystem/component failures within 60 days</div>
           </div>
         </div>
-        <button class="btn btn-dim" style="font-size: 11px; padding: 4px 10px;" onclick="window.TM_APP.openUploadModalForSelectedMachine()">
-          Upload Extra History
-        </button>
       </div>
       <div class="repeat-pills-container" id="repeatPillsContainer">
         <!-- Repeat incident pills injected by app.js -->
@@ -372,7 +351,7 @@
               <span class="badge badge-fit" id="hrmStatusBadge">✅ FIT</span>
             </div>
             <h2 class="hrm-machine-name" id="hrmMachineName">UNIMAT-8269</h2>
-            <div class="hrm-machine-model" id="hrmMachineModel">Unimat 08-475 4S Points &amp; Crossing Tamper (Depot: YPR / BYPL)</div>
+            <div class="hrm-machine-model" id="hrmMachineModel">Unimat 08-475 3S Points &amp; Crossing Tamper (Depot: YPR / BYPL)</div>
           </div>
 
           <!-- Dynamic Age Display Box -->
@@ -479,17 +458,67 @@
     </div>
 
     <!-- ====================================================================
-         FLEET & CATEGORY ANALYTICS
+         FLEET & CATEGORY ANALYTICS & MACHINE-WISE RADAR
          ==================================================================== -->
     <div class="tab-pane" id="fleet-view">
       
-      <!-- 3-Column Grid: Category Comparison, Division Distribution & Subsystem Breakdown -->
-      <div class="grid-3col">
+      <!-- Machine-Wise Subsystem Failure Contribution & Radar Analytics -->
+      <div class="machine-analytics-header-card" style="background: rgba(18, 28, 22, 0.95); border: 1.5px solid var(--border-gold); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 26px;">🎯</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--gold-400); letter-spacing: 0.5px; text-transform: uppercase;">
+              Machine-Wise Failure Percentage Contribution &amp; Radar Analysis
+            </div>
+            <div style="font-size: 11.5px; color: #cbd8cf;">
+              Active Machine: <strong id="radarMachineLabel" style="color: #fff;">UNIMAT-8269</strong> • Subsystem Failure Contribution &amp; Multi-Axis Distribution
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label for="radarMachineSelect" style="font-size: 11.5px; color: var(--pista-300); font-weight: 600; margin-bottom: 0;">Analyze Machine:</label>
+          <select id="radarMachineSelect" class="form-control" style="font-size: 12px; padding: 6px 12px; width: auto; background: var(--bg-surface); color: #fff; border-color: var(--border-dim);" onchange="window.TM_APP.onRadarMachineChange(this.value)">
+            <!-- Dynamically populated with monitored fleet machines -->
+          </select>
+        </div>
+      </div>
+
+      <!-- 2-Column Grid: Machine Subsystem Contribution Radar & Category % Donut -->
+      <div class="grid-2col" style="margin-bottom: 22px;">
         <div class="panel-card gold-focus">
           <div class="panel-header">
             <div class="panel-title gold-accent">
               <span class="indicator-circle"></span>
-              <span>Category Incidents &amp; Down Hours</span>
+              <span id="titleMachineRadar">Machine Subsystem Failure Contribution Radar</span>
+            </div>
+            <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">Multi-Axis Spider Radar</span>
+          </div>
+          <div class="chart-container-box" style="height: 320px;">
+            <canvas id="chartMachineRadar"></canvas>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="indicator-circle"></span>
+              <span id="titleMachinePercent">Failure Category Percentage Contribution (%)</span>
+            </div>
+            <span style="font-size: 11px; color: var(--pista-300);">% Contribution Breakdown</span>
+          </div>
+          <div class="chart-container-box" style="height: 320px;">
+            <canvas id="chartMachinePercentDonut"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fleet Overview Grid: Category Incidents, Division Distribution, Subsystem Pareto & Bad Actors -->
+      <div class="grid-3col" style="margin-bottom: 22px;">
+        <div class="panel-card gold-focus">
+          <div class="panel-header">
+            <div class="panel-title gold-accent">
+              <span class="indicator-circle"></span>
+              <span>Category Total Incidents</span>
             </div>
             <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">14 Categories</span>
           </div>
@@ -517,7 +546,7 @@
               <span class="indicator-circle"></span>
               <span>Subsystem Defect Pareto</span>
             </div>
-            <span style="font-size: 11px; color: var(--pista-300);">Pareto</span>
+            <span style="font-size: 11px; color: var(--pista-300);">Fleet-Wide Pareto</span>
           </div>
           <div class="chart-container-box">
             <canvas id="chartSubsystemDistribution"></canvas>
@@ -525,82 +554,17 @@
         </div>
       </div>
 
-      <!-- 2-Column Grid: High-Risk Recurrent Machines & Trend -->
-      <div class="grid-2col">
-        <div class="panel-card">
-          <div class="panel-header">
-            <div class="panel-title">
-              <span class="indicator-circle"></span>
-              <span>Frequent Failure Machines ("Bad Actors" Ranking)</span>
-            </div>
-            <span style="font-size: 11px; color: #ff8a65;">Recurrent Breakdown Frequency</span>
-          </div>
-          <div class="chart-container-box">
-            <canvas id="chartBadActors"></canvas>
-          </div>
-        </div>
-
-        <div class="panel-card gold-focus">
-          <div class="panel-header">
-            <div class="panel-title gold-accent">
-              <span class="indicator-circle"></span>
-              <span>Restoration Time (MTTR) Trend Over Recent Incidents</span>
-            </div>
-            <span style="font-size: 11px; color: var(--gold-400);">Hours to Restore Fit</span>
-          </div>
-          <div class="chart-container-box">
-            <canvas id="chartMTTRTimeline"></canvas>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ====================================================================
-         TAB 2: RESTORATION & MTTR LIFECYCLE
-         ==================================================================== -->
-    <div class="tab-pane" id="mttr-view">
-      
-      <div class="panel-card" style="margin-bottom: 24px;">
+      <!-- Frequent Failure Machines Ranking -->
+      <div class="panel-card" style="margin-bottom: 20px;">
         <div class="panel-header">
           <div class="panel-title">
             <span class="indicator-circle"></span>
-            <span>Track Machine Failure Restoration Lifecycle (Site Protocol)</span>
+            <span>Frequent Failure Machines ("Bad Actors" Ranking)</span>
           </div>
-          <span style="font-size: 11px; color: var(--pista-300); font-family: var(--font-mono);">From Breakdown to Fit Certificate</span>
+          <span style="font-size: 11px; color: #ff8a65;">Recurrent Breakdown Frequency</span>
         </div>
-
-        <div class="mttr-lifecycle-flow">
-          <div class="mttr-step-box">
-            <div class="step-label">Phase 1: Incident Reporting</div>
-            <div class="step-duration">0.5 hrs</div>
-            <div class="step-subtext">Driver/Operator reports failure &amp; clears block</div>
-          </div>
-
-          <div class="mttr-step-box">
-            <div class="step-label">Phase 2: Diagnosis &amp; Arrival</div>
-            <div class="step-duration">0.8 hrs</div>
-            <div class="step-subtext">Maintenance team arrives with diagnostic tools</div>
-          </div>
-
-          <div class="mttr-step-box">
-            <div class="step-label">Phase 3: Sourcing Spares</div>
-            <div class="step-duration">1.5 hrs</div>
-            <div class="step-subtext">Depot spares &amp; consumables mobilization</div>
-          </div>
-
-          <div class="mttr-step-box">
-            <div class="step-label">Phase 4: Site Repair &amp; Fitment</div>
-            <div class="step-duration">2.2 hrs</div>
-            <div class="step-subtext">Replacement, trial run &amp; fit certificate</div>
-          </div>
-        </div>
-
-        <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 8px; border: 1px solid var(--border-dim); font-size: 12.5px; line-height: 1.6;">
-          <strong style="color: var(--gold-400);">Key Surveillance Rule:</strong> When any machine exceeds 
-          <span style="color: #ff8a65; font-weight: bold;">6.0 hours</span> of cumulative site restoration time or suffers from a 
-          <span style="color: #ff8a65; font-weight: bold;">repetitive failure</span> within 60 days, an in-depth Root Cause Analysis (RCA) 
-          and written corrective action protocol must be submitted to Dy.CE/TM and AXEN/TM before clearing the machine for revenue line service.
+        <div class="chart-container-box" style="height: 260px;">
+          <canvas id="chartBadActors"></canvas>
         </div>
       </div>
 
