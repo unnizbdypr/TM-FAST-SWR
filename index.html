@@ -54,6 +54,9 @@
           </div>
 
           <div class="header-action-group">
+            <button class="btn btn-secondary-pista" onclick="window.TM_APP.focusUniversalSearch()" title="Open Universal Fleet Search">
+              <span>🔍 Universal Search</span>
+            </button>
             <button class="btn btn-primary-gold" onclick="window.TM_APP.openLogModal()">
               <span>➕ Log / Update Failure</span>
             </button>
@@ -176,8 +179,14 @@
           </select>
           <span class="select-arrow">▼</span>
         </div>
-        <button class="btn btn-secondary-pista" id="btnUploadForMachine" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+        <button class="btn btn-primary-gold" id="btnCreateNewMachine" onclick="window.TM_APP.openUploadModalForCategory(window.TM_APP.getAppState().selectedCategory)" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Register a new machine under this category and upload its Excel workbook">
+          <span>➕ Create / Upload New Machine</span>
+        </button>
+        <button class="btn btn-secondary-pista" id="btnUploadForMachine" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload or update Excel history sheet for selected machine">
           <span>📤 Upload Excel for Machine</span>
+        </button>
+        <button class="btn btn-danger-dim" id="btnDeleteSelectedMachine" onclick="window.TM_APP.openDeleteMachineModal()" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Delete this machine and all its uploaded failure and HRM data if uploaded wrongly">
+          <span>🗑️ Delete Machine Data</span>
         </button>
       </div>
 
@@ -234,24 +243,225 @@
     </div>
 
     <!-- ====================================================================
-         VIEW TABS
+         UNIVERSAL FLEET SEARCH SECTION (All machines, 6 failure desks, HRM)
          ==================================================================== -->
-    <div class="view-tabs-bar">
-      <button class="tab-btn active" data-tab="fleet-view">
-        <span>📊 Fleet &amp; Category Analytics</span>
+    <div class="universal-search-card" id="universalSearchCard">
+      <div class="universal-search-header">
+        <div class="universal-search-title">
+          <span class="universal-search-glass-icon">🔍</span>
+          <span class="gold-accent">Universal Fleet Search</span>
+          <span class="universal-search-subtitle">• Live search across all 19 machines, 6 subsystem failure desks &amp; History Register (HRM)</span>
+        </div>
+        <div class="universal-search-actions">
+          <span class="universal-search-badge" id="universalSearchCountBadge" style="display: none;">0 matches</span>
+          <button class="btn btn-dim" id="btnExportSearchResults" style="display: none; padding: 4px 10px; font-size: 11px;" onclick="window.TM_APP.exportSearchResultsToExcel()" title="Export search references to Excel">
+            <span>📊 Export Matches (.xlsx)</span>
+          </button>
+          <button class="btn btn-dim" id="btnClearUniversalSearch" style="display: none; padding: 4px 10px; font-size: 11px;" onclick="window.TM_APP.clearUniversalSearch()" title="Clear search results">
+            <span>✕ Clear Search</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="universal-search-input-wrapper">
+        <span class="universal-search-icon-inside">🔍</span>
+        <input type="text" id="universalSearchInput" class="universal-search-input" placeholder="Type any keyword to search references in detail (e.g. Cardan, Alternator, Squeeze cylinder, Filter, Valve, Leak, POH, IOH, Bush, Bearing, 09D)..." autocomplete="off" spellcheck="false">
+        <button class="universal-search-clear-btn" id="btnInputClear" onclick="window.TM_APP.clearUniversalSearch()" title="Clear search">✕</button>
+      </div>
+
+      <!-- Quick Suggestion Tags -->
+      <div class="universal-search-tags">
+        <span class="search-tag-label">Common Search Queries:</span>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Cardan shaft')">🔩 Cardan shaft</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Alternator')">⚡ Alternator</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Cylinder')">💧 Cylinder</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Valve')">💨 Valve</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Filter')">⚙️ Filter</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Bearing')">🔩 Bearing</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('POH')">📜 POH</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('IOH')">📜 IOH</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Leak')">⚠️ Leak</button>
+        <button class="search-tag" onclick="window.TM_APP.setUniversalSearchQuery('Battery')">🔋 Battery</button>
+      </div>
+
+      <!-- Live Search Results Container -->
+      <div id="universalSearchResultsArea" class="universal-results-container" style="display: none;">
+        <!-- Dynamically injected results -->
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         PRIMARY NAVIGATION TABS: 6 MACHINE-SPECIFIC TABS + FLEET OVERVIEW
+         1. 📜 History Register Module (HRM)
+         2. ⚙️ Engine Failures
+         3. 🔨 Tamping Unit Failures
+         4. 🔩 Mechanical Failures
+         5. 💧 Hydraulic Failures
+         6. 💨 Pneumatic Failures
+         7. ⚡ Electrical Failures
+         + 📊 Fleet Analytics & Radar
+         ==================================================================== -->
+    <div class="view-tabs-bar" id="mainTabsBar">
+      <button class="tab-btn active" data-tab="hrm-view" id="tabBtnHrm">
+        <span>📜 1. History Register Module (HRM)</span>
       </button>
-      <button class="tab-btn" data-tab="mttr-view">
-        <span>⏱️ Restoration &amp; MTTR Lifecycle</span>
+      <button class="tab-btn" data-tab="engine-view" id="tabBtnEngine">
+        <span>⚙️ 2. Engine Failures</span>
+        <span class="tab-count-badge" id="badgeEngineFailures">0</span>
       </button>
-      <button class="tab-btn" data-tab="history-view">
-        <span>📋 Detailed Failure History &amp; Corrective Log</span>
+      <button class="tab-btn" data-tab="tamping-view" id="tabBtnTamping">
+        <span id="tabBtnTampingText">🔨 3. Tamping Unit Failures</span>
+        <span class="tab-count-badge" id="badgeTampingFailures">0</span>
+      </button>
+      <button class="tab-btn" data-tab="mechanical-view" id="tabBtnMechanical">
+        <span>🔩 4. Mechanical Failures</span>
+        <span class="tab-count-badge" id="badgeMechanicalFailures">0</span>
+      </button>
+      <button class="tab-btn" data-tab="hydraulic-view" id="tabBtnHydraulic">
+        <span>💧 5. Hydraulic Failures</span>
+        <span class="tab-count-badge" id="badgeHydraulicFailures">0</span>
+      </button>
+      <button class="tab-btn" data-tab="pneumatic-view" id="tabBtnPneumatic">
+        <span>💨 6. Pneumatic Failures</span>
+        <span class="tab-count-badge" id="badgePneumaticFailures">0</span>
+      </button>
+      <button class="tab-btn" data-tab="electrical-view" id="tabBtnElectrical">
+        <span>⚡ 7. Electrical Failures</span>
+        <span class="tab-count-badge" id="badgeElectricalFailures">0</span>
+      </button>
+      <button class="tab-btn tab-btn-dim" data-tab="fleet-view" id="tabBtnFleet" style="margin-left: auto;">
+        <span>📊 Fleet Analytics &amp; Radar</span>
+      </button>
+      <button class="tab-btn tab-btn-dim" data-tab="history-view" id="tabBtnAllFailures">
+        <span>📋 All Machine Incidents</span>
       </button>
     </div>
 
     <!-- ====================================================================
-         TAB 1: FLEET & CATEGORY ANALYTICS
+         TAB 1: HISTORY REGISTER MODULE (HRM)
          ==================================================================== -->
-    <div class="tab-pane active" id="fleet-view">
+    <div class="tab-pane active" id="hrm-view">
+      
+      <!-- HRM Header Card: Machine info, Commissioning Date, Dynamic Age in Years, Months, Days -->
+      <div class="hrm-header-card">
+        <div class="hrm-header-main">
+          <div class="hrm-machine-title-box">
+            <div class="hrm-badge-row">
+              <span class="badge badge-subsystem" id="hrmMachineCat">UNI/PCTM</span>
+              <span class="badge" id="hrmDivisionBadge" style="background: rgba(37,99,235,0.2); color:#60a5fa; border:1px solid rgba(37,99,235,0.4);">🔵 SBC</span>
+              <span class="badge badge-fit" id="hrmStatusBadge">✅ FIT</span>
+            </div>
+            <h2 class="hrm-machine-name" id="hrmMachineName">UNIMAT-8269</h2>
+            <div class="hrm-machine-model" id="hrmMachineModel">Unimat 08-475 4S Points &amp; Crossing Tamper (Depot: YPR / BYPL)</div>
+          </div>
+
+          <!-- Dynamic Age Display Box -->
+          <div class="hrm-age-box">
+            <div class="hrm-age-label">
+              <span class="pulse-indicator"></span>
+              <span>DYNAMIC AGE (AS ON PRESENT DATE)</span>
+            </div>
+            <div class="hrm-age-value" id="hrmDynamicAgeValue">-- Years, -- Months, -- Days</div>
+            <div class="hrm-age-subtext" id="hrmDynamicAgeSubtext">Calculated dynamically each day from commissioning date</div>
+          </div>
+        </div>
+
+        <!-- Commissioning Date Bar with Calendar Selection & Quick Action Bar -->
+        <div class="hrm-comm-bar">
+          <div class="hrm-comm-item">
+            <span class="hrm-comm-label">📅 DATE OF COMMISSIONING:</span>
+            <span class="hrm-comm-date" id="hrmDisplayCommDate">--</span>
+            <button class="btn btn-dim" id="btnEditCommDate" onclick="window.TM_APP.toggleCommDateEditor()" style="padding: 4px 10px; font-size: 11px;">
+              ✏️ Edit Date (Calendar)
+            </button>
+            <div id="commDateEditorBox" style="display: none; align-items: center; gap: 8px;">
+              <input type="date" id="inputCommDateCalendar" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px;">
+              <button class="btn btn-primary-gold" onclick="window.TM_APP.saveCommissioningDate()" style="padding: 4px 12px; font-size: 11px;">💾 Save</button>
+              <button class="btn btn-dim" onclick="window.TM_APP.toggleCommDateEditor(false)" style="padding: 4px 8px; font-size: 11px;">✕</button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openAddHrmEntryModal()" style="font-size: 12px; padding: 6px 14px;">
+              ➕ Add / Update Entry
+            </button>
+            <button class="btn btn-dim" onclick="window.TM_APP.exportCurrentHrm()" style="font-size: 12px; padding: 6px 12px;">
+              📥 Export HRM
+            </button>
+            <button class="btn btn-dim" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
+              🔄 Reset to Workbook
+            </button>
+            <button class="btn btn-danger-dim" onclick="window.TM_APP.openDeleteMachineModal()" style="font-size: 12px; padding: 6px 12px;" title="Delete this machine entirely if uploaded wrongly">
+              🗑️ Delete Machine
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 16 History Register Items Table -->
+      <div class="panel-card" style="margin-top: 18px;">
+        <div class="panel-header">
+          <div class="panel-title gold-accent">
+            <span class="indicator-circle"></span>
+            <span>History Register Module (16 IR Standard Items)</span>
+          </div>
+          <span style="font-size: 11.5px; color: var(--pista-300); font-family: var(--font-mono);">
+            Zero Data Mismatch • Authentic SWR Records
+          </span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table hrm-table">
+            <thead>
+              <tr>
+                <th style="width: 48px;">#</th>
+                <th style="width: 270px;">Parameter / Item Description</th>
+                <th style="width: 160px;">Present Date</th>
+                <th style="width: 140px;">Present Engine Hours</th>
+                <th>Technical Remarks / Details</th>
+                <th style="width: 150px;">History Log</th>
+                <th style="width: 170px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="hrmTableBody">
+              <!-- Dynamically populated 16 items -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         SUBSYSTEM FAILURE PANES (TABS 2 TO 7)
+         ==================================================================== -->
+    <div class="tab-pane" id="engine-view">
+      <div id="subsystemDesk-engine"></div>
+    </div>
+
+    <div class="tab-pane" id="tamping-view">
+      <div id="subsystemDesk-tamping"></div>
+    </div>
+
+    <div class="tab-pane" id="mechanical-view">
+      <div id="subsystemDesk-mechanical"></div>
+    </div>
+
+    <div class="tab-pane" id="hydraulic-view">
+      <div id="subsystemDesk-hydraulic"></div>
+    </div>
+
+    <div class="tab-pane" id="pneumatic-view">
+      <div id="subsystemDesk-pneumatic"></div>
+    </div>
+
+    <div class="tab-pane" id="electrical-view">
+      <div id="subsystemDesk-electrical"></div>
+    </div>
+
+    <!-- ====================================================================
+         FLEET & CATEGORY ANALYTICS
+         ==================================================================== -->
+    <div class="tab-pane" id="fleet-view">
       
       <!-- 3-Column Grid: Category Comparison, Division Distribution & Subsystem Breakdown -->
       <div class="grid-3col">
@@ -580,92 +790,91 @@
 
           <div class="form-grid-2">
             <div class="form-group">
-              <label class="form-label" for="formDivision">Division</label>
-              <select id="formDivision" class="form-control">
-                <option value="SBC">SBC - Bengaluru</option>
-                <option value="UBL">UBL - Hubballi</option>
-                <option value="MYS">MYS - Mysuru</option>
-                <option value="HQ">Headquarters (UBL)</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="formSection">Section / Station Location</label>
-              <input type="text" id="formSection" class="form-control" placeholder="e.g. BYPL - KJM, Point 14B">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label class="form-label" for="formBreakdownTime">Breakdown Date &amp; Time *</label>
-              <input type="datetime-local" id="formBreakdownTime" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label gold-label" for="formFitTime">Machine Fit Date &amp; Time</label>
-              <input type="datetime-local" id="formFitTime" class="form-control" placeholder="Leave blank if currently under repair">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label class="form-label" for="formSubsystem">Subsystem *</label>
+              <label class="form-label" for="formSubsystem">Subsystem Desk *</label>
               <select id="formSubsystem" class="form-control" required>
-                <option value="Hydraulic">Hydraulic Circuit / Valves / Cylinders</option>
-                <option value="Electrical">Electrical / Contactors / Batteries</option>
-                <option value="Tamping Unit">Tamping Unit / Tools / Vibration</option>
-                <option value="Engine">Diesel Engine / Radiator / Fuel</option>
-                <option value="Pneumatic">Pneumatics / Brakes / Air Compressor</option>
-                <option value="Electronics & Measuring">Electronics / Sensors / Transducers</option>
-                <option value="Drive & Transmission">Drive / ZF Gearbox / Axle</option>
-                <option value="Mechanical/Structure">Mechanical / Structure / Cutter</option>
+                <option value="Engine">⚙️ Engine Failures</option>
+                <option value="Tamping Unit" id="optFormTampingUnit">🔨 Tamping Unit Failures</option>
+                <option value="Crane" id="optFormCrane">🏗️ Crane Failures</option>
+                <option value="Mechanical">🔩 Mechanical Failures</option>
+                <option value="Hydraulic">💧 Hydraulic Failures</option>
+                <option value="Pneumatic">💨 Pneumatic Failures</option>
+                <option value="Electrical">⚡ Electrical Failures</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="formComponent">Specific Component / Assembly</label>
-              <input type="text" id="formComponent" class="form-control" placeholder="e.g. Tilt Cylinder No. 2, ZF Charging Pump">
+              <label class="form-label" for="formSlNo">Sl. No. in Register</label>
+              <input type="text" id="formSlNo" class="form-control" placeholder="e.g. 1, 2, 3">
             </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="formNature">Nature / Symptoms of Failure *</label>
-            <input type="text" id="formNature" class="form-control" placeholder="e.g. Sudden hydraulic pressure drop during crossover tamping" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label gold-label" for="formRootCause">Identified Root Cause (RCA)</label>
-            <textarea id="formRootCause" class="form-control" placeholder="e.g. Viton O-ring seal extruded due to high pulsation pressure and thermal wear..."></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="formStepsTaken">Steps Taken for Troubleshooting &amp; Restoration</label>
-            <textarea id="formStepsTaken" class="form-control" placeholder="e.g. Isolated hydraulic circuit, drained manifold, polished rod, replaced Viton seals, pressure tested at 140 bar..."></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label gold-label" for="formCorrective">🛡️ Corrective Measures Taken to Avoid Recurrence in Future</label>
-            <textarea id="formCorrective" class="form-control" placeholder="e.g. Mandated 150-hr NAS oil testing; replaced return line filter; advised operator on gradual load application..."></textarea>
           </div>
 
           <div class="form-grid-2">
             <div class="form-group">
-              <label class="form-label" for="formSpares">Spares / Consumables Used</label>
-              <input type="text" id="formSpares" class="form-control" placeholder="e.g. Plasser Viton Kit #4301.12, 40L Shell Tellus 68">
+              <label class="form-label gold-label" for="formBreakdownDate">📅 Date of Failure (Calendar) *</label>
+              <input type="date" id="formBreakdownDate" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label gold-label" for="formFitDate">📅 Date of Rectification (Calendar)</label>
+              <input type="date" id="formFitDate" class="form-control" placeholder="Leave blank if currently under repair">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label gold-label" for="formTotalDownDays">⏱️ Total Down Days *</label>
+              <input type="number" step="0.1" min="0" id="formTotalDownDays" class="form-control" placeholder="e.g. 1, 2, 0.5" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="formWhetherInBlock">Whether Occurred During Block *</label>
+              <select id="formWhetherInBlock" class="form-control" required>
+                <option value="YES">YES (Under Traffic Block)</option>
+                <option value="NO">NO (Siding / Depot)</option>
+                <option value="Machine Movement">Machine Movement</option>
+                <option value="Pre-Block / Post-Block">Pre-Block / Post-Block</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label gold-label" for="formNature">Detailed Description of the Failure *</label>
+            <textarea id="formNature" class="form-control" placeholder="e.g. Engine shut down during movement from AMC to CTA due to NRV fuel line blockage..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="formStepsTaken">Action Taken &amp; Spares Consumed *</label>
+            <textarea id="formStepsTaken" class="form-control" placeholder="e.g. Made ready by dismantling and cleaning of NRV, replaced self starter..." required></textarea>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="formPartNo">Part No. of Spares Consumed</label>
+              <input type="text" id="formPartNo" class="form-control" placeholder="e.g. 09D090, 147901, 25322363 or -">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="formIsRepetitive">Is it a Repetitive Failure? *</label>
+              <select id="formIsRepetitive" class="form-control">
+                <option value="NO">NO (Single Defect)</option>
+                <option value="YES">🔁 YES (Recurring / Repetitive Defect)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="formRemarks">Remarks (e.g. Reference Sl. No &amp; Date / Notes)</label>
+              <input type="text" id="formRemarks" class="form-control" placeholder="e.g. yes, sl no:3, dt:29-06-25 or All tests passed">
             </div>
 
             <div class="form-group">
               <label class="form-label" for="formStatus">Operational Status *</label>
               <select id="formStatus" class="form-control" required>
-                <option value="UNDER REPAIR">⚠️ UNDER REPAIR (Active Breakdown)</option>
                 <option value="FIT">✅ FIT (Restored &amp; Ready)</option>
+                <option value="UNDER REPAIR">⚠️ UNDER REPAIR (Active Breakdown)</option>
               </select>
             </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="formCertifiedBy">Fit Certificate Issued By / SSE In-Charge</label>
-            <input type="text" id="formCertifiedBy" class="form-control" placeholder="e.g. SSE/TM/BYPL - R. K. Sharma">
           </div>
         </div>
 
@@ -674,6 +883,106 @@
           <button type="submit" class="btn btn-primary-gold">💾 Save Failure Record</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 3: ADD / UPDATE HISTORY REGISTER MODULE (HRM) ENTRY
+       ==================================================================== -->
+  <div class="modal-overlay" id="hrmEntryModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📜 Update / Add Entry to History Register Module</span>
+        </div>
+        <button class="modal-close-btn" onclick="window.TM_APP.closeModal('hrmEntryModal')">&times;</button>
+      </div>
+
+      <form id="hrmEntryForm" onsubmit="window.TM_APP.handleHrmEntrySubmit(event)">
+        <input type="hidden" id="hrmModalMachineId" value="">
+        <input type="hidden" id="hrmModalRecordId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="hrmModalItemSelect">Select History Register Item (1 to 16) *</label>
+            <select id="hrmModalItemSelect" class="form-control" required>
+              <!-- Populated dynamically with the 16 items -->
+            </select>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label gold-label" for="hrmModalDateInput">📅 Date of Event / Replacement * (Calendar)</label>
+              <input type="date" id="hrmModalDateInput" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="hrmModalEhInput">⏱️ Engine Hours</label>
+              <input type="text" id="hrmModalEhInput" class="form-control" placeholder="e.g. 20278 or E1: 3400 E2: 2100">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="hrmModalRemarksInput">Technical Details / Remarks / Location / Spares Used</label>
+            <textarea id="hrmModalRemarksInput" class="form-control" placeholder="e.g. Cummins NTA 855 L, Plasser Overhauled Tamping Bank fitted at ASK under POH..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-dim" onclick="window.TM_APP.closeModal('hrmEntryModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary-gold">💾 Save Record to HRM</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL 4: DELETE MACHINE FLEET DATA (UPLOADED WRONGLY)
+       ==================================================================== -->
+  <div class="modal-overlay" id="deleteMachineModal">
+    <div class="modal-card" style="max-width: 520px; border-color: rgba(239, 83, 80, 0.45); box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 25px rgba(239, 83, 80, 0.35);">
+      <div class="modal-header" style="border-bottom-color: rgba(239, 83, 80, 0.25);">
+        <div class="modal-title" style="color: #f87171; display: flex; align-items: center; gap: 8px;">
+          <span>🗑️</span>
+          <span>Delete Machine Fleet Data</span>
+        </div>
+        <button class="modal-close-btn" onclick="window.TM_APP.closeModal('deleteMachineModal')">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background: rgba(239, 83, 80, 0.12); border: 1px solid rgba(239, 83, 80, 0.4); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+          <div style="font-weight: 700; color: #ff8a80; font-size: 13.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span>
+            <span>Permanently Delete Machine from Fleet</span>
+          </div>
+          <div style="font-size: 12px; color: #cbd8cf; line-height: 1.5;">
+            Use this action if a machine was uploaded wrongly, has incorrect historical sheets, or does not belong to your operational fleet.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 11.5px; color: #9cb2a3; font-weight: 600; display: block; margin-bottom: 6px;">
+            Select Machine to Delete:
+          </label>
+          <select id="deleteTargetMachineSelect" class="form-control" style="font-size: 13px; padding: 8px 12px;" onchange="window.TM_APP.updateDeleteMachineDetails(this.value)">
+            <!-- Populated dynamically with fleet machines -->
+          </select>
+        </div>
+
+        <div id="deleteMachineSummaryBox" style="background: rgba(18, 28, 22, 0.9); border: 1px solid var(--border-dim); border-radius: 8px; padding: 14px 16px; font-size: 12px; line-height: 1.6; color: #e5ece6; margin-bottom: 14px;">
+          <!-- Machine deletion impact summary injected dynamically -->
+        </div>
+
+        <div style="font-size: 11px; color: #ffab91;">
+          <em>Note: This will completely purge the machine from categories, selectors, HRM registers, and all 6 failure tabs.</em>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="border-top-color: rgba(239, 83, 80, 0.25);">
+        <button class="btn btn-dim" onclick="window.TM_APP.closeModal('deleteMachineModal')">Cancel</button>
+        <button class="btn btn-danger-dim" id="btnConfirmDeleteMachine" onclick="window.TM_APP.confirmDeleteMachine()" style="background: rgba(239, 83, 80, 0.25); border-color: #ef5350; color: #fff; font-weight: 700; padding: 8px 20px;">
+          🗑️ Permanently Delete Machine
+        </button>
+      </div>
     </div>
   </div>
 
