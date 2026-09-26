@@ -1,7 +1,7 @@
 /**
- * TM-FAST (Failure Analysis & Surveillance Tool)
+ * TM-FAST (SWR)
  * High-performance Track Machine Surveillance, Fleet Reliability & Repetitive Defect Analytics
- * Indian Railways / SWR Specialized Track Machine Maintenance Module
+ * South Western Railway / Indian Railways Specialized Track Machine Module
  */
 
 (function () {
@@ -53,6 +53,440 @@
       return `${dd}.${mm}.${yyyy}`;
     }
     return s;
+  }
+
+  // ==========================================================================
+  // AUTHENTICATION & ROLE-BASED ACCESS CONTROL (SWR TM-FAST)
+  // ==========================================================================
+  const AUTH_STORAGE_KEY = 'TM_FAST_USERS_V3';
+  const SESSION_STORAGE_KEY = 'TM_FAST_SESSION_V3';
+
+  const DEFAULT_USERS = {
+    'admin1@zbdypr': {
+      userId: 'admin1@zbdypr',
+      password: 'admin1abcd',
+      name: 'USER 1 (Admin)',
+      role: 'ADMIN'
+    },
+    'admin2@zbdypr': {
+      userId: 'admin2@zbdypr',
+      password: 'admin2pqrs',
+      name: 'USER 2 (Admin)',
+      role: 'ADMIN'
+    },
+    'axentm@zbdypr': {
+      userId: 'axentm@zbdypr',
+      password: 'axentm1',
+      name: 'USER 3 (AXEN/TM)',
+      role: 'VIEWER'
+    },
+    'cetm@hqubl': {
+      userId: 'cetm@hqubl',
+      password: 'cetmswr',
+      name: 'USER 4 (CE/TM)',
+      role: 'VIEWER'
+    }
+  };
+
+  // User ID alias mapper for resilient login
+  function resolveUserId(input) {
+    if (!input) return '';
+    const clean = input.trim().toLowerCase().replace(/[\s\-_]/g, '');
+    if (clean === 'admin1' || clean === 'user1' || clean === 'admin1@zbdypr' || clean.startsWith('admin1@')) {
+      return 'admin1@zbdypr';
+    }
+    if (clean === 'admin2' || clean === 'user2' || clean === 'admin2@zbdypr' || clean.startsWith('admin2@')) {
+      return 'admin2@zbdypr';
+    }
+    if (clean === 'axentm' || clean === 'axen' || clean === 'user3' || clean === 'axentm@zbdypr' || clean.startsWith('axentm@')) {
+      return 'axentm@zbdypr';
+    }
+    if (clean === 'cetm' || clean === 'ce' || clean === 'user4' || clean === 'cetm@hqubl' || clean.startsWith('cetm@')) {
+      return 'cetm@hqubl';
+    }
+    return input.trim().toLowerCase();
+  }
+
+  let AppUsers = JSON.parse(JSON.stringify(DEFAULT_USERS));
+  let CurrentUser = null;
+
+  function loadAuthUsers() {
+    try {
+      // Clean legacy cache from previous test iterations
+      localStorage.removeItem('TM_FAST_USERS_V2');
+      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        Object.keys(DEFAULT_USERS).forEach(uid => {
+          if (!parsed[uid] || parsed[uid].password === 'newpass2026' || parsed[uid].password === 'axen2026') {
+            parsed[uid] = JSON.parse(JSON.stringify(DEFAULT_USERS[uid]));
+          }
+        });
+        AppUsers = parsed;
+      } else {
+        AppUsers = JSON.parse(JSON.stringify(DEFAULT_USERS));
+        saveAuthUsers();
+      }
+    } catch (e) {
+      console.warn('Error loading auth users:', e);
+      AppUsers = JSON.parse(JSON.stringify(DEFAULT_USERS));
+    }
+  }
+
+  function saveAuthUsers() {
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(AppUsers));
+    } catch (e) {
+      console.error('Error saving auth users to localStorage:', e);
+    }
+    if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured && CloudSync.db) {
+      try {
+        CloudSync.db.ref('tm_auth').set(AppUsers);
+      } catch (err) {
+        console.warn('Error syncing auth to cloud:', err);
+      }
+    }
+  }
+
+  function resetAuthUsersToDefault() {
+    AppUsers = JSON.parse(JSON.stringify(DEFAULT_USERS));
+    saveAuthUsers();
+    showToast('Reset user credentials to official Indian Railways default passwords.');
+    const errBox = document.getElementById('loginErrorMessage');
+    if (errBox) errBox.style.display = 'none';
+  }
+
+  function checkSession() {
+    loadAuthUsers();
+    try {
+      const sess = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (AppUsers[parsed.userId]) {
+          CurrentUser = AppUsers[parsed.userId];
+          applyUserSession(CurrentUser);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Session check error:', e);
+    }
+    showLoginOverlay();
+    return false;
+  }
+
+  function showLoginOverlay() {
+    CurrentUser = null;
+    document.body.classList.remove('role-admin');
+    document.body.classList.remove('role-viewer');
+    const overlay = document.getElementById('loginOverlay');
+    const container = document.getElementById('appContainer');
+    const chip = document.getElementById('userSessionChip');
+    if (overlay) overlay.classList.add('active');
+    if (container) container.style.display = 'none';
+    if (chip) chip.style.display = 'none';
+    const err = document.getElementById('loginErrorMessage');
+    if (err) err.style.display = 'none';
+    if (typeof switchLoginCardTab === 'function') {
+      switchLoginCardTab('login');
+    }
+  }
+
+  function applyUserSession(user) {
+    CurrentUser = user;
+    const overlay = document.getElementById('loginOverlay');
+    const container = document.getElementById('appContainer');
+    const chip = document.getElementById('userSessionChip');
+    const userDisplay = document.getElementById('loggedInUserDisplay');
+    const roleDisplay = document.getElementById('loggedInRoleDisplay');
+
+    if (overlay) overlay.classList.remove('active');
+    if (container) container.style.display = 'block';
+    if (chip) chip.style.display = 'inline-flex';
+
+    if (userDisplay) userDisplay.textContent = user.userId;
+    if (roleDisplay) {
+      roleDisplay.textContent = user.role;
+      roleDisplay.className = 'role-badge ' + (user.role === 'ADMIN' ? 'admin' : 'viewer');
+    }
+
+    if (user.role === 'ADMIN') {
+      document.body.classList.add('role-admin');
+      document.body.classList.remove('role-viewer');
+    } else {
+      document.body.classList.add('role-viewer');
+      document.body.classList.remove('role-admin');
+    }
+
+    try {
+      const sessData = JSON.stringify({ userId: user.userId, role: user.role, loggedInAt: Date.now() });
+      sessionStorage.setItem(SESSION_STORAGE_KEY, sessData);
+      localStorage.setItem(SESSION_STORAGE_KEY, sessData);
+    } catch (e) {}
+
+    renderAll();
+  }
+
+  function handleLogin() {
+    loadAuthUsers();
+    const idInput = document.getElementById('loginUserId');
+    const passInput = document.getElementById('loginPassword');
+    const errBox = document.getElementById('loginErrorMessage');
+    if (!idInput || !passInput) return;
+
+    const rawId = idInput.value.trim();
+    const uId = resolveUserId(rawId);
+    const pass = passInput.value.trim();
+
+    if (!rawId || !pass) {
+      if (errBox) {
+        errBox.textContent = 'Please enter both User ID and Password.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    const account = AppUsers[uId] || DEFAULT_USERS[uId];
+    if (account && (account.password === pass || account.password.toLowerCase() === pass.toLowerCase())) {
+      if (errBox) errBox.style.display = 'none';
+      passInput.value = '';
+      applyUserSession(account);
+      showToast(`Welcome, ${account.name}! Logged in as ${account.role}.`);
+    } else {
+      if (errBox) {
+        errBox.textContent = `Invalid credentials for "${rawId}". Expected official password or click a quick-select chip above.`;
+        errBox.style.display = 'block';
+      }
+    }
+  }
+
+  function logout() {
+    if (confirm('Are you sure you want to log out of TM-FAST?')) {
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (e) {}
+      showLoginOverlay();
+      showToast('Logged out successfully.');
+    }
+  }
+
+  function openChangePasswordModal() {
+    if (!CurrentUser) return;
+    const userDisplay = document.getElementById('changePassUserDisplay');
+    if (userDisplay) userDisplay.textContent = `${CurrentUser.userId} (${CurrentUser.name})`;
+    const currInput = document.getElementById('currentPasswordInput');
+    const newInput = document.getElementById('newPasswordInput');
+    const confInput = document.getElementById('confirmNewPasswordInput');
+    const err = document.getElementById('changePassError');
+    if (currInput) currInput.value = '';
+    if (newInput) newInput.value = '';
+    if (confInput) confInput.value = '';
+    if (err) err.style.display = 'none';
+    openModal('changePasswordModal');
+  }
+
+  function handleChangePassword() {
+    if (!CurrentUser) return;
+    const currInput = document.getElementById('currentPasswordInput');
+    const newInput = document.getElementById('newPasswordInput');
+    const confInput = document.getElementById('confirmNewPasswordInput');
+    const errBox = document.getElementById('changePassError');
+
+    const curr = currInput ? currInput.value.trim() : '';
+    const newP = newInput ? newInput.value.trim() : '';
+    const conf = confInput ? confInput.value.trim() : '';
+
+    if (curr !== CurrentUser.password) {
+      if (errBox) {
+        errBox.textContent = 'Current password does not match.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!newP || newP.length < 4) {
+      if (errBox) {
+        errBox.textContent = 'New password must be at least 4 characters long.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (newP !== conf) {
+      if (errBox) {
+        errBox.textContent = 'New password and confirmation do not match.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    // Update password
+    AppUsers[CurrentUser.userId].password = newP;
+    CurrentUser.password = newP;
+    saveAuthUsers();
+    closeModal('changePasswordModal');
+    showToast('Password updated successfully!');
+  }
+
+  function switchLoginCardTab(tab) {
+    const loginView = document.getElementById('loginViewContainer');
+    const changePwView = document.getElementById('loginChangePwContainer');
+    const tabLogin = document.getElementById('tabBtnLogin');
+    const tabChangePw = document.getElementById('tabBtnChangePw');
+    const err = document.getElementById('loginErrorMessage');
+    const changeErr = document.getElementById('loginChangeError');
+    const changeSuccess = document.getElementById('loginChangeSuccess');
+    const topTabLabel = document.getElementById('loginTopRightTabLabel');
+
+    if (err) err.style.display = 'none';
+    if (changeErr) changeErr.style.display = 'none';
+    if (changeSuccess) changeSuccess.style.display = 'none';
+
+    if (tab === 'changepw') {
+      if (loginView) loginView.style.display = 'none';
+      if (changePwView) changePwView.style.display = 'block';
+      if (tabLogin) tabLogin.classList.remove('active');
+      if (tabChangePw) tabChangePw.classList.add('active');
+      if (topTabLabel) topTabLabel.textContent = '🔒 Portal Sign In';
+      const typedId = document.getElementById('loginUserId')?.value.trim().toLowerCase();
+      const select = document.getElementById('loginChangeUserSelect');
+      if (select && typedId && AppUsers[typedId]) {
+        select.value = typedId;
+      }
+    } else {
+      if (loginView) loginView.style.display = 'block';
+      if (changePwView) changePwView.style.display = 'none';
+      if (tabLogin) tabLogin.classList.add('active');
+      if (tabChangePw) tabChangePw.classList.remove('active');
+      if (topTabLabel) topTabLabel.textContent = '🔑 Change Password';
+    }
+  }
+
+  function toggleLoginTabShortcut() {
+    const changePwView = document.getElementById('loginChangePwContainer');
+    const isChangePw = changePwView && changePwView.style.display === 'block';
+    switchLoginCardTab(isChangePw ? 'login' : 'changepw');
+  }
+
+  function fillLoginCredentials(userId) {
+    loadAuthUsers();
+    switchLoginCardTab('login');
+    const idInput = document.getElementById('loginUserId');
+    const passInput = document.getElementById('loginPassword');
+    const canonicalId = resolveUserId(userId);
+    if (idInput) idInput.value = canonicalId;
+    if (passInput) {
+      const acc = AppUsers[canonicalId] || DEFAULT_USERS[canonicalId];
+      if (acc && acc.password) {
+        passInput.value = acc.password;
+      }
+      passInput.focus();
+    }
+    const errBox = document.getElementById('loginErrorMessage');
+    if (errBox) errBox.style.display = 'none';
+    showToast(`Loaded ${canonicalId} credentials.`);
+  }
+
+  function toggleLoginPasswordVisibility() {
+    const passInput = document.getElementById('loginPassword');
+    const toggleIcon = document.getElementById('togglePasswordIcon');
+    if (!passInput) return;
+    if (passInput.type === 'password') {
+      passInput.type = 'text';
+      if (toggleIcon) toggleIcon.textContent = '🙈';
+    } else {
+      passInput.type = 'password';
+      if (toggleIcon) toggleIcon.textContent = '👁️';
+    }
+  }
+
+  function handleLoginChangePassword() {
+    loadAuthUsers();
+    const userSelect = document.getElementById('loginChangeUserSelect');
+    const currInput = document.getElementById('loginChangeCurrentPassword');
+    const newInput = document.getElementById('loginChangeNewPassword');
+    const confInput = document.getElementById('loginChangeConfirmPassword');
+    const errBox = document.getElementById('loginChangeError');
+    const successBox = document.getElementById('loginChangeSuccess');
+
+    if (errBox) errBox.style.display = 'none';
+    if (successBox) successBox.style.display = 'none';
+
+    const uid = userSelect ? userSelect.value : '';
+    const curr = currInput ? currInput.value.trim() : '';
+    const newP = newInput ? newInput.value.trim() : '';
+    const conf = confInput ? confInput.value.trim() : '';
+
+    if (!uid || !AppUsers[uid]) {
+      if (errBox) {
+        errBox.textContent = 'Please select a valid user account.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!curr) {
+      if (errBox) {
+        errBox.textContent = 'Please enter your current password.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (curr !== AppUsers[uid].password) {
+      if (errBox) {
+        errBox.textContent = 'Current password does not match for this account.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!newP || newP.length < 4) {
+      if (errBox) {
+        errBox.textContent = 'New password must be at least 4 characters long.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (newP !== conf) {
+      if (errBox) {
+        errBox.textContent = 'New password and confirmation do not match.';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    // Update password
+    AppUsers[uid].password = newP;
+    if (CurrentUser && CurrentUser.userId === uid) {
+      CurrentUser.password = newP;
+    }
+    saveAuthUsers();
+
+    if (currInput) currInput.value = '';
+    if (newInput) newInput.value = '';
+    if (confInput) confInput.value = '';
+
+    if (successBox) {
+      successBox.textContent = `Password updated successfully for ${AppUsers[uid].name}! You can now sign in.`;
+      successBox.style.display = 'block';
+    }
+
+    showToast(`Password updated for ${uid}!`, false);
+
+    setTimeout(() => {
+      switchLoginCardTab('login');
+      const loginIdInput = document.getElementById('loginUserId');
+      const loginPassInput = document.getElementById('loginPassword');
+      if (loginIdInput) loginIdInput.value = uid;
+      if (loginPassInput) loginPassInput.focus();
+    }, 1500);
+  }
+
+  function isUserAdmin() {
+    return CurrentUser && CurrentUser.role === 'ADMIN';
   }
 
   // Default SWR Machine Fleet Mapping (Authentic fleet from SWR divisional folders)
@@ -164,11 +598,17 @@
 
   // Initialization
   function initApp() {
+    loadAuthUsers();
     loadDataset();
     setupCategoryPills();
     updateMachineDropdown();
     setupEventListeners();
     renderAll();
+    // Initialize Central Cloud Database Synchronization (Firebase)
+    if (typeof CloudSync !== 'undefined') {
+      CloudSync.init();
+    }
+    checkSession();
     // Pre-warm SheetJS in background
     if (typeof ensureXLSX === 'function') {
       ensureXLSX().catch(e => console.warn('Pre-warming SheetJS deferred:', e));
@@ -327,12 +767,199 @@
     classifyRepetitiveFailures(AppState.failures);
   }
 
+  // ==========================================================================
+  // CENTRAL CLOUD DATABASE SYNCHRONIZATION ENGINE (Firebase Realtime DB)
+  // ==========================================================================
+  const CloudSync = {
+    isConfigured: false,
+    isConnected: false,
+    db: null,
+    isSyncingFromRemote: false,
+
+    init() {
+      const cfg = (typeof window !== 'undefined') ? window.FIREBASE_CONFIG : null;
+      if (!cfg || !cfg.apiKey || cfg.apiKey.includes('PASTE_') || !cfg.databaseURL || cfg.databaseURL.includes('PASTE_')) {
+        this.updateIndicator('local', 'Cloud: Local Storage');
+        return;
+      }
+
+      if (typeof firebase === 'undefined') {
+        console.warn('Firebase SDK not loaded, running in Local mode.');
+        this.updateIndicator('local', 'Cloud: SDK Offline');
+        return;
+      }
+
+      try {
+        this.updateIndicator('connecting', 'Cloud: Connecting...');
+        if (!firebase.apps.length) {
+          firebase.initializeApp(cfg);
+        }
+        this.db = firebase.database();
+        this.isConfigured = true;
+
+        // Monitor connection status via .info/connected
+        this.db.ref('.info/connected').on('value', snap => {
+          this.isConnected = snap.val() === true;
+          if (this.isConnected) {
+            this.updateIndicator('connected', 'Cloud Sync: Live');
+            console.log('Firebase Cloud Realtime Database connected successfully.');
+          } else {
+            this.updateIndicator('offline', 'Cloud: Reconnecting...');
+          }
+        });
+
+        // Initialize cloud listeners
+        this.setupCloudListeners();
+      } catch (err) {
+        console.error('Firebase initialization error:', err);
+        this.updateIndicator('offline', 'Cloud: Config Error');
+      }
+    },
+
+    updateIndicator(status, text) {
+      const ind = document.getElementById('cloudSyncIndicator');
+      const txt = document.getElementById('cloudStatusText');
+      if (ind) {
+        ind.className = 'cloud-sync-indicator ' + status;
+      }
+      if (txt) {
+        txt.innerText = text;
+      }
+    },
+
+    setupCloudListeners() {
+      if (!this.db) return;
+
+      // 1. Listen for Failures Database
+      this.db.ref('tm_failures').on('value', snapshot => {
+        const val = snapshot.val();
+        if (val) {
+          let remoteList = [];
+          if (Array.isArray(val)) {
+            remoteList = val;
+          } else if (typeof val === 'object') {
+            remoteList = Object.values(val);
+          }
+          if (remoteList.length > 0) {
+            this.isSyncingFromRemote = true;
+            AppState.failures = remoteList;
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.failures));
+            } catch (e) {}
+            classifyRepetitiveFailures(AppState.failures);
+            updateMachineDropdown();
+            renderAll();
+            this.isSyncingFromRemote = false;
+          }
+        } else {
+          // Cloud node is empty, seed initial dataset
+          this.seedInitialData();
+        }
+      });
+
+      // 2. Listen for HRM Database
+      this.db.ref('tm_hrm').on('value', snapshot => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          this.isSyncingFromRemote = true;
+          HRM_DATA = val;
+          try {
+            localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
+          } catch (e) {}
+          renderHrmView();
+          this.isSyncingFromRemote = false;
+        } else if (!val && HRM_DATA && Object.keys(HRM_DATA).length > 0) {
+          this.db.ref('tm_hrm').set(HRM_DATA);
+        }
+      });
+
+      // 3. Listen for Fleet Directory
+      this.db.ref('tm_fleet').on('value', snapshot => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          this.isSyncingFromRemote = true;
+          FLEET_DIRECTORY = val;
+          try {
+            localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
+          } catch (e) {}
+          setupCategoryPills();
+          updateMachineDropdown();
+          this.isSyncingFromRemote = false;
+        } else if (!val && FLEET_DIRECTORY) {
+          this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
+        }
+      });
+
+      // 4. Listen for User Accounts & Password Updates
+      this.db.ref('tm_auth').on('value', snapshot => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          Object.keys(val).forEach(uid => {
+            if (AppUsers[uid]) {
+              AppUsers[uid].password = val[uid].password || AppUsers[uid].password;
+            } else {
+              AppUsers[uid] = val[uid];
+            }
+          });
+          try {
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(AppUsers));
+          } catch (e) {}
+          if (CurrentUser && AppUsers[CurrentUser.userId]) {
+            CurrentUser = AppUsers[CurrentUser.userId];
+          }
+        } else if (!val) {
+          this.db.ref('tm_auth').set(AppUsers);
+        }
+      });
+    },
+
+    seedInitialData() {
+      if (!this.db || !AppState.failures || AppState.failures.length === 0) return;
+      console.log('Seeding initial authentic SWR dataset to Firebase Cloud...');
+      this.db.ref('tm_failures').set(AppState.failures);
+      if (HRM_DATA) this.db.ref('tm_hrm').set(HRM_DATA);
+      if (FLEET_DIRECTORY) this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
+      this.db.ref('tm_auth').set(AppUsers);
+    },
+
+    pushFailures() {
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
+      try {
+        this.db.ref('tm_failures').set(AppState.failures);
+      } catch (e) {
+        console.error('Error syncing failures to cloud:', e);
+      }
+    },
+
+    pushHrm() {
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
+      try {
+        this.db.ref('tm_hrm').set(HRM_DATA);
+      } catch (e) {
+        console.error('Error syncing HRM to cloud:', e);
+      }
+    },
+
+    pushFleet() {
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
+      try {
+        this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
+      } catch (e) {
+        console.error('Error syncing fleet to cloud:', e);
+      }
+    }
+  };
+
   function saveDataset() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.failures));
       localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
     } catch (e) {
       console.error('Error saving data to localStorage:', e);
+    }
+    if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured) {
+      CloudSync.pushFailures();
+      CloudSync.pushFleet();
     }
   }
 
@@ -341,6 +968,9 @@
       localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
     } catch (e) {
       console.error('Error saving HRM data to localStorage:', e);
+    }
+    if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured) {
+      CloudSync.pushHrm();
     }
   }
 
@@ -976,7 +1606,7 @@
             <div style="font-size: 12.5px; color: #cbd8cf; max-width: 480px; margin: 8px auto 14px; line-height: 1.5;">
               Upload the Indian Railways Track Machine failure history register spreadsheet (.xlsx / .xls) for this category to monitor failures, repetitive patterns, and MTTR.
             </div>
-            <button class="btn btn-primary-gold" onclick="window.TM_APP.openUploadModalForCategory('${AppState.selectedCategory}')" style="padding: 8px 18px; font-size: 12.5px;">
+            <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.openUploadModalForCategory('${AppState.selectedCategory}')" style="padding: 8px 18px; font-size: 12.5px;">
               <span>📤 Upload History Sheet for ${AppState.selectedCategory}</span>
             </button>
           `;
@@ -1042,8 +1672,8 @@
           <button class="btn btn-dim" style="padding: 5px 10px; font-size: 11.5px;" onclick="window.TM_APP.toggleDetails('${f.id}')">
             🔍 Details & Corrective
           </button>
-          ${isUnderRepair ? `
-            <button class="btn btn-secondary-pista" style="padding: 5px 10px; font-size: 11.5px; margin-left: 4px;" onclick="window.TM_APP.openMarkFitModal('${f.id}')">
+          ${(isUnderRepair && isUserAdmin()) ? `
+            <button class="btn btn-secondary-pista admin-only" style="padding: 5px 10px; font-size: 11.5px; margin-left: 4px;" onclick="window.TM_APP.openMarkFitModal('${f.id}')">
               ✅ Mark Fit
             </button>
           ` : ''}
@@ -1766,6 +2396,10 @@
 
   // Open Excel Upload Modal for a specific category (e.g. from empty state or pill)
   function openUploadModalForCategory(category) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Uploading requires Admin privileges.', true);
+      return;
+    }
     populateModalCategories();
     const catSelect = document.getElementById('modalTargetCategory');
     const machInput = document.getElementById('modalTargetMachineInput');
@@ -1786,6 +2420,10 @@
 
   // Open Excel Upload Modal pre-configured for the currently selected machine
   function openUploadModalForSelectedMachine() {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Uploading requires Admin privileges.', true);
+      return;
+    }
     populateModalCategories();
     const catSelect = document.getElementById('modalTargetCategory');
     const machInput = document.getElementById('modalTargetMachineInput');
@@ -2317,6 +2955,10 @@
   // Process Excel File Upload
   async function processExcelFile(file) {
     if (!file) return 0;
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Uploading requires Admin privileges.', true);
+      return 0;
+    }
 
     // Reset file input value so re-uploading the same file triggers change
     const fileInput = document.getElementById('excelFileInput');
@@ -2802,6 +3444,7 @@
           `}
         </td>
         <td>
+          ${isUserAdmin() ? `
           <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
             <button class="btn btn-secondary-pista" onclick="window.TM_APP.openAddHrmEntryModal(${idx})" style="padding: 4px 8px; font-size: 11px;" title="Update date and engine hours">
               ➕ Add/Edit
@@ -2810,6 +3453,7 @@
               🗑️ Delete
             </button>
           </div>
+          ` : `<span style="font-size: 11px; color: #799181;">View Only</span>`}
         </td>
       `;
       tbody.appendChild(tr);
@@ -2831,9 +3475,11 @@
                 </div>
                 <div style="font-size: 11px; color: #c4d7c8;">${escapeHtml((rec.remarks && rec.remarks.trim() !== '' && rec.remarks.trim() !== '-' && !/^(no|nil)$/i.test(rec.remarks.trim())) ? rec.remarks.trim() : 'NA')}</div>
               </div>
+              ${isUserAdmin() ? `
               <button class="hrm-btn-delete" onclick="window.TM_APP.deleteHrmRecord('${mId}', ${idx}, '${rec.id}')" title="Delete this entry">
                 🗑️
               </button>
+              ` : ''}
             </div>
           `;
         });
@@ -2843,7 +3489,7 @@
             <div class="hrm-history-drawer">
               <div style="font-size: 12px; font-weight: 700; color: var(--gold-400); margin-bottom: 6px; display: flex; justify-content: space-between;">
                 <span>Detailed Overhaul &amp; Replacement Audit History:</span>
-                <span style="font-size: 11px; color: #8fa696;">Click 🗑️ to delete any individual entry</span>
+                ${isUserAdmin() ? '<span style="font-size: 11px; color: #8fa696;">Click 🗑️ to delete any individual entry</span>' : ''}
               </div>
               <div class="hrm-history-grid">
                 ${recordsHtml}
@@ -2907,7 +3553,7 @@
             <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
             <div style="font-size: 15px; font-weight: 700; color: var(--pista-300);">No ${effectiveSubsystem} Failures Recorded for Machine ${mId}</div>
             <div style="font-size: 12px; margin-top: 4px; color: #cbd8cf;">Subsystem is operating with zero recorded breakdown down days.</div>
-            <button class="btn btn-primary-gold" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="margin-top: 14px; font-size: 11.5px; padding: 6px 14px;">
+            <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="margin-top: 14px; font-size: 11.5px; padding: 6px 14px;">
               ➕ Log First ${effectiveSubsystem} Failure
             </button>
           </td>
@@ -2970,10 +3616,12 @@
               `}
             </td>
             <td style="text-align: center;">
+              ${isUserAdmin() ? `
               <div style="display: flex; gap: 5px; justify-content: center; align-items: center;">
                 <button class="btn btn-dim" onclick="window.TM_APP.openEditFailureModal('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Edit failure record">✏️</button>
                 <button class="hrm-btn-delete" onclick="window.TM_APP.deleteFailureRecord('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Delete failure record">🗑️</button>
               </div>
+              ` : `<span style="font-size: 11px; color: #799181;">View Only</span>`}
             </td>
           </tr>
         `;
@@ -2988,7 +3636,7 @@
             <span>${icon} ${effectiveSubsystem} Failures Desk • Machine ${mId}</span>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="padding: 6px 14px; font-size: 12px;">
+            <button class="btn btn-secondary-pista admin-only" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="padding: 6px 14px; font-size: 12px;">
               ➕ Log ${effectiveSubsystem} Failure
             </button>
           </div>
@@ -3387,9 +4035,11 @@
                 <button class="btn btn-secondary-pista" onclick="window.TM_APP.jumpToSearchResult('${r.machineNo}', '${r.category}', '${r.subsystem}', '${r.id}', '')" style="padding: 4px 12px; font-size: 11.5px;">
                   <span>👉 Jump to Desk</span>
                 </button>
+                ${isUserAdmin() ? `
                 <button class="btn btn-dim" onclick="window.TM_APP.openEditFailureModal('${r.id}')" style="padding: 4px 8px; font-size: 11.5px;" title="Edit failure record">
                   <span>✏️</span>
                 </button>
+                ` : ''}
               </div>
             </div>
 
@@ -3724,6 +4374,10 @@
   }
 
   function saveCommissioningDate() {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Editing commissioning date requires Admin privileges.', true);
+      return;
+    }
     const mId = getActiveMachineId();
     const input = document.getElementById('inputCommDateCalendar');
     if (!input || !input.value) {
@@ -3755,6 +4409,10 @@
   }
 
   function openAddHrmEntryModal(itemIndex = 0) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Adding/editing HRM entries requires Admin privileges.', true);
+      return;
+    }
     const mId = getActiveMachineId();
     const hrm = HRM_DATA[mId];
     if (!hrm) return;
@@ -3797,6 +4455,10 @@
 
   function handleHrmEntrySubmit(event) {
     event.preventDefault();
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Adding/editing HRM entries requires Admin privileges.', true);
+      return;
+    }
     const mId = document.getElementById('hrmModalMachineId').value || getActiveMachineId();
     const itemIndex = parseInt(document.getElementById('hrmModalItemSelect').value, 10);
     const dateVal = document.getElementById('hrmModalDateInput').value;
@@ -3839,6 +4501,10 @@
   }
 
   function deleteHrmRecord(mId, itemIndex, recordId) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Deleting HRM records requires Admin privileges.', true);
+      return;
+    }
     if (!confirm('Are you sure you want to delete this historical record?')) return;
 
     const hrm = HRM_DATA[mId];
@@ -3866,6 +4532,10 @@
   }
 
   function deletePresentHrmEntry(mId, itemIndex) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Deleting HRM entries requires Admin privileges.', true);
+      return;
+    }
     const hrm = HRM_DATA[mId];
     if (!hrm || !hrm.items[itemIndex]) return;
     const it = hrm.items[itemIndex];
@@ -3897,6 +4567,10 @@
   }
 
   function resetMachineHrm() {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Resetting data requires Admin privileges.', true);
+      return;
+    }
     const mId = getActiveMachineId();
     if (!confirm(`Reset History Register Module for machine ${mId} to authentic workbook data? Any custom entries will be reverted.`)) return;
 
@@ -3956,6 +4630,10 @@
   }
 
   function openLogModalForSubsystem(subsystemName) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Logging failures requires Admin privileges.', true);
+      return;
+    }
     openLogModal();
     const mId = getActiveMachineId();
     const isCrane = isCraneMachine(mId) || isCraneMachine(AppState.selectedCategory);
@@ -3983,6 +4661,10 @@
   }
 
   function deleteFailureRecord(id) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Deleting failure records requires Admin privileges.', true);
+      return;
+    }
     const f = AppState.failures.find(x => x.id === id);
     const label = f ? `entry #${f.slNo || ''} (${f.machineNo} • ${f.subsystem})` : 'this failure record';
     if (!confirm(`Are you sure you want to delete ${label}?`)) return;
@@ -3999,6 +4681,10 @@
   // DELETE MACHINE DATA (UPLOADED WRONGLY)
   // ==========================================================================
   function openDeleteMachineModal(targetMachineId) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Deleting machines requires Admin privileges.', true);
+      return;
+    }
     const mId = targetMachineId || (AppState.selectedMachine !== 'ALL' ? AppState.selectedMachine : null);
     const selectEl = document.getElementById('deleteTargetMachineSelect');
     if (!selectEl) return;
@@ -4071,6 +4757,10 @@
   }
 
   function confirmDeleteMachine() {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Deleting machines requires Admin privileges.', true);
+      return;
+    }
     const selectEl = document.getElementById('deleteTargetMachineSelect');
     if (!selectEl) return;
     const mId = selectEl.value;
@@ -4148,6 +4838,10 @@
   }
 
   function openEditFailureModal(id) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Editing failure records requires Admin privileges.', true);
+      return;
+    }
     const f = AppState.failures.find(x => x.id === id);
     if (!f) return;
     openLogModal();
@@ -4351,6 +5045,10 @@
 
   // Open Log / Update Modal
   function openLogModal(presetMachine) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Logging failures requires Admin privileges.', true);
+      return;
+    }
     const modal = document.getElementById('failureEntryModal');
     if (!modal) return;
 
@@ -4411,6 +5109,10 @@
 
   // Open Mark Fit Modal
   function openMarkFitModal(id) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Marking machines fit requires Admin privileges.', true);
+      return;
+    }
     const incident = AppState.failures.find(f => f.id === id);
     if (!incident) return;
 
@@ -4440,6 +5142,10 @@
 
   // Save Failure from Modal Form
   function saveFailureFromForm() {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Saving failures requires Admin privileges.', true);
+      return;
+    }
     const incidentId = document.getElementById('formIncidentId').value;
     const cat = document.getElementById('formCategory').value;
     let mach = document.getElementById('formMachineNo').value;
@@ -4565,6 +5271,21 @@
 
   // Expose API for HTML Inline Handlers and Extensibility
   window.TM_APP = {
+    // Authentication & RBAC Control
+    handleLogin,
+    logout,
+    openChangePasswordModal,
+    handleChangePassword,
+    switchLoginCardTab,
+    toggleLoginTabShortcut,
+    fillLoginCredentials,
+    handleLoginChangePassword,
+    toggleLoginPasswordVisibility,
+    resetAuthUsersToDefault,
+    resolveUserId,
+    isUserAdmin,
+    getCurrentUser: () => CurrentUser,
+    getAppUsers: () => AppUsers,
     initApp,
     selectCategory,
     selectDivision,
@@ -4623,7 +5344,8 @@
     clearUniversalSearch,
     jumpToSearchResult,
     exportSearchResultsToExcel,
-    getUniversalSearchState: () => universalSearchState
+    getUniversalSearchState: () => universalSearchState,
+    getCloudSync: () => CloudSync
   };
 
   // Launch on DOM ready

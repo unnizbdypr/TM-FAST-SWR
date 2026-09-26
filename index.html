@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TM-FAST (Failure Analysis &amp; Surveillance Tool) | Indian Railways</title>
+  <title>TM-FAST (SWR) | Indian Railways</title>
   
   <!-- Favicon / Brand SVG -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚆</text></svg>">
@@ -39,10 +39,182 @@
 </head>
 <body>
 
-  <!-- Ambient Dim Watermark of Unimat Track Machine Repair -->
+  <!-- Ambient Dim Watermark of Machine Under Breakdown (Smooth Zoom In & Out) -->
   <div class="ambient-bg-watermark"></div>
+  <div class="ambient-bg-tint"></div>
 
-  <div class="app-container">
+  <!-- ====================================================================
+       AUTHENTICATION OVERLAY SCREEN (INDIAN RAILWAYS / SWR TM-FAST)
+       ==================================================================== -->
+  <div class="login-overlay active" id="loginOverlay">
+    <!-- Top-Right End Shortcut for Change Password on Opening Page -->
+    <div class="login-top-right-strip">
+      <button type="button" class="login-top-right-tab" id="loginTopRightTabBtn" onclick="window.TM_APP.toggleLoginTabShortcut()" title="Switch between Sign In and Change Password">
+        <span id="loginTopRightTabLabel">🔑 Change Password</span>
+      </button>
+    </div>
+
+    <div class="login-card">
+      <div class="login-brand-header">
+        <div class="login-logo-box">⚙️</div>
+        <h2><span class="gold-text-bold">TM-FAST (SWR)</span></h2>
+        <div class="login-subtext">South Western Railway · Track Machine Surveillance &amp; Failure Analysis</div>
+        <div class="login-lock-badge">🔒 SECURE FLEET PORTAL</div>
+      </div>
+      
+      <!-- Navigation Tabs: Sign In & Change Password -->
+      <div class="login-tab-strip">
+        <button type="button" class="login-tab-btn active" id="tabBtnLogin" onclick="window.TM_APP.switchLoginCardTab('login')">
+          <span>🔒 Portal Sign In</span>
+        </button>
+        <button type="button" class="login-tab-btn" id="tabBtnChangePw" onclick="window.TM_APP.switchLoginCardTab('changepw')">
+          <span>🔑 Change Password</span>
+        </button>
+      </div>
+
+      <!-- VIEW 1: PORTAL SIGN IN -->
+      <div id="loginViewContainer">
+        <!-- Quick Credential Auto-Fill Chips -->
+        <div class="quick-fill-label">
+          <span>Select Account to Sign In</span>
+          <span style="color: #7f9787; font-size: 10px; font-weight: normal;">Click to Quick-Fill</span>
+        </div>
+        <div class="quick-fill-grid">
+          <div class="quick-chip" onclick="window.TM_APP.fillLoginCredentials('admin1@zbdypr')" title="Click to fill USER 1 credentials">
+            <div class="quick-chip-id">admin1@zbdypr</div>
+            <div class="quick-chip-role admin">USER 1 · ADMIN (admin1abcd)</div>
+          </div>
+          <div class="quick-chip" onclick="window.TM_APP.fillLoginCredentials('admin2@zbdypr')" title="Click to fill USER 2 credentials">
+            <div class="quick-chip-id">admin2@zbdypr</div>
+            <div class="quick-chip-role admin">USER 2 · ADMIN (admin2pqrs)</div>
+          </div>
+          <div class="quick-chip" onclick="window.TM_APP.fillLoginCredentials('axentm@zbdypr')" title="Click to fill USER 3 credentials">
+            <div class="quick-chip-id">axentm@zbdypr</div>
+            <div class="quick-chip-role viewer">USER 3 · AXEN/TM (axentm1)</div>
+          </div>
+          <div class="quick-chip" onclick="window.TM_APP.fillLoginCredentials('cetm@hqubl')" title="Click to fill USER 4 credentials">
+            <div class="quick-chip-id">cetm@hqubl</div>
+            <div class="quick-chip-role viewer">USER 4 · CE/TM (cetmswr)</div>
+          </div>
+        </div>
+
+        <form id="loginForm" onsubmit="event.preventDefault(); window.TM_APP.handleLogin();">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="loginUserId" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              Official User ID
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <input type="text" id="loginUserId" class="form-control" placeholder="e.g. axentm@zbdypr or cetm@hqubl" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="width: 100%; padding: 12px 14px 12px 38px; font-size: 14px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">👤</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="loginPassword" style="display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              <span>Password</span>
+              <span onclick="window.TM_APP.toggleLoginPasswordVisibility()" style="cursor: pointer; color: var(--gold-400); text-transform: none; font-size: 12px; font-weight: 600;" id="togglePasswordBtn">
+                <span id="togglePasswordIcon">👁️</span> Show / Hide
+              </span>
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" style="width: 100%; padding: 12px 42px 12px 38px; font-size: 14px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">🔑</span>
+              <span onclick="window.TM_APP.toggleLoginPasswordVisibility()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; cursor: pointer; color: #a4bba9; user-select: none;" title="Toggle Password Visibility">👁️</span>
+            </div>
+          </div>
+
+          <div id="loginErrorMessage" style="display: none; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 16px; text-align: center;">
+            Invalid User ID or Password.
+          </div>
+
+          <button type="submit" class="btn btn-primary-gold btn-login-submit">
+            <span>🔓 Sign In to Fleet Portal</span>
+          </button>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button type="button" class="btn-login-changepw" onclick="window.TM_APP.switchLoginCardTab('changepw')" style="margin-top: 0; flex: 1;">
+              <span>🔑 Change Password</span>
+            </button>
+            <button type="button" class="btn-login-changepw" onclick="window.TM_APP.resetAuthUsersToDefault()" style="margin-top: 0; flex: 1; border-color: rgba(212,175,55,0.4); color: #ffd700;" title="Reset all 4 users back to official default passwords">
+              <span>🔄 Reset Passwords</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- VIEW 2: CHANGE PASSWORD ON OPENING/LOGIN PAGE -->
+      <div id="loginChangePwContainer" style="display: none;">
+        <div style="font-size: 12px; color: #c4d9cb; line-height: 1.45; margin-bottom: 16px; text-align: center;">
+          Select your official User ID and verify your current password to set a new password.
+        </div>
+
+        <form id="loginChangePwForm" onsubmit="event.preventDefault(); window.TM_APP.handleLoginChangePassword();">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="loginChangeUserSelect" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              Select Official Account
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <select id="loginChangeUserSelect" class="form-control" style="width: 100%; padding: 12px 14px 12px 38px; font-size: 13.5px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+                <option value="admin1@zbdypr">admin1@zbdypr — USER 1 (Admin)</option>
+                <option value="admin2@zbdypr">admin2@zbdypr — USER 2 (Admin)</option>
+                <option value="axentm@zbdypr">axentm@zbdypr — USER 3 (AXEN/TM)</option>
+                <option value="cetm@hqubl">cetm@hqubl — USER 4 (CE/TM)</option>
+              </select>
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">👤</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="loginChangeCurrentPassword" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              Current Password (Verification)
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <input type="password" id="loginChangeCurrentPassword" class="form-control" placeholder="Enter current password" required autocomplete="current-password" style="width: 100%; padding: 12px 14px 12px 38px; font-size: 13.5px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">🔑</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="loginChangeNewPassword" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              New Password (Min 4 chars)
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <input type="password" id="loginChangeNewPassword" class="form-control" placeholder="Enter new password" required minlength="4" autocomplete="new-password" style="width: 100%; padding: 12px 14px 12px 38px; font-size: 13.5px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">🛡️</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="loginChangeConfirmPassword" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 6px;">
+              Confirm New Password
+            </label>
+            <div class="input-icon-wrapper" style="position: relative;">
+              <input type="password" id="loginChangeConfirmPassword" class="form-control" placeholder="Re-enter new password" required autocomplete="new-password" style="width: 100%; padding: 12px 14px 12px 38px; font-size: 13.5px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 8px; color: #fff;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">✅</span>
+            </div>
+          </div>
+
+          <div id="loginChangeError" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 16px; text-align: center;"></div>
+          <div id="loginChangeSuccess" style="display: none; background: rgba(147, 197, 114, 0.2); border: 1px solid rgba(147, 197, 114, 0.5); color: #c8ecc0; padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 16px; text-align: center;"></div>
+
+          <button type="submit" class="btn btn-primary-gold btn-login-submit">
+            <span>💾 Save New Password &amp; Sync</span>
+          </button>
+
+          <button type="button" class="btn-login-changepw" onclick="window.TM_APP.switchLoginCardTab('login')">
+            <span>← Back to Portal Sign In</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="login-footer-info" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #7f9787; text-align: center; line-height: 1.5;">
+        <div>Indian Railways · South Western Railway (Track Machine Org)</div>
+        <div style="margin-top: 4px; color: var(--pista-300);">Role-Based Authorization (Admin &amp; View-Only) · Cloud Synchronized</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container" id="appContainer">
 
     <!-- ====================================================================
          HERO HEADER & ATMOSPHERIC UNIMAT SITE REPAIR
@@ -59,9 +231,8 @@
             </div>
             <div class="brand-titles">
               <h1>
-                <span class="pista-highlight">TM-FAST</span> 
-                <span class="gold-highlight" style="font-size: 0.62em; font-weight: 600; display: block; margin-top: 4px; letter-spacing: 0.5px;">
-                  (Failure Analysis &amp; Surveillance Tool)
+                <span class="gold-text-bold" style="font-size: 0.98em; letter-spacing: 0.5px;">
+                  TM-FAST (SWR)
                 </span>
               </h1>
               <div class="brand-subtitle">
@@ -70,23 +241,46 @@
                   <span class="pulse-dot"></span>
                   <span>SURVEILLANCE ACTIVE</span>
                 </div>
+                <div class="cloud-sync-indicator" id="cloudSyncIndicator" title="Multi-User Cloud Sync Status">
+                  <span class="cloud-dot" id="cloudDot"></span>
+                  <span id="cloudStatusText">Cloud: Local Storage</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="header-action-group">
-            <button class="btn btn-secondary-pista" onclick="window.TM_APP.focusUniversalSearch()" title="Open Universal Fleet Search">
-              <span>🔍 Universal Search</span>
-            </button>
-            <button class="btn btn-primary-gold" onclick="window.TM_APP.openLogModal()">
-              <span>➕ Log / Update Failure</span>
-            </button>
-            <button class="btn btn-dim" onclick="window.TM_APP.downloadExcelTemplate()">
-              <span>📥 Sample Template</span>
-            </button>
-            <button class="btn btn-dim" onclick="window.TM_APP.exportFilteredToExcel()">
-              <span>📊 Export Report</span>
-            </button>
+          <div class="header-right-zone">
+            <!-- Top Right End Auth & Account Bar (Change Password Tab & Logout Button) -->
+            <div class="user-session-chip top-right-session" id="userSessionChip" style="display: none;">
+              <div class="session-user-info">
+                <span class="user-icon">👤</span>
+                <span id="loggedInUserDisplay" class="session-username">admin1@zbdypr</span>
+                <span class="role-badge admin" id="loggedInRoleDisplay">ADMIN</span>
+              </div>
+              <div class="session-actions-divider"></div>
+              <button type="button" class="btn-user-tab btn-changepw-tab btn-user-action" onclick="window.TM_APP.openChangePasswordModal()" title="Change Account Password">
+                <span>🔑 Change Password</span>
+              </button>
+              <button type="button" class="btn-user-tab btn-logout-tab btn-user-action btn-logout" onclick="window.TM_APP.logout()" title="Logout of TM-FAST (SWR)">
+                <span>🚪 Logout</span>
+              </button>
+            </div>
+
+            <!-- Operational Header Action Controls -->
+            <div class="header-action-group">
+              <button class="btn btn-secondary-pista" onclick="window.TM_APP.focusUniversalSearch()" title="Open Universal Fleet Search">
+                <span>🔍 Universal Search</span>
+              </button>
+              <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.openLogModal()">
+                <span>➕ Log / Update Failure</span>
+              </button>
+              <button class="btn btn-dim" onclick="window.TM_APP.downloadExcelTemplate()">
+                <span>📥 Sample Template</span>
+              </button>
+              <button class="btn btn-dim" onclick="window.TM_APP.exportFilteredToExcel()">
+                <span>📊 Export Report</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -184,10 +378,10 @@
           </select>
           <span class="select-arrow">▼</span>
         </div>
-        <button class="btn btn-primary-gold" id="btnSingleUploadExcel" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 18px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Track Machine Excel workbook (.xlsx/.xls)">
+        <button class="btn btn-primary-gold admin-only" id="btnSingleUploadExcel" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 18px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Track Machine Excel workbook (.xlsx/.xls)">
           <span>📤 Upload Machine Excel Sheet</span>
         </button>
-        <button class="btn btn-danger-dim" id="btnDeleteSelectedMachine" onclick="window.TM_APP.openDeleteMachineModal()" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Delete this machine and all its uploaded failure and HRM data if uploaded wrongly">
+        <button class="btn btn-danger-dim admin-only" id="btnDeleteSelectedMachine" onclick="window.TM_APP.openDeleteMachineModal()" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Delete this machine and all its uploaded failure and HRM data if uploaded wrongly">
           <span>🗑️ Delete Machine Data</span>
         </button>
       </div>
@@ -370,27 +564,27 @@
           <div class="hrm-comm-item">
             <span class="hrm-comm-label">📅 DATE OF COMMISSIONING:</span>
             <span class="hrm-comm-date" id="hrmDisplayCommDate">--</span>
-            <button class="btn btn-dim" id="btnEditCommDate" onclick="window.TM_APP.toggleCommDateEditor()" style="padding: 4px 10px; font-size: 11px;">
+            <button class="btn btn-dim admin-only" id="btnEditCommDate" onclick="window.TM_APP.toggleCommDateEditor()" style="padding: 4px 10px; font-size: 11px;">
               ✏️ Edit Date (Calendar)
             </button>
             <div id="commDateEditorBox" style="display: none; align-items: center; gap: 8px;">
               <input type="date" id="inputCommDateCalendar" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px;">
-              <button class="btn btn-primary-gold" onclick="window.TM_APP.saveCommissioningDate()" style="padding: 4px 12px; font-size: 11px;">💾 Save</button>
+              <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.saveCommissioningDate()" style="padding: 4px 12px; font-size: 11px;">💾 Save</button>
               <button class="btn btn-dim" onclick="window.TM_APP.toggleCommDateEditor(false)" style="padding: 4px 8px; font-size: 11px;">✕</button>
             </div>
           </div>
 
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openAddHrmEntryModal()" style="font-size: 12px; padding: 6px 14px;">
+            <button class="btn btn-secondary-pista admin-only" onclick="window.TM_APP.openAddHrmEntryModal()" style="font-size: 12px; padding: 6px 14px;">
               ➕ Add / Update Entry
             </button>
             <button class="btn btn-dim" onclick="window.TM_APP.exportCurrentHrm()" style="font-size: 12px; padding: 6px 12px;">
               📥 Export HRM
             </button>
-            <button class="btn btn-dim" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
+            <button class="btn btn-dim admin-only" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
               🔄 Reset to Workbook
             </button>
-            <button class="btn btn-danger-dim" onclick="window.TM_APP.openDeleteMachineModal()" style="font-size: 12px; padding: 6px 12px;" title="Delete this machine entirely if uploaded wrongly">
+            <button class="btn btn-danger-dim admin-only" onclick="window.TM_APP.openDeleteMachineModal()" style="font-size: 12px; padding: 6px 12px;" title="Delete this machine entirely if uploaded wrongly">
               🗑️ Delete Machine
             </button>
           </div>
@@ -970,12 +1164,68 @@
     </div>
   </div>
 
+  <!-- ====================================================================
+       CHANGE PASSWORD MODAL
+       ==================================================================== -->
+  <div class="modal-backdrop" id="changePasswordModal">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔑</span>
+          <span>Update Account Password</span>
+        </div>
+        <button class="modal-close" onclick="window.TM_APP.closeModal('changePasswordModal')">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-size: 12px; color: #a4bba9; margin-bottom: 16px;">
+          Updating password for active account: <strong id="changePassUserDisplay" style="color: var(--gold-400);"></strong>
+        </div>
+
+        <form id="changePasswordForm" onsubmit="event.preventDefault(); window.TM_APP.handleChangePassword();">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="currentPasswordInput" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 5px;">
+              Current Password
+            </label>
+            <input type="password" id="currentPasswordInput" class="form-control" required style="width: 100%; padding: 10px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 6px; color: #fff;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="newPasswordInput" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 5px;">
+              New Password
+            </label>
+            <input type="password" id="newPasswordInput" class="form-control" required style="width: 100%; padding: 10px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 6px; color: #fff;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label for="confirmNewPasswordInput" style="display: block; font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a4bba9; margin-bottom: 5px;">
+              Confirm New Password
+            </label>
+            <input type="password" id="confirmNewPasswordInput" class="form-control" required style="width: 100%; padding: 10px; background: rgba(8, 14, 10, 0.95); border: 1px solid var(--border-dim); border-radius: 6px; color: #fff;">
+          </div>
+
+          <div id="changePassError" style="display: none; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 14px;"></div>
+
+          <div class="modal-footer" style="padding: 12px 0 0 0; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-dim" onclick="window.TM_APP.closeModal('changePasswordModal')">Cancel</button>
+            <button type="submit" class="btn btn-primary-gold">Save New Password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Popup -->
   <div class="toast-notification" id="toastNotification">
     <span style="font-size: 18px;">🔔</span>
     <span id="toastMessageText">Action performed successfully.</span>
   </div>
 
+  <!-- Google Firebase Realtime Database SDKs (Compat mode for browser web applications) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <!-- Firebase Central Project Configuration (Step 4: paste keys here) -->
+  <script src="firebase-config.js"></script>
   <!-- SWR Track Machine Real Fleet & Failure Database -->
   <script src="fleet_data.js"></script>
   <!-- Application Logic -->
