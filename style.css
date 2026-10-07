@@ -97,7 +97,9 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: url('assets/unimat_site_repair.jpg') no-repeat center 35%;
+  background-image: url('assets/unimat_site_repair.jpg'), url('unimat_site_repair.jpg');
+  background-position: center 35%;
+  background-repeat: no-repeat;
   background-size: cover;
   opacity: 0.68;
   pointer-events: none;
@@ -234,7 +236,10 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: url('assets/unimat_site_repair.jpg') center 40% / cover no-repeat;
+  background-image: url('assets/unimat_site_repair.jpg'), url('unimat_site_repair.jpg');
+  background-position: center 40%;
+  background-repeat: no-repeat;
+  background-size: cover;
   filter: brightness(0.52) contrast(1.18);
   transform: scale(1.02);
   animation: ambientZoom 20s ease-in-out infinite;
@@ -541,6 +546,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .fy-toggle-btn {
@@ -882,6 +888,19 @@ body {
   box-shadow: 0 0 16px rgba(132, 204, 22, 0.4);
 }
 .category-pill[data-category="UTV"].active .pill-badge { background: #84cc16; color: #1a2e05; }
+
+.category-pill[data-category="SRGM/RGM"] .pill-dot,
+.category-pill[data-category="SRGM / RGM"] .pill-dot { color: #10b981; }
+.category-pill[data-category="SRGM/RGM"]:hover,
+.category-pill[data-category="SRGM / RGM"]:hover { border-color: #10b981; background: rgba(16, 185, 129, 0.12); }
+.category-pill[data-category="SRGM/RGM"].active,
+.category-pill[data-category="SRGM / RGM"].active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.32), rgba(5, 150, 105, 0.35));
+  border: 1.5px solid #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
+}
+.category-pill[data-category="SRGM/RGM"].active .pill-badge,
+.category-pill[data-category="SRGM / RGM"].active .pill-badge { background: #10b981; color: #022c22; }
 
 .category-pill[data-category="RBMV"] .pill-dot { color: #f97316; }
 .category-pill[data-category="RBMV"]:hover { border-color: #f97316; background: rgba(249, 115, 22, 0.12); }
@@ -1497,6 +1516,67 @@ body {
   color: #c9dbd0;
   font-size: 12.5px;
   outline: none;
+}
+
+/* Date Range Filter Box in All Incidents */
+.history-date-range-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(14, 26, 20, 0.95);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 5px 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  flex-wrap: wrap;
+}
+
+.date-range-label {
+  font-size: 11.5px;
+  color: var(--gold-300);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.date-sub-label {
+  font-size: 11px;
+  color: #8da494;
+  margin: 0 1px;
+  font-weight: 600;
+}
+
+.filter-date-input {
+  background: rgba(8, 14, 10, 0.95);
+  border: 1px solid rgba(147, 197, 114, 0.35);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #e5ece6;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-date-input:focus {
+  border-color: var(--gold-400);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+}
+
+.btn-clear-date {
+  padding: 3px 8px;
+  font-size: 11px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-date:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
 }
 
 .table-responsive {

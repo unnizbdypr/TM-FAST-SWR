@@ -15457,9 +15457,9 @@
                          "subsystem":  "Engine",
                          "sheet":  "ENGINE FAILURE",
                          "slNo":  "8",
-                         "dateOfFailure":  "25-10_2022",
+                         "dateOfFailure":  "25-10-2022",
                          "dateOfRectification":  "25-10-2022",
-                         "breakdownTime":  "25-10_2022",
+                         "breakdownTime":  "25-10-2022",
                          "fitTime":  "25-10-2022",
                          "totalDownDays":  8,
                          "downHours":  192,
@@ -25897,9 +25897,9 @@
                          "subsystem":  "Electrical",
                          "sheet":  "ELECRICAL FAILURES",
                          "slNo":  "1",
-                         "dateOfFailure":  "25.07,2026",
+                         "dateOfFailure":  "25-07-2026",
                          "dateOfRectification":  "25-07-2026",
-                         "breakdownTime":  "25.07,2026",
+                         "breakdownTime":  "25-07-2026",
                          "fitTime":  "25-07-2026",
                          "totalDownDays":  0,
                          "downHours":  0,
@@ -30182,3 +30182,4 @@
                      }
                  ]
 }
+

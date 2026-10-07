@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TM-FAST (SWR) | Indian Railways</title>
+  <title>TM FAST (Failure Analysis and Surveillance Tool ) — South Western Railway</title>
   
   <!-- Favicon / Brand SVG -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚆</text></svg>">
@@ -36,6 +36,9 @@
   
   <!-- Custom Pista Green & Golden Dark Theme Styles -->
   <link rel="stylesheet" href="style.css">
+
+  <!-- Atmospheric Background Image Fallback Data for Complete Cross-System Portability -->
+  <script src="background_data.js"></script>
 </head>
 <body>
 
@@ -57,8 +60,9 @@
     <div class="login-card">
       <div class="login-brand-header">
         <div class="login-logo-box">⚙️</div>
-        <h2><span class="gold-text-bold">TM-FAST (SWR)</span></h2>
-        <div class="login-subtext">South Western Railway · Track Machine Surveillance &amp; Failure Analysis</div>
+        <h2><span class="gold-text-bold">TM FAST</span></h2>
+        <div class="login-subtext" style="font-size: 14.5px; font-weight: 700; color: var(--gold-400); margin-top: 4px; letter-spacing: 0.3px;">(Failure Analysis and Surveillance Tool )</div>
+        <div class="login-subtext" style="font-size: 11.5px; opacity: 0.85; margin-top: 4px;">South Western Railway · Track Machine Surveillance &amp; Failure Analysis</div>
         <div class="login-lock-badge">🔒 SECURE FLEET PORTAL</div>
       </div>
       
@@ -236,12 +240,11 @@
             </div>
             <div class="brand-titles">
               <h1>
-                <span class="gold-text-bold" style="font-size: 0.98em; letter-spacing: 0.5px;">
-                  TM-FAST (SWR)
-                </span>
+                <span class="gold-text-bold" style="font-size: 1.05em; letter-spacing: 0.6px;">TM FAST</span>
+                <span class="brand-title-sub" style="font-size: 0.56em; font-weight: 700; color: var(--gold-300); display: block; margin-top: 3px; letter-spacing: 0.4px;">(Failure Analysis and Surveillance Tool )</span>
               </h1>
               <div class="brand-subtitle">
-                <span>TRACK MACHINE FLEET RELIABILITY &amp; REPETITIVE DEFECT SURVEILLANCE</span>
+                <span>SOUTH WESTERN RAILWAY · FLEET RELIABILITY &amp; REPETITIVE DEFECT SURVEILLANCE</span>
                 <div class="live-indicator">
                   <span class="pulse-dot"></span>
                   <span>SURVEILLANCE ACTIVE</span>
@@ -293,14 +296,26 @@
         <div class="fy-scope-strip">
           <div class="fy-scope-badge">
             <span class="fy-indicator-dot"></span>
-            <span>Surveillance Highlights Period: <strong id="kpiScopePeriodLabel" style="color: var(--gold-300);">Current Financial Year (01-04-2026 to Present)</strong></span>
+            <span>Surveillance Highlights Period: <strong id="kpiScopePeriodLabel" style="color: var(--gold-300);">Current Financial Year 2026-27 (01-04-2026 to Present)</strong></span>
           </div>
           <div class="fy-toggle-group">
-            <button type="button" class="fy-toggle-btn active" id="btnScopeFY" onclick="window.TM_APP.setKpiScope('FY')" title="Filter highlights strictly to Current Financial Year (1 April 2026 to Present)">
-              📅 FY 2026-27 (Active)
+            <button type="button" class="fy-toggle-btn active" id="btnScopeFY2026_27" onclick="window.TM_APP.setKpiScope('FY_2026_27')" title="Filter highlights to Current Financial Year 2026-27 (01-04-2026 to Present)">
+              📅 FY 2026-27 (Current)
+            </button>
+            <button type="button" class="fy-toggle-btn" id="btnScopeFY2025_26" onclick="window.TM_APP.setKpiScope('FY_2025_26')" title="Filter highlights to FY 2025-26 (01-04-2025 to 31-03-2026)">
+              🗓️ FY 2025-26
+            </button>
+            <button type="button" class="fy-toggle-btn" id="btnScopeFY2024_25" onclick="window.TM_APP.setKpiScope('FY_2024_25')" title="Filter highlights to FY 2024-25 (01-04-2024 to 31-03-2025)">
+              🗓️ FY 2024-25
+            </button>
+            <button type="button" class="fy-toggle-btn" id="btnScopeFY2023_24" onclick="window.TM_APP.setKpiScope('FY_2023_24')" title="Filter highlights to FY 2023-24 (01-04-2023 to 31-03-2024)">
+              🗓️ FY 2023-24
+            </button>
+            <button type="button" class="fy-toggle-btn" id="btnScopeFY2022_23" onclick="window.TM_APP.setKpiScope('FY_2022_23')" title="Filter highlights to FY 2022-23 (01-04-2022 to 31-03-2023)">
+              🗓️ FY 2022-23
             </button>
             <button type="button" class="fy-toggle-btn" id="btnScopeAll" onclick="window.TM_APP.setKpiScope('ALL')" title="Show all-time cumulative metrics across all historical logs">
-              📜 All Historical Logs
+              📜 All-Time Logs
             </button>
           </div>
         </div>
@@ -392,7 +407,7 @@
         </div>
       </div>
       <div class="category-scroll-container" id="categoryScrollContainer">
-        <!-- Dynamically injected category pills (CSM, DTE, DUO, UNI/PCTM, MPT, BCM, SBCM/FRM, BRM, SQRS, T28, DGS, UTV, RBMV, MDU) -->
+        <!-- Dynamically injected category pills (CSM, DTE, DUO, UNI/PCTM, MPT, BCM, SBCM/FRM, BRM, SQRS, T28, DGS, UTV, SRGM/RGM, RBMV, MDU) -->
       </div>
     </nav>
 
@@ -642,8 +657,8 @@
               <tr>
                 <th style="width: 48px;">#</th>
                 <th style="width: 270px;">Parameter / Item Description</th>
-                <th style="width: 160px;">Present Date</th>
-                <th style="width: 140px;">Present Engine Hours</th>
+                <th style="width: 160px;">Date</th>
+                <th style="width: 140px;"> @ Engine Hours</th>
                 <th>Technical Remarks / Details</th>
                 <th style="width: 150px;">History Log</th>
                 <th style="width: 170px;">Actions</th>
@@ -835,12 +850,53 @@
             <input type="text" id="tableSearchInput" placeholder="Search across all machines, defects, parts or root causes...">
           </div>
 
-          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <select id="historyPeriodFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()" title="Filter timeline by Financial Year or view all history">
-              <option value="ALL">📅 All Historical Periods</option>
-              <option value="FY">🗓️ Current FY 2026–27 Only</option>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- Category Wise Filter -->
+            <select id="historyCategoryFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryCategoryFilterChange(this.value)" title="Filter failures machine category wise">
+              <option value="ALL">🏷️ All Categories (15 Categories)</option>
+              <option value="CSM">CSM (Continuous Action Tamping)</option>
+              <option value="DUO">DUOMAT (Two Sleeper Tamping)</option>
+              <option value="UNI/PCTM">UNI/PCTM (Points &amp; Crossing Tamping)</option>
+              <option value="MPT">MPT (Multi-Purpose Tamping)</option>
+              <option value="BCM">BCM (Ballast Cleaning)</option>
+              <option value="SBCM/FRM">SBCM / FRM (Shoulder Cleaning)</option>
+              <option value="BRM">BRM (Ballast Regulating)</option>
+              <option value="SQRS">SQRS (Quick Relaying System)</option>
+              <option value="T28">T-28 (Turnout Renewal)</option>
+              <option value="DGS">DGS (Dynamic Track Stabilizer)</option>
+              <option value="UTV">UTV (Utility Track Vehicle)</option>
+              <option value="SRGM/RGM">SRGM / RGM (Switch Rail Grinding / Rail Grinding Machine)</option>
+              <option value="RBMV">RBMV (Rail Bound Maintenance)</option>
+              <option value="MDU">MDU (Mobile Diagnostics)</option>
+              <option value="DTE">DTE</option>
             </select>
 
+            <!-- Machine Wise Filter -->
+            <select id="historyMachineFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()" title="Filter failures machine wise">
+              <option value="ALL">🚜 All Individual Machines</option>
+            </select>
+
+            <!-- Particular Date Range Search (From & To) -->
+            <div class="history-date-range-box" title="Search failures for a particular date range">
+              <span class="date-range-label">📅 Date Range:</span>
+              <span class="date-sub-label">From</span>
+              <input type="date" id="historyStartDate" class="filter-date-input" onchange="window.TM_APP.onHistoryDateRangeChange()" title="Filter starting from this date">
+              <span class="date-sub-label">To</span>
+              <input type="date" id="historyEndDate" class="filter-date-input" onchange="window.TM_APP.onHistoryDateRangeChange()" title="Filter up to this date">
+              <button type="button" class="btn btn-dim btn-clear-date" id="btnClearDateRange" onclick="window.TM_APP.clearHistoryDateRange()" title="Clear date range filter">❌ Clear</button>
+            </div>
+
+            <!-- Financial Year Timeline Filter -->
+            <select id="historyPeriodFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()" title="Filter timeline by Financial Year or view all history">
+              <option value="ALL">📅 All Historical Periods</option>
+              <option value="FY_2026_27">🗓️ FY 2026–27 (Current)</option>
+              <option value="FY_2025_26">🗓️ FY 2025–26</option>
+              <option value="FY_2024_25">🗓️ FY 2024–25</option>
+              <option value="FY_2023_24">🗓️ FY 2023–24</option>
+              <option value="FY_2022_23">🗓️ FY 2022–23</option>
+            </select>
+
+            <!-- Division Filter -->
             <select id="historyDivisionFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
               <option value="ALL">🌐 All Divisions</option>
               <option value="SBC">🔵 SBC Division</option>
@@ -848,12 +904,14 @@
               <option value="UBL">🔴 UBL Division</option>
             </select>
 
+            <!-- Block vs Non-Block Filter -->
             <select id="historyBlockFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
               <option value="ALL">🚦 All Operational Impacts</option>
               <option value="IN_BLOCK">⚠️ In Traffic Block Only</option>
               <option value="NON_BLOCK">ℹ️ Not In Block Only</option>
             </select>
 
+            <!-- Repair Status Filter -->
             <select id="statusFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
               <option value="ALL">All Statuses</option>
               <option value="UNDER REPAIR">⚠️ Under Repair</option>
@@ -1147,7 +1205,7 @@
   <div class="modal-overlay" id="hrmEntryModal">
     <div class="modal-card">
       <div class="modal-header">
-        <div class="modal-title">
+        <div class="modal-title" id="hrmModalTitle">
           <span>📜 Update / Add Entry to History Register Module</span>
         </div>
         <button class="modal-close-btn" onclick="window.TM_APP.closeModal('hrmEntryModal')">&times;</button>
@@ -1160,7 +1218,7 @@
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label" for="hrmModalItemSelect">Select History Register Item (1 to 16) *</label>
-            <select id="hrmModalItemSelect" class="form-control" required>
+            <select id="hrmModalItemSelect" class="form-control" required onchange="window.TM_APP.onHrmModalItemChanged()">
               <!-- Populated dynamically with the 16 items -->
             </select>
           </div>
@@ -1168,12 +1226,24 @@
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label gold-label" for="hrmModalDateInput">📅 Date of Event / Replacement * (Calendar)</label>
-              <input type="date" id="hrmModalDateInput" class="form-control" required>
+              <input type="date" id="hrmModalDateInput" class="form-control" required onchange="window.TM_APP.onHrmModalDateChanged()">
             </div>
             <div class="form-group">
-              <label class="form-label" for="hrmModalEhInput">⏱️ Engine Hours</label>
+              <label class="form-label" for="hrmModalEhInput">⏱️ @ Engine Hours</label>
               <input type="text" id="hrmModalEhInput" class="form-control" placeholder="e.g. 20278 or E1: 3400 E2: 2100">
             </div>
+          </div>
+
+          <!-- Chronological Ordinal Bracket (IOH/POH) -->
+          <div class="form-group" id="hrmModalOrdinalGroup" style="display: none;">
+            <label class="form-label gold-label" for="hrmModalOrdinalInput">🏷️ Overhaul Chronological Order Bracket (e.g. 1st IOH, 2nd IOH, 1st POH, etc.)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="hrmModalOrdinalInput" class="form-control" placeholder="e.g. (1st IOH) or (2nd POH)">
+              <button type="button" class="btn btn-dim" onclick="window.TM_APP.autoSuggestOrdinal()" style="white-space: nowrap; font-size: 11px;">⚡ Auto-Calculate</button>
+            </div>
+            <span style="font-size: 10.5px; color: var(--pista-300); margin-top: 4px; display: block;">
+              Mentioned in bracket as per chronological order (1st IOH, 2nd IOH,... or 1st POH, 2nd POH,...). Editable &amp; modifiable anytime.
+            </span>
           </div>
 
           <div class="form-group">
@@ -1184,7 +1254,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-dim" onclick="window.TM_APP.closeModal('hrmEntryModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary-gold">💾 Save Record to HRM</button>
+          <button type="submit" class="btn btn-primary-gold" id="btnHrmSubmit">💾 Save Record to HRM</button>
         </div>
       </form>
     </div>

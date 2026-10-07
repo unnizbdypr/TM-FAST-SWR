@@ -10,8 +10,35 @@
   // Available Categories (Canonical single RBMV category)
   const MACHINE_CATEGORIES = [
     'CSM', 'DTE', 'DUO', 'UNI/PCTM', 'MPT', 'BCM', 'SBCM/FRM',
-    'BRM', 'SQRS', 'T28', 'DGS', 'UTV', 'RBMV', 'MDU'
+    'BRM', 'SQRS', 'T28', 'DGS', 'UTV', 'SRGM/RGM', 'RBMV', 'MDU'
   ];
+
+  // Category Full Names & Descriptions
+  const CATEGORY_FULL_NAMES = {
+    'CSM': 'Continuous Action Tamping',
+    'DTE': 'Dynamic Track Equalizer',
+    'DUO': 'Duomatic Two Sleeper Tamping',
+    'UNI/PCTM': 'Points & Crossing Tamping',
+    'MPT': 'Multi-Purpose Tamping',
+    'BCM': 'Ballast Cleaning Machine',
+    'SBCM/FRM': 'Shoulder Cleaning / Formation Rehabilitation',
+    'BRM': 'Ballast Regulating Machine',
+    'SQRS': 'Quick Relaying System',
+    'T28': 'Turnout Renewal',
+    'DGS': 'Dynamic Track Stabilizer',
+    'UTV': 'Utility Track Vehicle',
+    'SRGM/RGM': 'Switch Rail Grinding Machine / Rail Grinding Machine',
+    'RBMV': 'Rail Borne Maintenance Vehicle',
+    'MDU': 'Muck Disposal Unit'
+  };
+
+  function getCategoryFullName(cat) {
+    if (!cat) return '';
+    if (cat === 'SRGM/RGM' || cat === 'SRGM / RGM' || cat === 'SRGM' || cat === 'RGM') {
+      return 'Switch Rail Grinding Machine / Rail Grinding Machine';
+    }
+    return CATEGORY_FULL_NAMES[cat] || cat;
+  }
 
   // Helper: check if machine or category belongs to Crane-equipped fleet (UTV / RBMV)
   function isCraneMachine(identifier) {
@@ -567,6 +594,7 @@
       { id: 'UTV-001', model: 'Utility Track Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
       { id: 'UTV-002', model: 'Utility Track Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' }
     ],
+    'SRGM/RGM': [],
     'RBMV': [
       { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
     ],
@@ -589,7 +617,7 @@
   // Local Storage Keys (v15 TM-FAST authentic fleet with strictly normalized DD-MM-YYYY dates and purged bogus rows)
   const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V15_DDMMYYYY';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V15_DDMMYYYY';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V16_ORDINAL_IOH_POH';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -635,8 +663,12 @@
     historyDivisionFilter: 'ALL',
     historyBlockFilter: 'ALL',
     historyPeriodFilter: 'ALL',
+    historyCategoryFilter: 'ALL',
+    historyMachineFilter: 'ALL',
+    historyStartDate: '',
+    historyEndDate: '',
     historyLimit: 100,
-    kpiScope: 'FY', // Default Surveillance Highlights Scope: Current Financial Year 2026-27 (01.04.2026 to Present)
+    kpiScope: 'FY_2026_27', // Default Surveillance Highlights Scope: Current Financial Year 2026-27 (01.04.2026 to Present)
     charts: {}
   };
 
@@ -646,6 +678,7 @@
     loadDataset();
     setupCategoryPills();
     updateMachineDropdown();
+    updateHistoryMachineDropdown('ALL');
     setupEventListeners();
     renderAll();
     // Initialize Central Cloud Database Synchronization (Firebase)
@@ -688,7 +721,7 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
         'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
         'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST', 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST', 'TM_HRM_DATA_V14_FAST',
-        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL'
+        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -704,6 +737,9 @@
 
       // Purge any stale RMBV duplicate from fleet directory
       delete FLEET_DIRECTORY['RMBV'];
+
+      // Always guarantee SRGM/RGM category exists
+      if (!FLEET_DIRECTORY['SRGM/RGM']) FLEET_DIRECTORY['SRGM/RGM'] = [];
 
       // Always guarantee canonical machines from DEFAULT_FLEET_DIRECTORY exist
       Object.keys(DEFAULT_FLEET_DIRECTORY).forEach(cat => {
@@ -738,9 +774,10 @@
         saveDataset();
       }
 
-      // Normalize any RMBV category in failures
+      // Normalize any RMBV and SRGM/RGM category in failures
       AppState.failures.forEach(f => {
         if (f.category === 'RMBV') f.category = 'RBMV';
+        if (f.category === 'SRGM' || f.category === 'RGM' || f.category === 'SRGM / RGM') f.category = 'SRGM/RGM';
       });
 
       // Guarantee any missing authentic machine failures are included
@@ -773,6 +810,10 @@
           }
         });
       }
+
+      // Synchronize and enforce all chronological IOH and POH ordinals across all machines
+      ensureAllHrmOrdinals(HRM_DATA);
+      saveHrmData();
 
       // Sanitize failures: filter out any header/bogus rows
       AppState.failures = AppState.failures.filter(f => {
@@ -1238,9 +1279,15 @@
         if (cat === 'RBMV' || cat === 'RMBV') {
           return f.category === 'RBMV' || f.category === 'RMBV';
         }
+        if (cat === 'SRGM/RGM' || cat === 'SRGM / RGM') {
+          return f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM';
+        }
         return f.category === cat;
       }).length;
-      pill.innerHTML = `<span>${cat}</span><span class="pill-badge">${count}</span>`;
+      const displayLabel = (cat === 'SRGM/RGM' || cat === 'SRGM / RGM') ? 'SRGM / RGM' : cat;
+      const fullName = getCategoryFullName(cat);
+      pill.innerHTML = `<span>${displayLabel}</span><span class="pill-badge">${count}</span>`;
+      pill.title = `${displayLabel} (${fullName})`;
       pill.addEventListener('click', () => selectCategory(cat));
       container.appendChild(pill);
     });
@@ -1375,11 +1422,14 @@
         : [];
       
       if (AppState.selectedCategory !== 'ALL' && catMachines.length === 0) {
+        const catLabel = (AppState.selectedCategory === 'SRGM/RGM' || AppState.selectedCategory === 'SRGM / RGM')
+          ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)'
+          : `${AppState.selectedCategory} Category`;
         metaContainer.innerHTML = `
-          <span class="meta-chip">Scope: <strong>${AppState.selectedCategory} Category</strong></span>
+          <span class="meta-chip">Scope: <strong>${catLabel}</strong></span>
           <span class="meta-chip" style="color: var(--gold-400);">Fleet: <strong>0 Machines Registered</strong></span>
           <button class="btn btn-primary-gold" onclick="window.TM_APP.openUploadModalForCategory('${AppState.selectedCategory}')" style="padding: 6px 14px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px;">
-            <span>➕ Upload History Sheet for ${AppState.selectedCategory}</span>
+            <span>➕ Upload History Sheet for ${catLabel}</span>
           </button>
         `;
         return;
@@ -1427,11 +1477,13 @@
   // Filter failures based on Category, Machine, Search, Subsystem, and Status
   function getFilteredFailures() {
     return AppState.failures.filter(f => {
-      // Category match (supporting both RBMV and RMBV aliases)
+      // Category match (supporting both RBMV/RMBV and SRGM/RGM aliases)
       if (AppState.selectedCategory !== 'ALL') {
         const isRbmvMatch = (AppState.selectedCategory === 'RBMV' || AppState.selectedCategory === 'RMBV') && 
                             (f.category === 'RBMV' || f.category === 'RMBV');
-        if (f.category !== AppState.selectedCategory && !isRbmvMatch) {
+        const isSrgmMatch = (AppState.selectedCategory === 'SRGM/RGM' || AppState.selectedCategory === 'SRGM / RGM') &&
+                            (f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM');
+        if (f.category !== AppState.selectedCategory && !isRbmvMatch && !isSrgmMatch) {
           return false;
         }
       }
@@ -1471,7 +1523,9 @@
       if (AppState.selectedCategory !== 'ALL') {
         const isRbmvMatch = (AppState.selectedCategory === 'RBMV' || AppState.selectedCategory === 'RMBV') && 
                             (f.category === 'RBMV' || f.category === 'RMBV');
-        if (f.category !== AppState.selectedCategory && !isRbmvMatch) {
+        const isSrgmMatch = (AppState.selectedCategory === 'SRGM/RGM' || AppState.selectedCategory === 'SRGM / RGM') &&
+                            (f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM');
+        if (f.category !== AppState.selectedCategory && !isRbmvMatch && !isSrgmMatch) {
           return false;
         }
       }
@@ -1505,20 +1559,90 @@
     updateTabBadges();
   }
 
-  // Set Financial Year Surveillance Scope ('FY' for 2026-27 or 'ALL' for cumulative)
-  function setKpiScope(scope) {
-    AppState.kpiScope = (scope === 'ALL') ? 'ALL' : 'FY';
+  // Indian Railways Financial Year Definitions
+  const FINANCIAL_YEARS = {
+    'FY_2026_27': {
+      id: 'FY_2026_27',
+      label: 'FY 2026-27 (Current)',
+      fullLabel: 'Current Financial Year 2026-27 (01-04-2026 to Present)',
+      shortName: 'FY 2026-27',
+      start: new Date(2026, 3, 1, 0, 0, 0).getTime(), // 01.04.2026 00:00:00
+      end: new Date(2027, 2, 31, 23, 59, 59).getTime()  // 31.03.2027 23:59:59
+    },
+    'FY_2025_26': {
+      id: 'FY_2025_26',
+      label: 'FY 2025-26',
+      fullLabel: 'Financial Year 2025-26 (01-04-2025 to 31-03-2026)',
+      shortName: 'FY 2025-26',
+      start: new Date(2025, 3, 1, 0, 0, 0).getTime(), // 01.04.2025 00:00:00
+      end: new Date(2026, 2, 31, 23, 59, 59).getTime()  // 31.03.2026 23:59:59
+    },
+    'FY_2024_25': {
+      id: 'FY_2024_25',
+      label: 'FY 2024-25',
+      fullLabel: 'Financial Year 2024-25 (01-04-2024 to 31-03-2025)',
+      shortName: 'FY 2024-25',
+      start: new Date(2024, 3, 1, 0, 0, 0).getTime(), // 01.04.2024 00:00:00
+      end: new Date(2025, 2, 31, 23, 59, 59).getTime()  // 31.03.2025 23:59:59
+    },
+    'FY_2023_24': {
+      id: 'FY_2023_24',
+      label: 'FY 2023-24',
+      fullLabel: 'Financial Year 2023-24 (01-04-2023 to 31-03-2024)',
+      shortName: 'FY 2023-24',
+      start: new Date(2023, 3, 1, 0, 0, 0).getTime(), // 01.04.2023 00:00:00
+      end: new Date(2024, 2, 31, 23, 59, 59).getTime()  // 31.03.2024 23:59:59
+    },
+    'FY_2022_23': {
+      id: 'FY_2022_23',
+      label: 'FY 2022-23',
+      fullLabel: 'Financial Year 2022-23 (01-04-2022 to 31-03-2023)',
+      shortName: 'FY 2022-23',
+      start: new Date(2022, 3, 1, 0, 0, 0).getTime(), // 01.04.2022 00:00:00
+      end: new Date(2023, 2, 31, 23, 59, 59).getTime()  // 31.03.2023 23:59:59
+    }
+  };
 
-    const btnFY = document.getElementById('btnScopeFY');
-    const btnAll = document.getElementById('btnScopeAll');
-    if (btnFY) btnFY.classList.toggle('active', AppState.kpiScope === 'FY');
-    if (btnAll) btnAll.classList.toggle('active', AppState.kpiScope === 'ALL');
+  // Helper: Determine if failure falls strictly in a selected Financial Year or ALL
+  function isFailureInFY(f, fyKey) {
+    if (!f) return false;
+    if (!fyKey || fyKey === 'ALL') return true;
+    if (fyKey === 'FY') fyKey = 'FY_2026_27';
+    const conf = FINANCIAL_YEARS[fyKey];
+    if (!conf) return true;
+    const ts = getFailureTimestamp(f);
+    if (!ts) return false;
+    return ts >= conf.start && ts <= conf.end;
+  }
+
+  // Set Financial Year Surveillance Scope ('FY_2026_27', 'FY_2025_26', 'FY_2024_25', 'FY_2023_24', 'FY_2022_23', 'ALL')
+  function setKpiScope(scope) {
+    if (scope === 'FY') scope = 'FY_2026_27';
+    AppState.kpiScope = scope;
+
+    const fyButtons = [
+      { id: 'btnScopeFY2026_27', key: 'FY_2026_27' },
+      { id: 'btnScopeFY2025_26', key: 'FY_2025_26' },
+      { id: 'btnScopeFY2024_25', key: 'FY_2024_25' },
+      { id: 'btnScopeFY2023_24', key: 'FY_2023_24' },
+      { id: 'btnScopeFY2022_23', key: 'FY_2022_23' },
+      { id: 'btnScopeAll', key: 'ALL' }
+    ];
+
+    fyButtons.forEach(b => {
+      const el = document.getElementById(b.id);
+      if (el) el.classList.toggle('active', AppState.kpiScope === b.key);
+    });
 
     const labelEl = document.getElementById('kpiScopePeriodLabel');
     if (labelEl) {
-      labelEl.textContent = (AppState.kpiScope === 'FY')
-        ? 'Current Financial Year (01-04-2026 to Present)'
-        : 'All-Time Cumulative Historical Dataset';
+      if (AppState.kpiScope === 'ALL') {
+        labelEl.textContent = 'All-Time Cumulative Historical Dataset';
+      } else if (FINANCIAL_YEARS[AppState.kpiScope]) {
+        labelEl.textContent = FINANCIAL_YEARS[AppState.kpiScope].fullLabel;
+      } else {
+        labelEl.textContent = 'Current Financial Year 2026-27 (01-04-2026 to Present)';
+      }
     }
 
     const kpiFailures = getFleetFailuresForKPIs();
@@ -1526,14 +1650,18 @@
     renderBlockVsNonBlockChart(kpiFailures);
     renderSurveillanceAlerts(kpiFailures);
 
-    showToast(`Surveillance Highlights Period: ${AppState.kpiScope === 'FY' ? 'Current Financial Year 2026–27' : 'All Historical Logs'}`);
+    const toastName = (AppState.kpiScope === 'ALL')
+      ? 'All Historical Logs'
+      : (FINANCIAL_YEARS[AppState.kpiScope] ? FINANCIAL_YEARS[AppState.kpiScope].shortName : 'Current Financial Year');
+    showToast(`Surveillance Highlights Period: ${toastName}`);
   }
 
   // Render KPI Counter Strip
   function renderKPIs(list) {
-    const isFYScope = (AppState.kpiScope === 'FY');
-    // In FY scope, filter incidents strictly to Current Financial Year (01-04-2026 to present)
-    const kpiList = isFYScope ? list.filter(isFailureInCurrentFY) : list;
+    const isAllScope = (AppState.kpiScope === 'ALL');
+    const fyKey = isAllScope ? null : (AppState.kpiScope === 'FY' ? 'FY_2026_27' : AppState.kpiScope);
+    const kpiList = isAllScope ? list : list.filter(f => isFailureInFY(f, fyKey));
+    const fyShort = isAllScope ? 'All-Time' : (FINANCIAL_YEARS[fyKey] ? FINANCIAL_YEARS[fyKey].shortName : 'FY 2026-27');
 
     const totalFailures = kpiList.length;
     const activeRepairs = kpiList.filter(f => f.status === 'UNDER REPAIR').length;
@@ -1575,18 +1703,18 @@
     if (elTot) elTot.textContent = totalFailures;
     const elTotSub = document.getElementById('kpiTotalFailuresSubtext');
     if (elTotSub) {
-      elTotSub.textContent = isFYScope
-        ? (AppState.selectedCategory !== 'ALL' ? `FY 2026-27 (${AppState.selectedCategory} fleet)` : 'FY 2026-27 (1 Apr 2026 - Present)')
-        : (AppState.selectedCategory !== 'ALL' ? `All-time (${AppState.selectedCategory} fleet)` : 'All-Time Cumulative Dataset');
+      elTotSub.textContent = isAllScope
+        ? (AppState.selectedCategory !== 'ALL' ? `All-time (${AppState.selectedCategory} fleet)` : 'All-Time Cumulative Dataset')
+        : (AppState.selectedCategory !== 'ALL' ? `${fyShort} (${AppState.selectedCategory} fleet)` : `${fyShort} (${FINANCIAL_YEARS[fyKey] ? FINANCIAL_YEARS[fyKey].label : '1 Apr - 31 Mar'})`);
     }
 
     const elAct = document.getElementById('kpiActiveRepairs');
     if (elAct) elAct.textContent = activeRepairs;
     const elActSub = document.getElementById('kpiActiveRepairsSubtext');
     if (elActSub) {
-      elActSub.textContent = isFYScope
-        ? (activeRepairs === 0 ? 'All site breakdowns rectified in FY 2026-27' : `${activeRepairs} under active repair in FY 2026-27`)
-        : (activeRepairs === 0 ? 'All site breakdowns rectified' : `${activeRepairs} currently under active repair`);
+      elActSub.textContent = isAllScope
+        ? (activeRepairs === 0 ? 'All site breakdowns rectified' : `${activeRepairs} currently under active repair`)
+        : (activeRepairs === 0 ? `All site breakdowns rectified in ${fyShort}` : `${activeRepairs} under active repair in ${fyShort}`);
     }
 
     // Machines Monitored vs 87 Total (Always show total updated machines / 87 machines)
@@ -1608,14 +1736,14 @@
     if (elRep) elRep.textContent = repeatFailures;
     const elRepSub = document.getElementById('kpiFleetRepeatSubtext');
     if (elRepSub) {
-      if (isFYScope) {
-        elRepSub.textContent = AppState.selectedCategory !== 'ALL'
-          ? `Recurring defects in ${AppState.selectedCategory} fleet (FY 2026-27)`
-          : `Recurring defect incidents in FY 2026-27`;
-      } else {
+      if (isAllScope) {
         elRepSub.textContent = AppState.selectedCategory !== 'ALL'
           ? `All-time recurring defects in ${AppState.selectedCategory} fleet`
           : `All-time recurring defect incidents across monitored fleet`;
+      } else {
+        elRepSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `Recurring defects in ${AppState.selectedCategory} fleet (${fyShort})`
+          : `Recurring defect incidents in ${fyShort}`;
       }
     }
 
@@ -1626,14 +1754,14 @@
     if (elNonBlock) elNonBlock.textContent = nonBlockCount;
     const elBlockSub = document.getElementById('kpiBlockSubtext');
     if (elBlockSub) {
-      if (isFYScope) {
-        elBlockSub.textContent = AppState.selectedCategory !== 'ALL'
-          ? `FY 2026-27: In Block vs Non-Block (${AppState.selectedCategory})`
-          : `FY 2026-27 traffic block operational impact`;
-      } else {
+      if (isAllScope) {
         elBlockSub.textContent = AppState.selectedCategory !== 'ALL'
           ? `All-time: In Block vs Non-Block (${AppState.selectedCategory})`
           : `All-time traffic block operational impact`;
+      } else {
+        elBlockSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `${fyShort}: In Block vs Non-Block (${AppState.selectedCategory})`
+          : `${fyShort} traffic block operational impact`;
       }
     }
   }
@@ -1971,12 +2099,58 @@
     // 1. Start with ALL failures available in the app across all machines and categories
     let list = AppState.failures.slice();
 
-    // 2. Period filter (ALL vs FY)
-    if (AppState.historyPeriodFilter && AppState.historyPeriodFilter === 'FY') {
-      list = list.filter(isFailureInCurrentFY);
+    // 2. Financial Year Period filter (ALL, FY_2026_27, FY_2025_26, FY_2024_25, FY_2023_24, FY_2022_23)
+    if (AppState.historyPeriodFilter && AppState.historyPeriodFilter !== 'ALL') {
+      const p = (AppState.historyPeriodFilter === 'FY') ? 'FY_2026_27' : AppState.historyPeriodFilter;
+      list = list.filter(f => isFailureInFY(f, p));
     }
 
-    // 3. Division filter for history table (defaults to ALL)
+    // 3. Machine Category Filter (Category wise)
+    if (AppState.historyCategoryFilter && AppState.historyCategoryFilter !== 'ALL') {
+      const cat = AppState.historyCategoryFilter;
+      list = list.filter(f => {
+        if (cat === 'RBMV' || cat === 'RMBV') {
+          return f.category === 'RBMV' || f.category === 'RMBV';
+        }
+        if (cat === 'SBCM/FRM' || cat === 'SBCM' || cat === 'FRM') {
+          return f.category === 'SBCM' || f.category === 'FRM' || f.category === 'SBCM/FRM';
+        }
+        if (cat === 'SRGM/RGM' || cat === 'SRGM / RGM' || cat === 'SRGM' || cat === 'RGM') {
+          return f.category === 'SRGM' || f.category === 'RGM' || f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM';
+        }
+        return f.category === cat;
+      });
+    }
+
+    // 4. Machine Number Filter (Machine wise)
+    if (AppState.historyMachineFilter && AppState.historyMachineFilter !== 'ALL') {
+      const mId = AppState.historyMachineFilter.toUpperCase().trim();
+      list = list.filter(f => (f.machineNo || '').toUpperCase().trim() === mId);
+    }
+
+    // 5. Particular Date Range Search (From Date & To Date)
+    if (AppState.historyStartDate) {
+      const sParts = AppState.historyStartDate.split('-'); // YYYY-MM-DD
+      if (sParts.length === 3) {
+        const sTs = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10), 0, 0, 0).getTime();
+        list = list.filter(f => {
+          const ts = getFailureTimestamp(f);
+          return ts >= sTs;
+        });
+      }
+    }
+    if (AppState.historyEndDate) {
+      const eParts = AppState.historyEndDate.split('-'); // YYYY-MM-DD
+      if (eParts.length === 3) {
+        const eTs = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10), 23, 59, 59).getTime();
+        list = list.filter(f => {
+          const ts = getFailureTimestamp(f);
+          return ts <= eTs;
+        });
+      }
+    }
+
+    // 6. Division filter for history table (defaults to ALL)
     if (AppState.historyDivisionFilter && AppState.historyDivisionFilter !== 'ALL') {
       list = list.filter(f => (f.division || '').toUpperCase().includes(AppState.historyDivisionFilter));
     }
@@ -2239,18 +2413,112 @@
     showToast(`Chronological Order: ${AppState.chronologicalSortOrder === 'ASC' ? 'Oldest to Newest' : 'Newest to Oldest'}`);
   }
 
+  // Update history machine dropdown options based on selected category
+  function updateHistoryMachineDropdown(cat) {
+    const machSelect = document.getElementById('historyMachineFilterSelect');
+    if (!machSelect) return;
+    const prevVal = machSelect.value;
+    machSelect.innerHTML = '';
+
+    const allOpt = document.createElement('option');
+    allOpt.value = 'ALL';
+    allOpt.textContent = '🚜 All Individual Machines';
+    machSelect.appendChild(allOpt);
+
+    const machineMap = new Map();
+    // Collect from FLEET_DIRECTORY
+    if (typeof FLEET_DIRECTORY !== 'undefined') {
+      Object.keys(FLEET_DIRECTORY).forEach(c => {
+        const isCatMatch = (cat === 'ALL') || (c === cat) ||
+                           (cat === 'RBMV' && c === 'RMBV') ||
+                           (cat === 'SBCM/FRM' && (c === 'SBCM' || c === 'FRM')) ||
+                           ((cat === 'SRGM/RGM' || cat === 'SRGM / RGM') && (c === 'SRGM' || c === 'RGM' || c === 'SRGM/RGM' || c === 'SRGM / RGM'));
+        if (isCatMatch) {
+          (FLEET_DIRECTORY[c] || []).forEach(m => {
+            const mId = m.id || m.machineNo;
+            if (mId && !machineMap.has(mId.toUpperCase())) {
+              machineMap.set(mId.toUpperCase(), { id: mId, model: m.model || c });
+            }
+          });
+        }
+      });
+    }
+    // Also include from failures
+    AppState.failures.forEach(f => {
+      const fCat = f.category || '';
+      const isCatMatch = (cat === 'ALL') || (fCat === cat) ||
+                         (cat === 'RBMV' && (fCat === 'RBMV' || fCat === 'RMBV')) ||
+                         (cat === 'SBCM/FRM' && (fCat === 'SBCM' || fCat === 'FRM')) ||
+                         ((cat === 'SRGM/RGM' || cat === 'SRGM / RGM') && (fCat === 'SRGM' || fCat === 'RGM' || fCat === 'SRGM/RGM' || fCat === 'SRGM / RGM'));
+      if (isCatMatch && f.machineNo) {
+        const up = f.machineNo.toUpperCase();
+        if (!machineMap.has(up)) {
+          machineMap.set(up, { id: f.machineNo, model: f.category || '' });
+        }
+      }
+    });
+
+    const sortedMachines = Array.from(machineMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+    allOpt.textContent = `🚜 All Individual Machines (${sortedMachines.length})`;
+
+    sortedMachines.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.id} (${m.model})`;
+      machSelect.appendChild(opt);
+    });
+
+    if (prevVal && machineMap.has(prevVal.toUpperCase())) {
+      machSelect.value = prevVal;
+      AppState.historyMachineFilter = prevVal;
+    } else {
+      machSelect.value = 'ALL';
+      AppState.historyMachineFilter = 'ALL';
+    }
+  }
+
+  function onHistoryCategoryFilterChange(cat) {
+    AppState.historyCategoryFilter = cat || 'ALL';
+    updateHistoryMachineDropdown(AppState.historyCategoryFilter);
+    AppState.historyLimit = 100;
+    renderTable(getAllMachineIncidentsChronological());
+  }
+
+  function onHistoryDateRangeChange() {
+    const startEl = document.getElementById('historyStartDate');
+    const endEl = document.getElementById('historyEndDate');
+    AppState.historyStartDate = startEl ? startEl.value.trim() : '';
+    AppState.historyEndDate = endEl ? endEl.value.trim() : '';
+    AppState.historyLimit = 100;
+    renderTable(getAllMachineIncidentsChronological());
+  }
+
+  function clearHistoryDateRange() {
+    const startEl = document.getElementById('historyStartDate');
+    const endEl = document.getElementById('historyEndDate');
+    if (startEl) startEl.value = '';
+    if (endEl) endEl.value = '';
+    AppState.historyStartDate = '';
+    AppState.historyEndDate = '';
+    AppState.historyLimit = 100;
+    renderTable(getAllMachineIncidentsChronological());
+    showToast('Date range filter cleared');
+  }
+
   function onHistoryFilterChange() {
     const periodSelect = document.getElementById('historyPeriodFilterSelect');
     const divSelect = document.getElementById('historyDivisionFilterSelect');
     const blockSelect = document.getElementById('historyBlockFilterSelect');
     const statSelect = document.getElementById('statusFilterSelect');
     const subSelect = document.getElementById('subsystemFilterSelect');
+    const machSelect = document.getElementById('historyMachineFilterSelect');
 
     if (periodSelect) AppState.historyPeriodFilter = periodSelect.value;
     if (divSelect) AppState.historyDivisionFilter = divSelect.value;
     if (blockSelect) AppState.historyBlockFilter = blockSelect.value;
     if (statSelect) AppState.statusFilter = statSelect.value;
     if (subSelect) AppState.subsystemFilter = subSelect.value;
+    if (machSelect) AppState.historyMachineFilter = machSelect.value;
 
     AppState.historyLimit = 100;
     renderTable(getAllMachineIncidentsChronological());
@@ -2334,8 +2602,12 @@
     }
 
     // Tally by category
-    const catLabels = MACHINE_CATEGORIES;
-    const counts = catLabels.map(c => AppState.failures.filter(f => f.category === c).length);
+    const catLabels = MACHINE_CATEGORIES.map(c => (c === 'SRGM/RGM' ? 'SRGM / RGM' : c));
+    const counts = MACHINE_CATEGORIES.map(c => {
+      if (c === 'RBMV') return AppState.failures.filter(f => f.category === 'RBMV' || f.category === 'RMBV').length;
+      if (c === 'SRGM/RGM') return AppState.failures.filter(f => f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM').length;
+      return AppState.failures.filter(f => f.category === c).length;
+    });
 
     AppState.charts.category = new Chart(ctx, {
       type: 'bar',
@@ -2773,12 +3045,16 @@
       AppState.charts.blockVsNonBlock.destroy();
     }
 
-    const isFYScope = (AppState.kpiScope === 'FY');
-    const targetPool = isFYScope
-      ? AppState.failures.filter(isFailureInCurrentFY)
-      : AppState.failures;
+    const isAllScope = (AppState.kpiScope === 'ALL');
+    const fyKey = isAllScope ? null : (AppState.kpiScope === 'FY' ? 'FY_2026_27' : AppState.kpiScope);
+    const targetPool = isAllScope
+      ? AppState.failures
+      : AppState.failures.filter(f => isFailureInFY(f, fyKey));
 
     const categoriesWithIncidents = MACHINE_CATEGORIES.filter(cat => {
+      if (cat === 'SRGM/RGM') {
+        return targetPool.some(f => f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM');
+      }
       return targetPool.some(f => f.category === cat);
     });
 
@@ -2787,7 +3063,12 @@
     const repetitiveData = [];
 
     categoriesWithIncidents.forEach(cat => {
-      const catFailures = targetPool.filter(f => f.category === cat);
+      const catFailures = targetPool.filter(f => {
+        if (cat === 'SRGM/RGM') {
+          return f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM';
+        }
+        return f.category === cat;
+      });
       let inBlock = 0;
       let nonBlock = 0;
       let rep = 0;
@@ -2812,7 +3093,7 @@
     AppState.charts.blockVsNonBlock = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: categoriesWithIncidents,
+        labels: categoriesWithIncidents.map(c => (c === 'SRGM/RGM' ? 'SRGM / RGM' : c)),
         datasets: [
           {
             label: 'In Traffic Block (⚠️ Operational Impact)',
@@ -2968,7 +3249,7 @@
     MACHINE_CATEGORIES.forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
-      opt.textContent = cat;
+      opt.textContent = (cat === 'SRGM/RGM') ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)' : cat;
       catSelect.appendChild(opt);
     });
     if (prevVal && MACHINE_CATEGORIES.includes(prevVal)) {
@@ -3118,7 +3399,7 @@
             const row = hData[r] || [];
             for (let c = 0; c < row.length; c++) {
               const cellStr = String(row[c]).trim();
-              const match = cellStr.match(/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|T-28|DGS|UTV|RBMV|RMBV|MDU)[\s\-_]*\d+/i);
+              const match = cellStr.match(/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|T-28|DGS|UTV|SRGM|RGM|RBMV|RMBV|MDU)[\s\-_]*\d+/i);
               if (match) {
                 chosenMachine = match[0].replace(/\s+/g, '-').toUpperCase();
                 break;
@@ -3132,7 +3413,7 @@
       // Check filename if still not found
       if (!chosenMachine && fileName) {
         const baseName = fileName.replace(/\.[^/.]+$/, '').trim();
-        if (/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|DGS|UTV|RBMV|RMBV|MDU|\d)/i.test(baseName)) {
+        if (/(?:UNI|PCTM|CSM|DTE|DUO|MPT|BCM|FRM|SBCM|BRM|SQRS|T28|DGS|UTV|SRGM|RGM|RBMV|RMBV|MDU|\d)/i.test(baseName)) {
           chosenMachine = baseName.replace(/\s+/g, '-').toUpperCase();
         }
       }
@@ -3652,7 +3933,8 @@
     if (m.includes('T28') || m.includes('T-28')) return 'T28';
     if (m.includes('DGS')) return 'DGS';
     if (m.includes('UTV')) return 'UTV';
-    if (m.includes('RMBV')) return 'RMBV';
+    if (m.includes('SRGM') || m.includes('RGM')) return 'SRGM/RGM';
+    if (m.includes('RBMV') || m.includes('RMBV')) return 'RBMV';
     if (m.includes('MDU')) return 'MDU';
     return AppState.selectedCategory !== 'ALL' ? AppState.selectedCategory : 'CSM';
   }
@@ -3678,7 +3960,7 @@
     const modalCat = document.getElementById('modalTargetCategory')?.value;
     const isCrane = isCraneMachine(modalCat) || isCraneMachine(AppState.selectedCategory) || isCraneMachine(AppState.selectedMachine);
     const targetCat = isCrane ? (modalCat && isCraneMachine(modalCat) ? modalCat : (isCraneMachine(AppState.selectedCategory) ? AppState.selectedCategory : 'UTV')) : (AppState.selectedCategory !== 'ALL' ? AppState.selectedCategory : 'CSM');
-    const targetMach = isCrane ? `${targetCat}-001` : `${targetCat}-901`;
+    const targetMach = isCrane ? `${targetCat}-001` : (targetCat.includes('/') ? `${targetCat.split('/')[0]}-001` : `${targetCat}-901`);
 
     const wb = XLSX.utils.book_new();
 
@@ -3906,6 +4188,144 @@
     return 'UNIMAT-8269';
   }
 
+  // Get Ordinal Suffix (1st, 2nd, 3rd, 4th, 5th, etc.)
+  function getOrdinalSuffix(n) {
+    const num = parseInt(n, 10) || 1;
+    const j = num % 10, k = num % 100;
+    if (j === 1 && k !== 11) return num + 'st';
+    if (j === 2 && k !== 12) return num + 'nd';
+    if (j === 3 && k !== 13) return num + 'rd';
+    return num + 'th';
+  }
+
+  // Parse Date string or Excel serial to timestamp for strict chronological sorting
+  function parseRecordTimestamp(rec) {
+    if (!rec) return 0;
+    if (rec.sortTimestamp) return rec.sortTimestamp;
+    const s = (rec.isoDate || rec.displayDate || rec.rawDate || '').toString().trim();
+    if (!s || /^(na|nil|not done|not done yet|_|-)$/i.test(s)) return 0;
+
+    // DD[-/. ]MM[-/. ]YYYY
+    const dmyMatch = s.match(/\b(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})\b/);
+    if (dmyMatch) {
+      return new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10)).getTime();
+    }
+    // YYYY-MM-DD
+    const isoMatch = s.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+    if (isoMatch) {
+      return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10)).getTime();
+    }
+    // Excel 5-digit serial
+    if (/^\d{5}$/.test(s)) {
+      const serial = parseInt(s, 10);
+      return new Date((serial - 25569) * 86400 * 1000).getTime();
+    }
+    // 4-digit year fallback
+    const yMatch = s.match(/\b(19\d{2}|20\d{2})\b/);
+    if (yMatch) {
+      return new Date(parseInt(yMatch[1], 10), 0, 1).getTime();
+    }
+    return 0;
+  }
+
+  // Convert various date representations to standard YYYY-MM-DD for HTML input[type=date]
+  function toIsoDate(dStr) {
+    if (!dStr) return '';
+    const s = dStr.toString().trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const dmy = s.match(/\b(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})\b/);
+    if (dmy) {
+      const d = dmy[1].padStart(2, '0');
+      const m = dmy[2].padStart(2, '0');
+      const y = dmy[3];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{5}$/.test(s)) {
+      const serial = parseInt(s, 10);
+      const dt = new Date((serial - 25569) * 86400 * 1000);
+      if (!isNaN(dt.getTime())) return dt.toISOString().substring(0, 10);
+    }
+    return '';
+  }
+
+  // Synchronize and enforce chronological ordinals: (1st IOH), (2nd IOH), ... or (1st POH), (2nd POH), ...
+  function syncHrmItemOrdinals(it) {
+    if (!it || !it.title) return;
+    const isIoh = /IOH/i.test(it.title);
+    const isPoh = /POH/i.test(it.title);
+    if (!isIoh && !isPoh) return;
+
+    const kind = isIoh ? 'IOH' : 'POH';
+    if (!Array.isArray(it.records)) it.records = [];
+
+    // Filter valid overhaul records with parsed timestamps
+    const validRecs = [];
+    it.records.forEach((r, idx) => {
+      const ts = parseRecordTimestamp(r);
+      if (ts > 0) {
+        r.sortTimestamp = ts;
+        validRecs.push({ r, ts, origIdx: idx });
+      }
+    });
+
+    // Sort valid records chronologically (earliest to latest)
+    validRecs.sort((a, b) => a.ts - b.ts);
+
+    // Assign chronological ordinal bracket
+    validRecs.forEach((entry, k) => {
+      const ord = getOrdinalSuffix(k + 1);
+      const computedTag = `(${ord} ${kind})`;
+      const r = entry.r;
+
+      if (!r.userOrdinalTag) {
+        r.ordinalTag = computedTag;
+      } else {
+        r.ordinalTag = r.userOrdinalTag;
+      }
+
+      // Ensure remarks contains the tag
+      if (!r.remarks || /^(na|nil|-)$/i.test(r.remarks.trim())) {
+        r.remarks = r.ordinalTag;
+      } else {
+        if (/\([ci]?p?ioh-?\d+\)/i.test(r.remarks)) {
+          r.remarks = r.remarks.replace(/\([ci]?p?ioh-?\d+\)/gi, r.ordinalTag);
+        } else if (!r.remarks.includes(r.ordinalTag) && !/\(\d+(st|nd|rd|th)\s+(IOH|POH)\)/i.test(r.remarks)) {
+          r.remarks = `${r.ordinalTag} ${r.remarks}`;
+        }
+      }
+    });
+
+    // Recompute present values (latest date)
+    if (it.records.length > 0) {
+      let latest = null;
+      if (validRecs.length > 0) {
+        latest = validRecs[validRecs.length - 1].r;
+      } else {
+        latest = it.records[it.records.length - 1];
+      }
+      if (latest) {
+        it.presentDate = latest.displayDate || latest.isoDate || latest.rawDate || 'NA';
+        it.presentEngineHours = latest.engineHours || 'NA';
+        it.presentRemarks = latest.remarks || latest.ordinalTag || 'NA';
+      }
+    }
+  }
+
+  // Ensure all machines' HRM data has chronological ordinals
+  function ensureAllHrmOrdinals(hrmData) {
+    if (!hrmData || typeof hrmData !== 'object') return;
+    Object.keys(hrmData).forEach(mId => {
+      const m = hrmData[mId];
+      if (m && Array.isArray(m.items)) {
+        m.items.forEach(it => {
+          if (/IOH|POH/i.test(it.title)) {
+            syncHrmItemOrdinals(it);
+          }
+        });
+      }
+    });
+  }
+
   // Render History Register Module (Tab 1)
   function renderHrmView() {
     const mId = getActiveMachineId();
@@ -3934,6 +4354,15 @@
     }
 
     const hrm = HRM_DATA[mId];
+
+    // Guarantee ordinals for this machine's items
+    if (hrm && Array.isArray(hrm.items)) {
+      hrm.items.forEach(it => {
+        if (/IOH|POH/i.test(it.title)) {
+          syncHrmItemOrdinals(it);
+        }
+      });
+    }
 
     // Update Header Card
     const catEl = document.getElementById('hrmMachineCat');
@@ -3993,6 +4422,17 @@
       const recordsCount = it.records ? it.records.length : 0;
       const hasHistory = recordsCount > 0;
 
+      // For IOH and POH items, calculate latest chronological ordinal tag for display in present row
+      let latestTag = '';
+      if (/IOH|POH/i.test(it.title) && it.records && it.records.length > 0) {
+        const validRecs = it.records.filter(r => parseRecordTimestamp(r) > 0);
+        if (validRecs.length > 0) {
+          validRecs.sort((a, b) => parseRecordTimestamp(a) - parseRecordTimestamp(b));
+          const latestRec = validRecs[validRecs.length - 1];
+          latestTag = latestRec.ordinalTag || `(${getOrdinalSuffix(validRecs.length)} ${/IOH/i.test(it.title) ? 'IOH' : 'POH'})`;
+        }
+      }
+
       tr.innerHTML = `
         <td><strong style="color: var(--gold-400); font-family: var(--font-mono);">${it.itemNum || (idx + 1)}</strong></td>
         <td>
@@ -4004,6 +4444,11 @@
           <span class="hrm-date-badge">
             <span>📅</span>
             <span>${escapeHtml(formatDateDisplay(it.presentDate))}</span>
+            ${latestTag && it.presentDate && it.presentDate !== 'NA' && !/^(not done|not done yet|nil|_|-)$/i.test(it.presentDate) ? `
+              <span class="badge badge-gold" style="font-size: 11px; font-weight: 700; background: rgba(228, 193, 83, 0.22); color: #e4c153; border: 1px solid rgba(228, 193, 83, 0.45); padding: 2px 7px; border-radius: 4px; margin-left: 6px;">
+                ${escapeHtml(latestTag)}
+              </span>
+            ` : ''}
           </span>
         </td>
         <td>
@@ -4029,12 +4474,15 @@
         </td>
         <td>
           ${isUserAdmin() ? `
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openAddHrmEntryModal(${idx})" style="padding: 4px 8px; font-size: 11px;" title="Update date and engine hours">
-              ➕ Add/Edit
+          <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary-pista" onclick="window.TM_APP.openAddHrmEntryModal(${idx})" style="padding: 4px 8px; font-size: 11px;" title="Add new overhaul record or entry">
+              ➕ Add
+            </button>
+            <button class="btn btn-dim" onclick="window.TM_APP.openEditHrmPresentModal(${idx})" style="padding: 4px 8px; font-size: 11px;" title="Edit present entry details anytime">
+              ✏️ Edit
             </button>
             <button class="hrm-btn-delete" onclick="window.TM_APP.deletePresentHrmEntry('${mId}', ${idx})" style="padding: 4px 8px; font-size: 11px;" title="Delete present entry">
-              🗑️ Delete
+              🗑️
             </button>
           </div>
           ` : `<span style="font-size: 11px; color: #799181;">View Only</span>`}
@@ -4053,16 +4501,26 @@
           recordsHtml += `
             <div class="hrm-history-item-card">
               <div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 3px;">
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 3px; flex-wrap: wrap;">
                   <span style="color: var(--pista-300); font-weight: 700; font-size: 11.5px;">📅 ${escapeHtml(formatDateDisplay(rec.displayDate || rec.isoDate || rec.rawDate))}</span>
+                  ${rec.ordinalTag ? `
+                    <span class="badge" style="background: rgba(228, 193, 83, 0.22); color: #e4c153; border: 1px solid rgba(228, 193, 83, 0.45); font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px;">
+                      ${escapeHtml(rec.ordinalTag)}
+                    </span>
+                  ` : ''}
                   ${rec.engineHours ? `<span style="color: var(--gold-300); font-family: var(--font-mono); font-size: 11.5px;">⏱️ ${escapeHtml(rec.engineHours)} EH</span>` : ''}
                 </div>
                 <div style="font-size: 11px; color: #c4d7c8;">${escapeHtml((rec.remarks && rec.remarks.trim() !== '' && rec.remarks.trim() !== '-' && !/^(no|nil)$/i.test(rec.remarks.trim())) ? rec.remarks.trim() : 'NA')}</div>
               </div>
               ${isUserAdmin() ? `
-              <button class="hrm-btn-delete" onclick="window.TM_APP.deleteHrmRecord('${mId}', ${idx}, '${rec.id}')" title="Delete this entry">
-                🗑️
-              </button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button class="btn btn-dim" onclick="window.TM_APP.openEditHrmRecordModal('${mId}', ${idx}, '${rec.id}')" style="padding: 3px 6px; font-size: 11px;" title="Edit this historical entry anytime">
+                  ✏️
+                </button>
+                <button class="hrm-btn-delete" onclick="window.TM_APP.deleteHrmRecord('${mId}', ${idx}, '${rec.id}')" style="padding: 3px 6px; font-size: 11px;" title="Delete this entry">
+                  🗑️
+                </button>
+              </div>
               ` : ''}
             </div>
           `;
@@ -4072,8 +4530,8 @@
           <td colspan="7" style="padding: 0;">
             <div class="hrm-history-drawer">
               <div style="font-size: 12px; font-weight: 700; color: var(--gold-400); margin-bottom: 6px; display: flex; justify-content: space-between;">
-                <span>Detailed Overhaul &amp; Replacement Audit History:</span>
-                ${isUserAdmin() ? '<span style="font-size: 11px; color: #8fa696;">Click 🗑️ to delete any individual entry</span>' : ''}
+                <span>Detailed Overhaul &amp; Replacement Audit History (Chronological Ordinals):</span>
+                ${isUserAdmin() ? '<span style="font-size: 11px; color: #8fa696;">Click ✏️ to edit or 🗑️ to delete any individual entry anytime</span>' : ''}
               </div>
               <div class="hrm-history-grid">
                 ${recordsHtml}
@@ -4994,6 +5452,67 @@
     }
   }
 
+  function onHrmModalItemChanged() {
+    const mId = document.getElementById('hrmModalMachineId').value || getActiveMachineId();
+    const itemIndex = parseInt(document.getElementById('hrmModalItemSelect').value, 10);
+    const hrm = HRM_DATA[mId];
+    if (!hrm || !hrm.items[itemIndex]) return;
+
+    const it = hrm.items[itemIndex];
+    const isOverhaul = /IOH|POH/i.test(it.title);
+    const ordGroup = document.getElementById('hrmModalOrdinalGroup');
+    if (ordGroup) {
+      ordGroup.style.display = isOverhaul ? 'block' : 'none';
+    }
+
+    const recId = document.getElementById('hrmModalRecordId').value;
+    if (!recId && isOverhaul) {
+      autoSuggestOrdinal();
+    }
+  }
+
+  function onHrmModalDateChanged() {
+    const recId = document.getElementById('hrmModalRecordId').value;
+    if (!recId) {
+      autoSuggestOrdinal();
+    }
+  }
+
+  function autoSuggestOrdinal() {
+    const mId = document.getElementById('hrmModalMachineId').value || getActiveMachineId();
+    const itemIndex = parseInt(document.getElementById('hrmModalItemSelect').value, 10);
+    const hrm = HRM_DATA[mId];
+    if (!hrm || !hrm.items[itemIndex]) return;
+
+    const it = hrm.items[itemIndex];
+    const isIoh = /IOH/i.test(it.title);
+    const isPoh = /POH/i.test(it.title);
+    if (!isIoh && !isPoh) return;
+
+    const kind = isIoh ? 'IOH' : 'POH';
+    const dateVal = document.getElementById('hrmModalDateInput').value;
+    const inputTs = parseRecordTimestamp({ isoDate: dateVal, rawDate: dateVal });
+
+    const validRecs = (it.records || []).filter(r => parseRecordTimestamp(r) > 0);
+    const recId = document.getElementById('hrmModalRecordId').value;
+    const others = recId ? validRecs.filter(r => r.id !== recId) : validRecs;
+
+    let earlierCount = 0;
+    others.forEach(r => {
+      if (parseRecordTimestamp(r) <= inputTs) {
+        earlierCount++;
+      }
+    });
+
+    const nextOrdinalNumber = inputTs > 0 ? (earlierCount + 1) : (others.length + 1);
+    const ordTag = `(${getOrdinalSuffix(nextOrdinalNumber)} ${kind})`;
+
+    const ordInput = document.getElementById('hrmModalOrdinalInput');
+    if (ordInput) {
+      ordInput.value = ordTag;
+    }
+  }
+
   function openAddHrmEntryModal(itemIndex = 0) {
     if (!isUserAdmin()) {
       showToast('View-Only Access: Adding/editing HRM entries requires Admin privileges.', true);
@@ -5005,6 +5524,11 @@
 
     document.getElementById('hrmModalMachineId').value = mId;
     document.getElementById('hrmModalRecordId').value = '';
+
+    const titleEl = document.getElementById('hrmModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<span>➕ Add New Entry to History Register Module</span>`;
+    }
 
     const select = document.getElementById('hrmModalItemSelect');
     if (select) {
@@ -5018,6 +5542,9 @@
       });
     }
 
+    const activeIt = hrm.items[itemIndex];
+    const isOverhaul = activeIt && /IOH|POH/i.test(activeIt.title);
+
     // Set default date to today in YYYY-MM-DD
     const dateInput = document.getElementById('hrmModalDateInput');
     if (dateInput) {
@@ -5026,17 +5553,111 @@
 
     const ehInput = document.getElementById('hrmModalEhInput');
     if (ehInput) {
-      const activeIt = hrm.items[itemIndex];
-      ehInput.value = (activeIt && activeIt.presentEngineHours && activeIt.presentEngineHours !== 'NA') ? activeIt.presentEngineHours : '';
+      ehInput.value = '';
     }
 
+    const ordGroup = document.getElementById('hrmModalOrdinalGroup');
+    const ordInput = document.getElementById('hrmModalOrdinalInput');
     const remarksInput = document.getElementById('hrmModalRemarksInput');
-    if (remarksInput) {
-      const activeIt = hrm.items[itemIndex];
-      remarksInput.value = (activeIt && activeIt.presentRemarks) ? activeIt.presentRemarks : '';
+
+    if (isOverhaul) {
+      if (ordGroup) ordGroup.style.display = 'block';
+      const kind = /IOH/i.test(activeIt.title) ? 'IOH' : 'POH';
+      const validRecs = (activeIt.records || []).filter(r => parseRecordTimestamp(r) > 0);
+      const nextNum = validRecs.length + 1;
+      const tag = `(${getOrdinalSuffix(nextNum)} ${kind})`;
+      if (ordInput) ordInput.value = tag;
+      if (remarksInput) remarksInput.value = `${tag} `;
+    } else {
+      if (ordGroup) ordGroup.style.display = 'none';
+      if (ordInput) ordInput.value = '';
+      if (remarksInput) remarksInput.value = '';
     }
 
     openModal('hrmEntryModal');
+  }
+
+  function openEditHrmRecordModal(mId, itemIndex, recordId) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Adding/editing HRM entries requires Admin privileges.', true);
+      return;
+    }
+    const hrm = HRM_DATA[mId];
+    if (!hrm || !hrm.items[itemIndex]) return;
+
+    const it = hrm.items[itemIndex];
+    const rec = (it.records || []).find(r => r.id === recordId);
+    if (!rec) return;
+
+    document.getElementById('hrmModalMachineId').value = mId;
+    document.getElementById('hrmModalRecordId').value = recordId;
+
+    const titleEl = document.getElementById('hrmModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<span>✏️ Edit HRM Record • ${escapeHtml(it.title)}</span>`;
+    }
+
+    const select = document.getElementById('hrmModalItemSelect');
+    if (select) {
+      select.innerHTML = '';
+      hrm.items.forEach((item, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `${item.itemNum || (idx + 1)}. ${item.title}`;
+        if (idx === itemIndex) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    const dateInput = document.getElementById('hrmModalDateInput');
+    if (dateInput) {
+      const iso = toIsoDate(rec.displayDate || rec.isoDate || rec.rawDate);
+      dateInput.value = iso || new Date().toISOString().substring(0, 10);
+    }
+
+    const ehInput = document.getElementById('hrmModalEhInput');
+    if (ehInput) {
+      ehInput.value = (rec.engineHours && rec.engineHours !== 'NA') ? rec.engineHours : '';
+    }
+
+    const isOverhaul = /IOH|POH/i.test(it.title);
+    const ordGroup = document.getElementById('hrmModalOrdinalGroup');
+    const ordInput = document.getElementById('hrmModalOrdinalInput');
+    const remarksInput = document.getElementById('hrmModalRemarksInput');
+
+    if (isOverhaul) {
+      if (ordGroup) ordGroup.style.display = 'block';
+      if (ordInput) ordInput.value = rec.ordinalTag || '';
+    } else {
+      if (ordGroup) ordGroup.style.display = 'none';
+      if (ordInput) ordInput.value = '';
+    }
+
+    if (remarksInput) {
+      remarksInput.value = (rec.remarks && rec.remarks !== 'NA') ? rec.remarks : '';
+    }
+
+    openModal('hrmEntryModal');
+  }
+
+  function openEditHrmPresentModal(itemIndex = 0) {
+    const mId = getActiveMachineId();
+    const hrm = HRM_DATA[mId];
+    if (!hrm || !hrm.items[itemIndex]) return;
+
+    const it = hrm.items[itemIndex];
+    if (it.records && it.records.length > 0) {
+      const validRecs = it.records.filter(r => parseRecordTimestamp(r) > 0);
+      if (validRecs.length > 0) {
+        validRecs.sort((a, b) => parseRecordTimestamp(a) - parseRecordTimestamp(b));
+        const latest = validRecs[validRecs.length - 1];
+        openEditHrmRecordModal(mId, itemIndex, latest.id);
+        return;
+      }
+      openEditHrmRecordModal(mId, itemIndex, it.records[it.records.length - 1].id);
+    } else {
+      openAddHrmEntryModal(itemIndex);
+    }
   }
 
   function handleHrmEntrySubmit(event) {
@@ -5047,10 +5668,12 @@
     }
     const mId = document.getElementById('hrmModalMachineId').value || getActiveMachineId();
     const itemIndex = parseInt(document.getElementById('hrmModalItemSelect').value, 10);
+    const recordId = document.getElementById('hrmModalRecordId').value;
     const dateVal = document.getElementById('hrmModalDateInput').value;
     const ehVal = document.getElementById('hrmModalEhInput').value.trim();
     const rawRem = document.getElementById('hrmModalRemarksInput').value.trim();
     const remarksVal = (rawRem && rawRem !== '-' && !/^(no|nil)$/i.test(rawRem)) ? rawRem : 'NA';
+    const ordVal = document.getElementById('hrmModalOrdinalInput') ? document.getElementById('hrmModalOrdinalInput').value.trim() : '';
 
     if (!HRM_DATA[mId] || !HRM_DATA[mId].items[itemIndex]) {
       showToast('Error: Machine HRM record not found', true);
@@ -5060,30 +5683,54 @@
     const it = HRM_DATA[mId].items[itemIndex];
     if (!it.records) it.records = [];
 
-    const newRec = {
-      id: `rec_${mId}_it${itemIndex}_${Date.now()}`,
-      colPair: 'USER-ENTRY',
-      rawDate: dateVal,
-      isoDate: dateVal,
-      displayDate: dateVal,
-      engineHours: ehVal || 'NA',
-      remarks: remarksVal
-    };
+    if (recordId) {
+      // Edit existing record
+      const existingRec = it.records.find(r => r.id === recordId);
+      if (existingRec) {
+        existingRec.rawDate = dateVal;
+        existingRec.isoDate = dateVal;
+        existingRec.displayDate = dateVal;
+        existingRec.engineHours = ehVal || 'NA';
+        if (ordVal) {
+          existingRec.userOrdinalTag = ordVal;
+          existingRec.ordinalTag = ordVal;
+        }
+        existingRec.remarks = remarksVal;
+        existingRec.sortTimestamp = parseRecordTimestamp(existingRec);
+      }
+    } else {
+      // Add new record
+      const newRec = {
+        id: `rec_${mId}_it${itemIndex}_${Date.now()}`,
+        colPair: 'USER-ENTRY',
+        rawDate: dateVal,
+        isoDate: dateVal,
+        displayDate: dateVal,
+        engineHours: ehVal || 'NA',
+        userOrdinalTag: ordVal || null,
+        ordinalTag: ordVal || null,
+        remarks: remarksVal,
+        sortTimestamp: parseRecordTimestamp({ isoDate: dateVal, rawDate: dateVal })
+      };
+      it.records.push(newRec);
+    }
 
-    it.records.push(newRec);
+    // Sync ordinals chronologically and update present values
+    syncHrmItemOrdinals(it);
 
-    // Recompute present values (latest date)
-    const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
-    const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
-
-    it.presentDate = latest.displayDate || latest.isoDate || dateVal;
-    it.presentEngineHours = latest.engineHours || ehVal || 'NA';
-    it.presentRemarks = latest.remarks || remarksVal || 'NA';
+    // If non-overhaul item or only 1 record, compute present values
+    if (!/IOH|POH/i.test(it.title)) {
+      const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+      const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
+      it.presentDate = latest.displayDate || latest.isoDate || dateVal;
+      it.presentEngineHours = latest.engineHours || ehVal || 'NA';
+      it.presentRemarks = latest.remarks || remarksVal || 'NA';
+    }
 
     saveHrmData();
     renderHrmView();
     closeModal('hrmEntryModal');
-    showToast(`Added new entry to '${it.title}' for ${mId}`);
+    showToast(`Saved record in '${it.title}' for ${mId}`);
   }
 
   function deleteHrmRecord(mId, itemIndex, recordId) {
@@ -5099,17 +5746,26 @@
     const it = hrm.items[itemIndex];
     it.records = it.records.filter(r => r.id !== recordId);
 
-    // Recompute present values
-    if (it.records.length > 0) {
-      const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
-      const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
-      it.presentDate = latest.displayDate || latest.isoDate || 'NA';
-      it.presentEngineHours = latest.engineHours || 'NA';
-      it.presentRemarks = latest.remarks || 'NA';
+    // Sync ordinals chronologically and update present values
+    if (/IOH|POH/i.test(it.title)) {
+      syncHrmItemOrdinals(it);
+      if (it.records.length === 0) {
+        it.presentDate = 'NA';
+        it.presentEngineHours = 'NA';
+        it.presentRemarks = 'NA';
+      }
     } else {
-      it.presentDate = 'NA';
-      it.presentEngineHours = 'NA';
-      it.presentRemarks = 'NA';
+      if (it.records.length > 0) {
+        const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+        const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
+        it.presentDate = latest.displayDate || latest.isoDate || 'NA';
+        it.presentEngineHours = latest.engineHours || 'NA';
+        it.presentRemarks = latest.remarks || 'NA';
+      } else {
+        it.presentDate = 'NA';
+        it.presentEngineHours = 'NA';
+        it.presentRemarks = 'NA';
+      }
     }
 
     saveHrmData();
@@ -5130,16 +5786,25 @@
 
     if (it.records && it.records.length > 0) {
       it.records.pop();
-      if (it.records.length > 0) {
-        const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
-        const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
-        it.presentDate = latest.displayDate || latest.isoDate || 'NA';
-        it.presentEngineHours = latest.engineHours || 'NA';
-        it.presentRemarks = latest.remarks || 'NA';
+      if (/IOH|POH/i.test(it.title)) {
+        syncHrmItemOrdinals(it);
+        if (it.records.length === 0) {
+          it.presentDate = 'NA';
+          it.presentEngineHours = 'NA';
+          it.presentRemarks = 'NA';
+        }
       } else {
-        it.presentDate = 'NA';
-        it.presentEngineHours = 'NA';
-        it.presentRemarks = 'NA';
+        if (it.records.length > 0) {
+          const isoRecs = it.records.filter(r => r.isoDate).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+          const latest = isoRecs.length > 0 ? isoRecs[isoRecs.length - 1] : it.records[it.records.length - 1];
+          it.presentDate = latest.displayDate || latest.isoDate || 'NA';
+          it.presentEngineHours = latest.engineHours || 'NA';
+          it.presentRemarks = latest.remarks || 'NA';
+        } else {
+          it.presentDate = 'NA';
+          it.presentEngineHours = 'NA';
+          it.presentRemarks = 'NA';
+        }
       }
     } else {
       it.presentDate = 'NA';
@@ -5162,6 +5827,7 @@
 
     if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters && window.REAL_SWR_FLEET_DATA.historyRegisters[mId]) {
       HRM_DATA[mId] = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters[mId]));
+      ensureAllHrmOrdinals(HRM_DATA);
       saveHrmData();
       renderHrmView();
       showToast(`Reset ${mId} HRM to authentic workbook records.`);
@@ -5173,14 +5839,30 @@
     const hrm = HRM_DATA[mId];
     if (!hrm) return;
 
-    const rows = hrm.items.map(it => ({
-      'Item No': it.itemNum,
-      'Parameter Description': it.title,
-      'Present Date': it.presentDate,
-      'Present Engine Hours': it.presentEngineHours,
-      'Technical Remarks / Spares': it.presentRemarks,
-      'Total Historical Records Logged': it.records ? it.records.length : 0
-    }));
+    const rows = hrm.items.map(it => {
+      let latestTag = '';
+      if (/IOH|POH/i.test(it.title) && it.records && it.records.length > 0) {
+        const validRecs = it.records.filter(r => parseRecordTimestamp(r) > 0);
+        if (validRecs.length > 0) {
+          validRecs.sort((a, b) => parseRecordTimestamp(a) - parseRecordTimestamp(b));
+          const latestRec = validRecs[validRecs.length - 1];
+          latestTag = latestRec.ordinalTag || `(${getOrdinalSuffix(validRecs.length)} ${/IOH/i.test(it.title) ? 'IOH' : 'POH'})`;
+        }
+      }
+
+      const dateExport = (latestTag && it.presentDate && it.presentDate !== 'NA' && !/^(not done|nil|_|-)$/i.test(it.presentDate))
+        ? `${it.presentDate} ${latestTag}`
+        : it.presentDate;
+
+      return {
+        'Item No': it.itemNum,
+        'Parameter Description': it.title,
+        'Date': dateExport,
+        '@ Engine Hours': it.presentEngineHours,
+        'Technical Remarks / Spares': it.presentRemarks,
+        'Total Historical Records Logged': it.records ? it.records.length : 0
+      };
+    });
 
     if (typeof XLSX === 'undefined' || !XLSX.utils) {
       try {
@@ -5651,7 +6333,7 @@
     MACHINE_CATEGORIES.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c;
-      opt.textContent = c;
+      opt.textContent = (c === 'SRGM/RGM') ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)' : c;
       if (AppState.selectedCategory === c) opt.selected = true;
       catSelect.appendChild(opt);
     });
@@ -5895,6 +6577,7 @@
     resetToDefaultData,
     getAppState: () => AppState,
     getFleetDirectory: () => FLEET_DIRECTORY,
+    getHrmData: () => HRM_DATA,
     getMachineInfo,
     // Machine Deletion Methods
     openDeleteMachineModal,
@@ -5905,6 +6588,11 @@
     saveCommissioningDate,
     toggleHrmHistory,
     openAddHrmEntryModal,
+    openEditHrmRecordModal,
+    openEditHrmPresentModal,
+    autoSuggestOrdinal,
+    onHrmModalItemChanged,
+    onHrmModalDateChanged,
     handleHrmEntrySubmit,
     deleteHrmRecord,
     deletePresentHrmEntry,
@@ -5937,14 +6625,23 @@
     // Financial Year Surveillance Scope Methods
     setKpiScope,
     isFailureInCurrentFY,
-    // All Machine Incidents Chronological Master Timeline Methods
+    isFailureInFY,
+    getFinancialYears: () => FINANCIAL_YEARS,
+    // All Machine Incidents Chronological Master Timeline & Filter Methods
     toggleChronologicalSort,
     onSortSelectChange,
     onHistoryFilterChange,
+    onHistoryCategoryFilterChange,
+    updateHistoryMachineDropdown,
+    onHistoryDateRangeChange,
+    clearHistoryDateRange,
     showMoreIncidents,
     showAllIncidents,
     getAllMachineIncidentsChronological,
-    renderTable
+    renderTable,
+    getAppState: () => AppState,
+    selectCategory,
+    populateModalCategories
   };
 
   // Launch on DOM ready
