@@ -96,6 +96,10 @@
             <div class="quick-chip-id">cetm@hqubl</div>
             <div class="quick-chip-role viewer">USER 4 · CE/TM (cetmswr)</div>
           </div>
+          <div class="quick-chip" onclick="window.TM_APP.fillLoginCredentials('dtycetmypr')" title="Click to fill USER 5 credentials">
+            <div class="quick-chip-id">dtycetmypr</div>
+            <div class="quick-chip-role viewer">USER 5 · Dy.CE/TM (dtycetm@zbdypr)</div>
+          </div>
         </div>
 
         <form id="loginForm" onsubmit="event.preventDefault(); window.TM_APP.handleLogin();">
@@ -159,6 +163,7 @@
                 <option value="admin2@zbdypr">admin2@zbdypr — USER 2 (Admin)</option>
                 <option value="axentm@zbdypr">axentm@zbdypr — USER 3 (AXEN/TM)</option>
                 <option value="cetm@hqubl">cetm@hqubl — USER 4 (CE/TM)</option>
+                <option value="dtycetmypr">dtycetmypr — USER 5 (Dy.CE/TM)</option>
               </select>
               <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gold-400);">👤</span>
             </div>
@@ -258,10 +263,10 @@
                 <span class="role-badge admin" id="loggedInRoleDisplay">ADMIN</span>
               </div>
               <div class="session-actions-divider"></div>
-              <button type="button" class="btn-user-tab btn-changepw-tab btn-user-action" onclick="window.TM_APP.openChangePasswordModal()" title="Change Account Password">
+              <button type="button" class="btn-user-tab btn-changepw-tab btn-user-action" id="btnHeaderChangePassword" onclick="window.TM_APP.openChangePasswordModal()" title="Change Account Password">
                 <span>🔑 Change Password</span>
               </button>
-              <button type="button" class="btn-user-tab btn-logout-tab btn-user-action btn-logout" onclick="window.TM_APP.logout()" title="Logout of TM-FAST (SWR)">
+              <button type="button" class="btn-user-tab btn-logout-tab btn-user-action btn-logout" id="btnHeaderLogout" onclick="window.TM_APP.logout()" title="Logout of TM-FAST (SWR)">
                 <span>🚪 Logout</span>
               </button>
             </div>
@@ -284,6 +289,22 @@
           </div>
         </div>
 
+        <!-- Highlights Financial Year Scope Bar -->
+        <div class="fy-scope-strip">
+          <div class="fy-scope-badge">
+            <span class="fy-indicator-dot"></span>
+            <span>Surveillance Highlights Period: <strong id="kpiScopePeriodLabel" style="color: var(--gold-300);">Current Financial Year (01-04-2026 to Present)</strong></span>
+          </div>
+          <div class="fy-toggle-group">
+            <button type="button" class="fy-toggle-btn active" id="btnScopeFY" onclick="window.TM_APP.setKpiScope('FY')" title="Filter highlights strictly to Current Financial Year (1 April 2026 to Present)">
+              📅 FY 2026-27 (Active)
+            </button>
+            <button type="button" class="fy-toggle-btn" id="btnScopeAll" onclick="window.TM_APP.setKpiScope('ALL')" title="Show all-time cumulative metrics across all historical logs">
+              📜 All Historical Logs
+            </button>
+          </div>
+        </div>
+
         <!-- KPI Summary Strip -->
         <div class="hero-kpi-strip">
           <div class="kpi-chip">
@@ -295,7 +316,7 @@
               <span class="kpi-value pista-text" id="kpiTotalFailures">0</span>
               <span class="kpi-unit">cases</span>
             </div>
-            <div class="kpi-subtext">Across monitored machines</div>
+            <div class="kpi-subtext" id="kpiTotalFailuresSubtext">FY 2026-27 (1 Apr 2026 - Present)</div>
           </div>
 
           <div class="kpi-chip alert-edge">
@@ -307,41 +328,52 @@
               <span class="kpi-value alert-text" id="kpiActiveRepairs">0</span>
               <span class="kpi-unit">machines</span>
             </div>
-            <div class="kpi-subtext">Currently under restoration</div>
+            <div class="kpi-subtext" id="kpiActiveRepairsSubtext">Under restoration in FY 2026–27</div>
           </div>
 
           <div class="kpi-chip gold-edge">
             <div class="kpi-title">
-              <span>Fleet Fit Rate</span>
-              <span>🛡️</span>
+              <span>Machines Monitored</span>
+              <span>🚂</span>
             </div>
             <div class="kpi-value-row">
-              <span class="kpi-value gold-text" id="kpiFleetFitRate">100%</span>
+              <span class="kpi-value gold-text" id="kpiMonitoredMachines">22</span>
+              <span style="font-size: 18px; color: var(--gold-400); font-weight: 700; margin: 0 4px;">/</span>
+              <span style="font-size: 20px; color: #a4bba9; font-weight: 700;" id="kpiTotalFleetMachines">87</span>
+              <span class="kpi-unit">units</span>
             </div>
-            <div class="kpi-subtext">Fit for block traffic operations</div>
+            <div class="kpi-subtext" id="kpiMonitoredSubtext">22 updated machines with complete history vs 87 total SWR fleet</div>
           </div>
 
           <div class="kpi-chip alert-edge">
             <div class="kpi-title">
-              <span>Repetitive Failure Index</span>
+              <span>Fleet Repetitive Cases</span>
               <span>🔁</span>
             </div>
             <div class="kpi-value-row">
-              <span class="kpi-value alert-text" id="kpiRepeatIndex">0%</span>
+              <span class="kpi-value alert-text" id="kpiFleetRepeatCases">0</span>
+              <span class="kpi-unit">cases</span>
             </div>
-            <div class="kpi-subtext">Recurring defects within 60 days</div>
+            <div class="kpi-subtext" id="kpiFleetRepeatSubtext">Recurring defect incidents in FY 2026–27</div>
           </div>
 
-          <div class="kpi-chip gold-edge">
+          <div class="kpi-chip block-edge">
             <div class="kpi-title">
-              <span>Bad Actor Machines</span>
-              <span>🚨</span>
+              <span>Block vs Non-Block Cases</span>
+              <span>🚦</span>
             </div>
-            <div class="kpi-value-row">
-              <span class="kpi-value gold-text" id="kpiBadActors">0</span>
-              <span class="kpi-unit">units</span>
+            <div class="kpi-value-row" style="gap: 10px; align-items: baseline;">
+              <div>
+                <span class="kpi-value" style="color: #ff8a65; font-size: 24px;" id="kpiInBlockCases">0</span>
+                <span style="font-size: 10.5px; color: #ffab91; font-weight: 700; text-transform: uppercase;">In Block</span>
+              </div>
+              <div style="color: rgba(212,175,55,0.4); font-size: 18px; font-weight: 300;">|</div>
+              <div>
+                <span class="kpi-value" style="color: #93c5fd; font-size: 24px;" id="kpiNonBlockCases">0</span>
+                <span style="font-size: 10.5px; color: #bfdbfe; font-weight: 700; text-transform: uppercase;">Non-Block</span>
+              </div>
             </div>
-            <div class="kpi-subtext">≥2 breakdowns / repeat cases</div>
+            <div class="kpi-subtext" id="kpiBlockSubtext">Traffic block operational impact in FY 2026–27</div>
           </div>
         </div>
       </div>
@@ -527,6 +559,7 @@
       </button>
       <button class="tab-btn tab-btn-dim" data-tab="history-view" id="tabBtnAllFailures">
         <span>📋 All Machine Incidents</span>
+        <span class="tab-count-badge" id="badgeAllFailures">0</span>
       </button>
     </div>
 
@@ -748,17 +781,17 @@
         </div>
       </div>
 
-      <!-- Frequent Failure Machines Ranking -->
+      <!-- Fleet Operational Impact: Block vs Non-Block & Repetitive Defect Analysis -->
       <div class="panel-card" style="margin-bottom: 20px;">
         <div class="panel-header">
-          <div class="panel-title">
+          <div class="panel-title gold-accent">
             <span class="indicator-circle"></span>
-            <span>Frequent Failure Machines ("Bad Actors" Ranking)</span>
+            <span>Fleet Operational Surveillance: In Block vs Non-Block Cases &amp; Repetitive Defect Breakdown</span>
           </div>
-          <span style="font-size: 11px; color: #ff8a65;">Recurrent Breakdown Frequency</span>
+          <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">Traffic Block Impact Analysis</span>
         </div>
-        <div class="chart-container-box" style="height: 260px;">
-          <canvas id="chartBadActors"></canvas>
+        <div class="chart-container-box" style="height: 280px;">
+          <canvas id="chartBlockVsNonBlock"></canvas>
         </div>
       </div>
 
@@ -773,14 +806,24 @@
         <div class="panel-header">
           <div class="panel-title gold-accent">
             <span class="indicator-circle"></span>
-            <span>Failure Logbook, Corrective Measures &amp; Surveillance Records</span>
+            <span>All Machine Incidents — Master Fleet Timeline</span>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary-pista" style="padding: 6px 12px; font-size: 12px;" onclick="window.TM_APP.openLogModal()">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span class="badge" style="background: rgba(212,175,55,0.18); color: var(--gold-300); border: 1px solid var(--border-gold);" id="allIncidentsSummaryBadge">
+              Chronological Timeline · All Machines &amp; Divisions
+            </span>
+            <select id="historySortOrderSelect" class="filter-select" style="font-weight: 700; color: var(--gold-300); border-color: var(--border-gold); background: rgba(18, 38, 26, 0.95); padding: 5px 10px; cursor: pointer;" onchange="window.TM_APP.onSortSelectChange(this.value)" title="Choose chronological sorting direction">
+              <option value="DESC">⬇️ Newest to Oldest (Latest First)</option>
+              <option value="ASC">⬆️ Oldest to Newest (Earliest First)</option>
+            </select>
+            <button class="btn btn-secondary-pista" style="padding: 6px 12px; font-size: 12px;" onclick="window.TM_APP.toggleChronologicalSort()" id="btnToggleSort" title="Click to toggle chronological order (Latest First vs Oldest First)">
+              📅 Sort: Latest First ⬇️
+            </button>
+            <button class="btn btn-secondary-pista admin-only" style="padding: 6px 12px; font-size: 12px;" onclick="window.TM_APP.openLogModal()">
               ➕ Add Failure
             </button>
-            <button class="btn btn-dim" style="padding: 6px 12px; font-size: 12px;" onclick="window.TM_APP.resetToDefaultData()">
-              🔄 Reset to Sample Data
+            <button class="btn btn-dim admin-only" style="padding: 6px 12px; font-size: 12px;" onclick="window.TM_APP.resetToDefaultData()">
+              🔄 Reset to Sample
             </button>
           </div>
         </div>
@@ -789,17 +832,35 @@
         <div class="table-filter-bar">
           <div class="search-input-box">
             <span class="search-icon">🔍</span>
-            <input type="text" id="tableSearchInput" placeholder="Search by machine, subsystem, defect or root cause...">
+            <input type="text" id="tableSearchInput" placeholder="Search across all machines, defects, parts or root causes...">
           </div>
 
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <select id="statusFilterSelect" class="filter-select">
+            <select id="historyPeriodFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()" title="Filter timeline by Financial Year or view all history">
+              <option value="ALL">📅 All Historical Periods</option>
+              <option value="FY">🗓️ Current FY 2026–27 Only</option>
+            </select>
+
+            <select id="historyDivisionFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
+              <option value="ALL">🌐 All Divisions</option>
+              <option value="SBC">🔵 SBC Division</option>
+              <option value="MYS">🟢 MYS Division</option>
+              <option value="UBL">🔴 UBL Division</option>
+            </select>
+
+            <select id="historyBlockFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
+              <option value="ALL">🚦 All Operational Impacts</option>
+              <option value="IN_BLOCK">⚠️ In Traffic Block Only</option>
+              <option value="NON_BLOCK">ℹ️ Not In Block Only</option>
+            </select>
+
+            <select id="statusFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
               <option value="ALL">All Statuses</option>
               <option value="UNDER REPAIR">⚠️ Under Repair</option>
               <option value="FIT">✅ Fit Only</option>
             </select>
 
-            <select id="subsystemFilterSelect" class="filter-select">
+            <select id="subsystemFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryFilterChange()">
               <option value="ALL">All Subsystems</option>
               <option value="Hydraulic">Hydraulic</option>
               <option value="Electrical">Electrical</option>
@@ -820,18 +881,34 @@
               <tr>
                 <th>#</th>
                 <th>Machine No / Cat</th>
-                <th>Breakdown Time / Sec</th>
-                <th>Subsystem / Part</th>
+                <th>Breakdown Date &amp; Sec</th>
+                <th>Subsystem / Component</th>
                 <th>Nature of Failure</th>
+                <th>Block Impact</th>
                 <th>Down Time</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="failureTableBody">
-              <!-- Dynamically populated rows and detail drawers -->
+              <!-- Dynamically populated rows and detail drawers in chronological order -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination & Record Summary Strip -->
+        <div id="historyPaginationBar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: rgba(9,18,13,0.7); border-radius: 8px; margin-top: 12px; border: 1px solid var(--border-dim); flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 12.5px; color: #cbd8cf;" id="historyCountText">
+            Showing <strong id="historyVisibleCount" style="color: var(--gold-400);">0</strong> of <strong id="historyTotalCount" style="color: #fff;">0</strong> incidents in chronological order
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary-pista" id="btnLoadMoreIncidents" style="padding: 6px 14px; font-size: 12px;" onclick="window.TM_APP.showMoreIncidents()">
+              ⬇️ Load More Incidents
+            </button>
+            <button type="button" class="btn btn-dim" id="btnShowAllIncidents" style="padding: 6px 14px; font-size: 12px;" onclick="window.TM_APP.showAllIncidents()">
+              📜 Show All Incidents
+            </button>
+          </div>
         </div>
 
         <div id="tableEmptyState" style="display: none; text-align: center; padding: 40px; color: #8da494;">

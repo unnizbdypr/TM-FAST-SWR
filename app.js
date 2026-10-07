@@ -21,36 +21,64 @@
            str.startsWith('UTV') || str.startsWith('RBMV') || str.startsWith('RMBV');
   }
 
-  // Universal Date Formatter: Strictly DD.MM.YYYY
+  // Universal Date Formatter: Strictly DD-MM-YYYY
   function formatDateDisplay(val) {
     if (!val || val === 'N/A' || val === '-' || val === '--' || val === 'NA' || val === 'Not Set') return '--';
-    const s = String(val).trim();
+    const s = String(val).trim().replace(/[`'"]/g, '').trim();
     if (/^(active|under repair|nil|none|ongoing)$/i.test(s) || s.toLowerCase().includes('active')) {
       return s;
     }
+    // Handle Excel serial numbers (e.g. 45180 -> 11-09-2023)
+    if (/^\d{5}$/.test(s)) {
+      const serial = parseInt(s, 10);
+      const dt = new Date((serial - 25569) * 86400 * 1000);
+      if (!isNaN(dt.getTime())) {
+        const dd = String(dt.getUTCDate()).padStart(2, '0');
+        const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const yyyy = dt.getUTCFullYear();
+        return `${dd}-${mm}-${yyyy}`;
+      }
+    }
+    // Handle composite date formats e.g. "04/5-6-26", "16-17/11/2025", "3-4/06/2023"
+    let cleanStr = s;
+    const compMatch = s.match(/^(\d+)[-/](\d+)[-/](\d+)(?:[-/](\d+))?$/);
+    if (compMatch && compMatch[4]) {
+      cleanStr = `${compMatch[1]}/${compMatch[3]}/${compMatch[4]}`;
+    } else {
+      cleanStr = s.replace(/^\d+[-/](\d+[-/]\d+[-/]\d+)$/, '$1');
+    }
+
     // Match YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD (optionally with time)
-    const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    const isoMatch = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
     if (isoMatch) {
       const yyyy = isoMatch[1];
       const mm = isoMatch[2].padStart(2, '0');
       const dd = isoMatch[3].padStart(2, '0');
-      return `${dd}.${mm}.${yyyy}`;
+      return `${dd}-${mm}-${yyyy}`;
     }
     // Match DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optionally with time)
-    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
     if (dmyMatch) {
       const dd = dmyMatch[1].padStart(2, '0');
       const mm = dmyMatch[2].padStart(2, '0');
       const yyyy = dmyMatch[3];
-      return `${dd}.${mm}.${yyyy}`;
+      return `${dd}-${mm}-${yyyy}`;
+    }
+    // Match DD-MM-YY or DD/MM/YY or DD.MM.YY
+    const dmyShortMatch = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
+    if (dmyShortMatch) {
+      const dd = dmyShortMatch[1].padStart(2, '0');
+      const mm = dmyShortMatch[2].padStart(2, '0');
+      const yyyy = '20' + dmyShortMatch[3];
+      return `${dd}-${mm}-${yyyy}`;
     }
     // Date object / timestamp fallback
-    const parsed = new Date(s);
+    const parsed = new Date(cleanStr);
     if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900 && parsed.getFullYear() < 2100) {
       const dd = String(parsed.getDate()).padStart(2, '0');
       const mm = String(parsed.getMonth() + 1).padStart(2, '0');
       const yyyy = parsed.getFullYear();
-      return `${dd}.${mm}.${yyyy}`;
+      return `${dd}-${mm}-${yyyy}`;
     }
     return s;
   }
@@ -58,8 +86,8 @@
   // ==========================================================================
   // AUTHENTICATION & ROLE-BASED ACCESS CONTROL (SWR TM-FAST)
   // ==========================================================================
-  const AUTH_STORAGE_KEY = 'TM_FAST_USERS_V3';
-  const SESSION_STORAGE_KEY = 'TM_FAST_SESSION_V3';
+  const AUTH_STORAGE_KEY = 'TM_FAST_USERS_V4';
+  const SESSION_STORAGE_KEY = 'TM_FAST_SESSION_V4';
 
   const DEFAULT_USERS = {
     'admin1@zbdypr': {
@@ -85,6 +113,12 @@
       password: 'cetmswr',
       name: 'USER 4 (CE/TM)',
       role: 'VIEWER'
+    },
+    'dtycetmypr': {
+      userId: 'dtycetmypr',
+      password: 'dtycetm@zbdypr',
+      name: 'USER 5 (Dy.CE/TM)',
+      role: 'VIEWER'
     }
   };
 
@@ -104,6 +138,9 @@
     if (clean === 'cetm' || clean === 'ce' || clean === 'user4' || clean === 'cetm@hqubl' || clean.startsWith('cetm@')) {
       return 'cetm@hqubl';
     }
+    if (clean === 'dtycetmypr' || clean === 'dycetmypr' || clean === 'dycetm' || clean === 'dtycetm' || clean === 'user5' || clean === 'dtycetm@zbdypr' || clean === 'dycetm@zbdypr' || clean.startsWith('dtycetm') || clean.startsWith('dycetm')) {
+      return 'dtycetmypr';
+    }
     return input.trim().toLowerCase();
   }
 
@@ -114,6 +151,7 @@
     try {
       // Clean legacy cache from previous test iterations
       localStorage.removeItem('TM_FAST_USERS_V2');
+      localStorage.removeItem('TM_FAST_USERS_V3');
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -548,10 +586,10 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v14 TM-FAST authentic fleet with single RBMV, Muck Disposal Unit, 3S Unimat)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST';
-  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V14_FAST';
+  // Local Storage Keys (v15 TM-FAST authentic fleet with strictly normalized DD-MM-YYYY dates and purged bogus rows)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
+  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V15_DDMMYYYY';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V15_DDMMYYYY';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -586,13 +624,19 @@
   // State Management
   const AppState = {
     failures: [],
-    selectedCategory: 'UNI/PCTM', // Default to Unimat
+    selectedCategory: 'ALL',      // Default to Fleet Overview
     selectedMachine: 'UNIMAT-8269', // Default to active machine so HRM is immediately rendered!
     selectedDivision: 'ALL',      // Division Filter: ALL, SBC, MYS, UBL
     activeTab: 'hrm-view',        // TAB 1: History Register Module (HRM) as requested!
     searchQuery: '',
     statusFilter: 'ALL',
     subsystemFilter: 'ALL',
+    chronologicalSortOrder: 'DESC', // 'DESC' (latest first) or 'ASC' (oldest first)
+    historyDivisionFilter: 'ALL',
+    historyBlockFilter: 'ALL',
+    historyPeriodFilter: 'ALL',
+    historyLimit: 100,
+    kpiScope: 'FY', // Default Surveillance Highlights Scope: Current Financial Year 2026-27 (01.04.2026 to Present)
     charts: {}
   };
 
@@ -643,6 +687,7 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V9_CRANE_FLEET', 'TM_FAILURE_FLEET_DIRECTORY_V9_CRANE',
         'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
         'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
+        'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST', 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST', 'TM_HRM_DATA_V14_FAST',
         'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
@@ -729,8 +774,38 @@
         });
       }
 
-      // Sanitize remarks to ensure "NA" if empty, whitespace, hyphen, or literal "no"
+      // Sanitize failures: filter out any header/bogus rows
+      AppState.failures = AppState.failures.filter(f => {
+        if (!f || !f.id) return false;
+        if (f.id === 'INC-DUO-8128-1062' || f.id === 'INC-FRM-57160-1541' || f.id === 'INC-MPT-12008-1659' || f.id === 'INC-MDU-57222-1557') return false;
+        if (f.dateOfFailure === 'DESCRIPTION OF FAILURE' || f.natureOfFailure === 'REMARKS') return false;
+        if (f.dateOfFailure === 'NA' && f.natureOfFailure === 'NA' && f.description === 'NA') return false;
+        return true;
+      });
+
+      // Ensure every record has strictly normalized DD-MM-YYYY dates & remarks
       AppState.failures.forEach(f => {
+        // Auto-detect and handle shifted column where date was put in natureOfFailure
+        if (typeof f.natureOfFailure === 'string' && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(f.natureOfFailure.trim())) {
+          const dStr = String(f.dateOfFailure).trim();
+          if (!/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(dStr) && !/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+            const temp = f.dateOfFailure;
+            f.dateOfFailure = f.natureOfFailure;
+            f.natureOfFailure = temp;
+            if (f.description === f.dateOfFailure) f.description = temp;
+          }
+        }
+
+        if (f.dateOfFailure) f.dateOfFailure = formatDateDisplay(f.dateOfFailure);
+        if (f.breakdownTime) f.breakdownTime = formatDateDisplay(f.breakdownTime);
+        else f.breakdownTime = f.dateOfFailure;
+        if (f.dateOfRectification && !/^(active|under repair|nil)$/i.test(f.dateOfRectification)) {
+          f.dateOfRectification = formatDateDisplay(f.dateOfRectification);
+        }
+        if (f.fitTime && !/^(active|under repair|nil)$/i.test(f.fitTime)) {
+          f.fitTime = formatDateDisplay(f.fitTime);
+        }
+
         if (!f.remarks || f.remarks.trim() === '' || f.remarks.trim() === '-' || /^(no|nil)$/i.test(f.remarks.trim())) {
           f.remarks = 'NA';
         }
@@ -974,55 +1049,164 @@
     }
   }
 
-  // Repetitive Failure Surveillance Algorithm
-  function classifyRepetitiveFailures(list) {
-    // Sort chronologically
-    list.sort((a, b) => {
-      const ta = new Date(a.breakdownTime || a.dateOfFailure || 0).getTime();
-      const tb = new Date(b.breakdownTime || b.dateOfFailure || 0).getTime();
-      return ta - tb;
+  // ==========================================================================
+  // INTELLIGENT SEMANTIC DEFECT SURVEILLANCE & REPETITIVE FAILURE ENGINE
+  // ==========================================================================
+  const CANONICAL_DEFECT_FAMILIES = [
+    { id: 'SQUEEZE_CYL', name: 'Squeezing Cylinder Defect', pat: /squeez\w*\s+cyl|male\s+squeez|female\s+squeez|inner\s+squeez|outer\s+squeez|big\s+squeez|small\s+squeez|hzs-ds|squeezing\s+cyl|squeezing\s+piston/i, sym: /seal|leak|burst|cut|worn|pressure|damage|oil/i },
+    { id: 'VIB_SHAFT', name: 'Tamping Vibration Shaft / Bearing Failure', pat: /vibrat\w*\s+shaft|vibrat\w*\s+unit|vibrat\w*\s+bearing|eccentric\s+shaft|main\s+bearing\s+flange/i, sym: /shaft|bearing|cut|seiz|damage|vibrat|flange|noise|hot|smoke/i },
+    { id: 'SPRING_CORD', name: 'Tamping Transducer Spring / Cord Wire Cut', pat: /tamping\s+bank\s+(?:cord\s+wire|spring)|tras?nducer\s+spring|cord\s+wire|hty2-00-12/i, sym: /cut|broken|damage|wire|spring|snapped/i },
+    { id: 'PIN_35MM', name: 'Tamping 35mm Extension Joint Pin Failure', pat: /35\s*mm\s+pin|23067096|extension\s+joint/i, sym: /pin|cut|broken|joint/i },
+    { id: 'TOOL_ARM', name: 'Tamping Tool Holder / Squeezing Arm Defect', pat: /tool\s+tilting|squeezing\s+arm|tool\s+holder|tamping\s+arm|tamping\s+tool/i, sym: /cut|broken|arm|cylinder|pin|wear|loose|fallen|bolt/i },
+    { id: 'TRANSDUCER', name: 'Lining / Leveling Transducer & Potentiometer Defect', pat: /tras?nducer|potentiometer|depth\s+transducer|lining\s+potentiometer|lining\s+disturbance|slewed/i, sym: /signal|malfunction|output|potentiometer|transducer|fluctuat|slewed|disturbance/i },
+    { id: 'CARDAN_SHAFT', name: 'Cardan / Propeller Shaft Defect', pat: /card[ao]n\s+shaft|propeller\s+shaft|flange\s+yoke|intermediate\s+shaft/i, sym: /groove|cut|yoke|broken|shaft|bolt|dummy|noise/i },
+    { id: 'AXLE_GEARBOX', name: 'Axle Drive & Gearbox Defect', pat: /axle\s+(?:1|2|3|4|gear\s*box)|axle\s+drive|revers\w*\s+gearbox|axle\s+clutch/i, sym: /stuck|gearbox|drive|leak|noise|seiz|clutch\s+pressure|drop/i },
+    { id: 'ENGINE_RPM', name: 'Engine RPM & Governor Fluctuation', pat: /rpm\s+(?:fluct|stuck|higher|hunt|meter|cable|motor)|governor|147901|control\s+rod/i, sym: /rpm|stuck|hunting|fluct|speed|high\s+rpm|control\s+rod|cable/i },
+    { id: 'ENGINE_START', name: 'Engine Starting & Cranking Troubles', pat: /engine\s+(?:not\s+start|shut\s+down|stopped|crank)|starter\s+motor|self\s+starter/i, sym: /start|crank|shut\s*down|stopped|cranking/i },
+    { id: 'ENGINE_COOLING', name: 'Engine Radiator, Water Pump & Fan Defect', pat: /radiator|fan\s+hub|water\s+pump|coolant|pulley.*belt|radiator\s+fan/i, sym: /leak|belt|bolt|cut|fan|pulley|temp|cool|broken/i },
+    { id: 'ENGINE_FUEL', name: 'Engine Fuel System & PT Pump Failure', pat: /pt\s+pump|fuel\s+(?:pump|inject|supply|pipe)|fuel\s+line/i, sym: /fuel|diesel|leak|shaft|coupler|calibrat|jammed/i },
+    { id: 'AIR_COMPRESSOR', name: 'Air Compressor & Pneumatic Braking Defect', pat: /air\s+compressor|unloader\s+valve|brake\s+cylinder|direct\s+brake|pneumatic\s+system/i, sym: /air|compressor|pressure|unloader|brake|build|releasing|leak/i },
+    { id: 'HYD_HOSE', name: 'Hydraulic High Pressure Hose Burst / Leak', pat: /hyd\w*\s+hose|driving\s+hose|16r02|4r02|dash\s+no\s*16|high\s+pressure\s+hose/i, sym: /hose|burst|leak|punct|crimp|fitting|end\s+fitting/i },
+    { id: 'HYD_VALVE', name: 'Hydraulic DC / Proportional Valve Malfunction', pat: /dc\s+valve|solenoid\s+valve|proportional\s+valve|relief\s+valve|lifting\s+valve/i, sym: /valve|elbow|leak|stick|solenoid|malfunction|output/i },
+    { id: 'HYD_PRESSURE', name: 'Hydraulic System Pressure & Pump Failure', pat: /hydraulic\s+system\s+pressure|hyd\w*\s+pump|variable\s+pump/i, sym: /pressure|pump|cavitat|flow|unable\s+to\s+develop/i },
+    { id: 'CONVEYOR', name: 'Conveyor System & Swivel Belt Defect', pat: /waste\s+conveyor|transfer\s+conveyor|conveyor\s+belt|conveyor\s+roller|swivel\s+belt|main\s+conveyor/i, sym: /conveyor|bearing|belt|roller|motor|pasting|layer|stuck|rotation/i },
+    { id: 'CUTTER_CHAIN', name: 'Cutter Chain, Bar & Sprocket Failure', pat: /cutter\s+chain|cutter\s+bar|sprocket|guide\s+trough|cutter\s+gearbox/i, sym: /chain|sprocket|bar|fell|bolt|broken|roller|guide\s+plate/i },
+    { id: 'ALTERNATOR_BAT', name: 'Alternator & Battery Charging Failure', pat: /alternator|dynamo|batter(?:y|ies)/i, sym: /charg|alternator|battery|voltage|low\s+charge/i },
+    { id: 'ELECTRICAL_HMI', name: 'Electrical Control Panel, Relay & HMI Defect', pat: /hmi|display\s+unit|control\s+panel|proximity\s+switch|relay\s+pcb|u111|u156/i, sym: /hmi|hang|display|panel|sensor|switch|relay|glowing/i }
+  ];
+
+  const PART_CODE_REGEX = /\b(?:hty2-00-12|23067096|hzs-ds[\w.-]*|16r02|4r02|147901|w\.33\.200|3240743|5413187|3067459|3005962|4026171|66219|67532|1308\s*tvh|gh506|hy830|hy6rsj|09d090|ke\s*127)\b/gi;
+
+  function extractFailureFeatures(f) {
+    // Primary text: strictly what happened in the incident (natureOfFailure and description)
+    const compClean = (f.component || '').replace(/\(P\/N:[\s\S]*?\)/gi, '').trim();
+    const primaryTxt = ((f.natureOfFailure || '') + ' ' + compClean + ' ' + (f.description || '')).toLowerCase();
+    const fullTxt = (primaryTxt + ' ' + (f.rootCause || '') + ' ' + (f.actionTaken || '') + ' ' + (f.partNo || '') + ' ' + (f.sparesUsed || '')).toLowerCase();
+
+    // Part codes: can be anywhere in full text or partNo
+    const codes = [];
+    let m;
+    PART_CODE_REGEX.lastIndex = 0;
+    while ((m = PART_CODE_REGEX.exec(fullTxt)) !== null) {
+      codes.push(m[0].toLowerCase());
+    }
+
+    // Matched families: based on primary text of the actual incident!
+    const families = [];
+    CANONICAL_DEFECT_FAMILIES.forEach(fam => {
+      if (fam.pat.test(primaryTxt) && fam.sym.test(primaryTxt)) {
+        families.push(fam);
+      }
     });
 
-    const machineMap = {};
+    return { primaryTxt, fullTxt, codes, families };
+  }
 
-    list.forEach(f => {
-      const mId = f.machineNo;
-      if (!machineMap[mId]) machineMap[mId] = [];
-      machineMap[mId].push(f);
-    });
+  function areFailuresRepetitive(a, b) {
+    if (a.machineNo !== b.machineNo) return null;
 
-    // Check each machine's incidents for repeats within 60 days
-    Object.keys(machineMap).forEach(mId => {
-      const records = machineMap[mId];
-      for (let i = 0; i < records.length; i++) {
-        let repeatCount = records[i].isRepetitive ? (records[i].repeatCount || 2) : 1;
-        const rawTimeI = records[i].breakdownTime || records[i].dateOfFailure;
-        const curDate = rawTimeI ? new Date(rawTimeI).getTime() : 0;
+    // Check shared specific part codes
+    if (a._features && b._features && a._features.codes.length > 0 && b._features.codes.length > 0) {
+      for (let ca of a._features.codes) {
+        if (b._features.codes.includes(ca)) {
+          return 'Shared Part Code: ' + ca.toUpperCase();
+        }
+      }
+    }
 
-        if (curDate > 0) {
-          for (let j = 0; j < i; j++) {
-            const rawTimeJ = records[j].breakdownTime || records[j].dateOfFailure;
-            const prevDate = rawTimeJ ? new Date(rawTimeJ).getTime() : 0;
-            if (prevDate > 0) {
-              const daysDiff = (curDate - prevDate) / (1000 * 60 * 60 * 24);
-
-              // If within 60 days and same subsystem or similar component
-              if (daysDiff >= 0 && daysDiff <= 60) {
-                const sameSub = (records[i].subsystem || '').toLowerCase() === (records[j].subsystem || '').toLowerCase();
-                const compMatch = (records[i].component || '').toLowerCase().includes((records[j].component || '').toLowerCase()) ||
-                                 (records[j].component || '').toLowerCase().includes((records[i].component || '').toLowerCase());
-
-                if (sameSub || compMatch) {
-                  repeatCount++;
-                }
-              }
-            }
+    // Check shared component family
+    if (a._features && b._features) {
+      for (let fa of a._features.families) {
+        for (let fb of b._features.families) {
+          if (fa.id === fb.id) {
+            return fa.name;
           }
         }
+      }
+    }
 
-        if (repeatCount > 1 || records[i].isRepetitive) {
-          records[i].isRepetitive = true;
-          records[i].repeatCount = Math.max(repeatCount, records[i].repeatCount || 2);
+    return null;
+  }
+
+  // Repetitive Failure Surveillance Algorithm (Semantic Defect Matching)
+  function classifyRepetitiveFailures(list) {
+    if (!list || !Array.isArray(list)) return;
+
+    // 1. Column shift auto-repair (e.g. DUO-8128)
+    list.forEach(f => {
+      const dVal = String(f.dateOfFailure || f.breakdownTime || f.date || '');
+      const natVal = String(f.natureOfFailure || '');
+      const isNatDate = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(natVal.trim());
+      const isDDate = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(dVal.trim()) || /^\d{4}-\d{2}-\d{2}/.test(dVal.trim());
+      if (isNatDate && !isDDate) {
+        f.dateOfFailure = natVal;
+        f.breakdownTime = natVal;
+        f.natureOfFailure = dVal;
+        f.description = dVal;
+      }
+    });
+
+    // 2. Extract semantic defect features & reset flags
+    list.forEach(f => {
+      f.isRepetitive = false;
+      f.repeatCount = 1;
+      f.defectFamily = '';
+      f.repetitiveReason = '';
+      f._features = extractFailureFeatures(f);
+    });
+
+    // 3. Group by machine
+    const byMachine = {};
+    list.forEach(f => {
+      const mId = f.machineNo;
+      if (!byMachine[mId]) byMachine[mId] = [];
+      byMachine[mId].push(f);
+    });
+
+    // 4. Discover connected defect recurrence clusters on each machine
+    Object.keys(byMachine).forEach(mId => {
+      const recs = byMachine[mId];
+      const n = recs.length;
+      const adj = Array.from({ length: n }, () => []);
+
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const reason = areFailuresRepetitive(recs[i], recs[j]);
+          if (reason) {
+            adj[i].push({ idx: j, reason });
+            adj[j].push({ idx: i, reason });
+          }
+        }
+      }
+
+      const visited = new Array(n).fill(false);
+      for (let i = 0; i < n; i++) {
+        if (!visited[i] && adj[i].length > 0) {
+          const cluster = [];
+          const queue = [i];
+          visited[i] = true;
+          let clusterReason = adj[i][0].reason;
+
+          while (queue.length > 0) {
+            const curr = queue.shift();
+            cluster.push(recs[curr]);
+            adj[curr].forEach(edge => {
+              if (!visited[edge.idx]) {
+                visited[edge.idx] = true;
+                queue.push(edge.idx);
+                if (!clusterReason) clusterReason = edge.reason;
+              }
+            });
+          }
+
+          if (cluster.length >= 2) {
+            cluster.forEach(c => {
+              c.isRepetitive = true;
+              c.repeatCount = Math.max(c.repeatCount || 1, cluster.length);
+              c.defectFamily = clusterReason;
+              c.repetitiveReason = `Recurring ${clusterReason} on ${mId} (${cluster.length}x cases)`;
+            });
+          }
         }
       }
     });
@@ -1280,13 +1464,36 @@
     });
   }
 
+  // Get failures for the highlights KPI strip & Fleet Surveillance (scoped to selected category & division across all machines)
+  function getFleetFailuresForKPIs() {
+    return AppState.failures.filter(f => {
+      // Category match
+      if (AppState.selectedCategory !== 'ALL') {
+        const isRbmvMatch = (AppState.selectedCategory === 'RBMV' || AppState.selectedCategory === 'RMBV') && 
+                            (f.category === 'RBMV' || f.category === 'RMBV');
+        if (f.category !== AppState.selectedCategory && !isRbmvMatch) {
+          return false;
+        }
+      }
+      // Division match
+      if (AppState.selectedDivision !== 'ALL') {
+        const div = (f.division || '').toUpperCase();
+        if (!div.includes(AppState.selectedDivision)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   // Render KPIs, Surveillance Banner, Charts and Tables
   function renderAll() {
     const filtered = getFilteredFailures();
+    const kpiFailures = getFleetFailuresForKPIs();
 
-    renderKPIs(filtered);
-    renderSurveillanceAlerts(filtered);
-    renderTable(filtered);
+    renderKPIs(kpiFailures);
+    renderSurveillanceAlerts(kpiFailures);
+    renderTable(getAllMachineIncidentsChronological());
     renderCharts(filtered);
     renderHrmView();
     renderSubsystemDesk('Engine', 'subsystemDesk-engine');
@@ -1298,43 +1505,137 @@
     updateTabBadges();
   }
 
+  // Set Financial Year Surveillance Scope ('FY' for 2026-27 or 'ALL' for cumulative)
+  function setKpiScope(scope) {
+    AppState.kpiScope = (scope === 'ALL') ? 'ALL' : 'FY';
+
+    const btnFY = document.getElementById('btnScopeFY');
+    const btnAll = document.getElementById('btnScopeAll');
+    if (btnFY) btnFY.classList.toggle('active', AppState.kpiScope === 'FY');
+    if (btnAll) btnAll.classList.toggle('active', AppState.kpiScope === 'ALL');
+
+    const labelEl = document.getElementById('kpiScopePeriodLabel');
+    if (labelEl) {
+      labelEl.textContent = (AppState.kpiScope === 'FY')
+        ? 'Current Financial Year (01-04-2026 to Present)'
+        : 'All-Time Cumulative Historical Dataset';
+    }
+
+    const kpiFailures = getFleetFailuresForKPIs();
+    renderKPIs(kpiFailures);
+    renderBlockVsNonBlockChart(kpiFailures);
+    renderSurveillanceAlerts(kpiFailures);
+
+    showToast(`Surveillance Highlights Period: ${AppState.kpiScope === 'FY' ? 'Current Financial Year 2026–27' : 'All Historical Logs'}`);
+  }
+
   // Render KPI Counter Strip
   function renderKPIs(list) {
-    const totalFailures = list.length;
-    const activeRepairs = list.filter(f => f.status === 'UNDER REPAIR').length;
-    const repeatFailures = list.filter(f => f.isRepetitive).length;
+    const isFYScope = (AppState.kpiScope === 'FY');
+    // In FY scope, filter incidents strictly to Current Financial Year (01-04-2026 to present)
+    const kpiList = isFYScope ? list.filter(isFailureInCurrentFY) : list;
 
-    // Calculate Fleet Fit Rate % across monitored machines
-    let totalMonitoredMachines = new Set(list.map(f => f.machineNo)).size;
-    if (totalMonitoredMachines === 0) {
-      let count = 0;
-      Object.keys(FLEET_DIRECTORY).forEach(c => { count += FLEET_DIRECTORY[c].length; });
-      totalMonitoredMachines = count;
+    const totalFailures = kpiList.length;
+    const activeRepairs = kpiList.filter(f => f.status === 'UNDER REPAIR').length;
+
+    // 1. Total Monitored Machines vs 87 Total SWR Machines (Always show total updated machines / 87 machines)
+    const TOTAL_SWR_FLEET = 87;
+    const allMonitoredSet = new Set();
+    if (typeof FLEET_DIRECTORY !== 'undefined') {
+      Object.keys(FLEET_DIRECTORY).forEach(c => {
+        (FLEET_DIRECTORY[c] || []).forEach(m => {
+          if (m.id || m.machineNo) allMonitoredSet.add(m.id || m.machineNo);
+        });
+      });
     }
-    const fitRate = totalMonitoredMachines > 0 
-      ? (((totalMonitoredMachines - activeRepairs) / totalMonitoredMachines) * 100).toFixed(1) + '%'
-      : '100%';
-
-    // Repetitive Failure Rate
-    const repeatRate = totalFailures > 0 ? ((repeatFailures / totalFailures) * 100).toFixed(0) : '0';
-
-    // Bad Actor Machines (machines with 2 or more failures)
-    const machineFailCounts = {};
-    list.forEach(f => {
-      machineFailCounts[f.machineNo] = (machineFailCounts[f.machineNo] || 0) + 1;
+    AppState.failures.forEach(f => {
+      if (f.machineNo) allMonitoredSet.add(f.machineNo);
     });
-    const badActors = Object.keys(machineFailCounts).filter(m => machineFailCounts[m] >= 2).length;
+    const totalMonitoredCount = allMonitoredSet.size || 22;
+    const currentMonitoredSet = new Set(list.map(f => f.machineNo));
+    const currentCategoryMonitored = currentMonitoredSet.size;
 
+    // 2. Count Repetitive Cases for currently scoped fleet
+    const repeatFailures = kpiList.filter(f => f.isRepetitive).length;
+
+    // 3. Count Cases Occurred In Block vs Not In Block
+    let inBlockCount = 0;
+    let nonBlockCount = 0;
+    kpiList.forEach(f => {
+      const b = String(f.whetherInBlock || '').toUpperCase().trim();
+      if (b === 'YES' || b.includes('BLOCK') || b === 'Y') {
+        inBlockCount++;
+      } else {
+        nonBlockCount++;
+      }
+    });
+
+    // Populate DOM elements
     const elTot = document.getElementById('kpiTotalFailures');
     if (elTot) elTot.textContent = totalFailures;
+    const elTotSub = document.getElementById('kpiTotalFailuresSubtext');
+    if (elTotSub) {
+      elTotSub.textContent = isFYScope
+        ? (AppState.selectedCategory !== 'ALL' ? `FY 2026-27 (${AppState.selectedCategory} fleet)` : 'FY 2026-27 (1 Apr 2026 - Present)')
+        : (AppState.selectedCategory !== 'ALL' ? `All-time (${AppState.selectedCategory} fleet)` : 'All-Time Cumulative Dataset');
+    }
+
     const elAct = document.getElementById('kpiActiveRepairs');
     if (elAct) elAct.textContent = activeRepairs;
-    const elFit = document.getElementById('kpiFleetFitRate');
-    if (elFit) elFit.textContent = fitRate;
-    const elRep = document.getElementById('kpiRepeatIndex');
-    if (elRep) elRep.textContent = `${repeatRate}% (${repeatFailures})`;
-    const elBad = document.getElementById('kpiBadActors');
-    if (elBad) elBad.textContent = badActors;
+    const elActSub = document.getElementById('kpiActiveRepairsSubtext');
+    if (elActSub) {
+      elActSub.textContent = isFYScope
+        ? (activeRepairs === 0 ? 'All site breakdowns rectified in FY 2026-27' : `${activeRepairs} under active repair in FY 2026-27`)
+        : (activeRepairs === 0 ? 'All site breakdowns rectified' : `${activeRepairs} currently under active repair`);
+    }
+
+    // Machines Monitored vs 87 Total (Always show total updated machines / 87 machines)
+    const elMon = document.getElementById('kpiMonitoredMachines');
+    if (elMon) elMon.textContent = totalMonitoredCount;
+    const elTotFleet = document.getElementById('kpiTotalFleetMachines');
+    if (elTotFleet) elTotFleet.textContent = TOTAL_SWR_FLEET;
+    const elMonSub = document.getElementById('kpiMonitoredSubtext');
+    if (elMonSub) {
+      if (AppState.selectedCategory !== 'ALL') {
+        elMonSub.textContent = `${totalMonitoredCount} updated machines (${currentCategoryMonitored} in ${AppState.selectedCategory}) vs ${TOTAL_SWR_FLEET} total SWR fleet`;
+      } else {
+        elMonSub.textContent = `${totalMonitoredCount} updated machines with complete history vs ${TOTAL_SWR_FLEET} total SWR fleet`;
+      }
+    }
+
+    // Fleet Repetitive Cases
+    const elRep = document.getElementById('kpiFleetRepeatCases');
+    if (elRep) elRep.textContent = repeatFailures;
+    const elRepSub = document.getElementById('kpiFleetRepeatSubtext');
+    if (elRepSub) {
+      if (isFYScope) {
+        elRepSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `Recurring defects in ${AppState.selectedCategory} fleet (FY 2026-27)`
+          : `Recurring defect incidents in FY 2026-27`;
+      } else {
+        elRepSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `All-time recurring defects in ${AppState.selectedCategory} fleet`
+          : `All-time recurring defect incidents across monitored fleet`;
+      }
+    }
+
+    // Block vs Non-Block Cases
+    const elInBlock = document.getElementById('kpiInBlockCases');
+    if (elInBlock) elInBlock.textContent = inBlockCount;
+    const elNonBlock = document.getElementById('kpiNonBlockCases');
+    if (elNonBlock) elNonBlock.textContent = nonBlockCount;
+    const elBlockSub = document.getElementById('kpiBlockSubtext');
+    if (elBlockSub) {
+      if (isFYScope) {
+        elBlockSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `FY 2026-27: In Block vs Non-Block (${AppState.selectedCategory})`
+          : `FY 2026-27 traffic block operational impact`;
+      } else {
+        elBlockSub.textContent = AppState.selectedCategory !== 'ALL'
+          ? `All-time: In Block vs Non-Block (${AppState.selectedCategory})`
+          : `All-time traffic block operational impact`;
+      }
+    }
   }
 
   // Render Repetitive Failure & Surveillance Alert Panel
@@ -1588,42 +1889,214 @@
     }
   }
 
-  // Render Failure History Table
+  // Indian Railways Current Financial Year (FY 2026-27: April 1st 2026 to March 31st 2027)
+  const FY_2026_START = new Date(2026, 3, 1, 0, 0, 0).getTime(); // 01.04.2026 00:00:00
+  const FY_2026_END = new Date(2027, 2, 31, 23, 59, 59).getTime();   // 31.03.2027 23:59:59
+
+  // Helper: Determine if failure falls strictly in Current Financial Year (FY 2026-27)
+  function isFailureInCurrentFY(f) {
+    if (!f) return false;
+    const ts = getFailureTimestamp(f);
+    if (!ts) return false;
+    return ts >= FY_2026_START && ts <= FY_2026_END;
+  }
+
+  // Timestamp extractor for precise chronological sorting & Financial Year filtering
+  function getFailureTimestamp(f) {
+    if (!f) return 0;
+    let dVal = f.dateOfFailure || f.breakdownTime || f.date || '';
+    let natVal = f.natureOfFailure || '';
+
+    // Auto-detect and handle shifted column where date was put in natureOfFailure
+    if (typeof natVal === 'string' && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(natVal.trim())) {
+      const dStr = String(dVal).trim();
+      if (!/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(dStr) && !/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+        dVal = natVal;
+      }
+    }
+
+    if (typeof dVal === 'number') {
+      if (dVal > 30000 && dVal < 60000) {
+        return (dVal - 25569) * 86400 * 1000;
+      }
+      return dVal;
+    }
+    const str = String(dVal).trim().replace(/[`'"]/g, '');
+    if (!str) return 0;
+
+    // Handle 5-digit Excel serial numbers
+    if (/^\d{5}$/.test(str)) {
+      return (parseInt(str, 10) - 25569) * 86400 * 1000;
+    }
+
+    // Handle composite date formats e.g. "04/5-6-26", "16-17/11/2025", "3-4/06/2023"
+    let cleanStr = str;
+    const compMatch = str.match(/^(\d+)[-/](\d+)[-/](\d+)(?:[-/](\d+))?$/);
+    if (compMatch && compMatch[4]) {
+      // 4 parts e.g. 16-17-11-2025 -> use 16/11/2025
+      cleanStr = `${compMatch[1]}/${compMatch[3]}/${compMatch[4]}`;
+    } else {
+      cleanStr = str.replace(/^\d+[-/](\d+[-/]\d+[-/]\d+)$/, '$1');
+    }
+
+    // Standard ISO format (YYYY-MM-DD)
+    if (cleanStr.includes('-') && cleanStr.split('-')[0].length === 4) {
+      const parsed = Date.parse(cleanStr);
+      if (!isNaN(parsed)) return parsed;
+    }
+
+    // Parse DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    const parts = cleanStr.split(/[-/.]/);
+    if (parts.length === 3) {
+      let day = parseInt(parts[0], 10);
+      let month = parseInt(parts[1], 10) - 1;
+      let year = parseInt(parts[2], 10);
+      if (year < 100) year += 2000;
+      if (day > 1000) {
+        year = day;
+        month = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+      }
+      const dt = new Date(year, month, day);
+      if (!isNaN(dt.getTime())) return dt.getTime();
+    }
+
+    const parsedFallback = Date.parse(cleanStr);
+    if (!isNaN(parsedFallback)) return parsedFallback;
+    return 0;
+  }
+
+  // Get All Machine Failures Across Entire Application in Strict Chronological Order
+  function getAllMachineIncidentsChronological() {
+    // 1. Start with ALL failures available in the app across all machines and categories
+    let list = AppState.failures.slice();
+
+    // 2. Period filter (ALL vs FY)
+    if (AppState.historyPeriodFilter && AppState.historyPeriodFilter === 'FY') {
+      list = list.filter(isFailureInCurrentFY);
+    }
+
+    // 3. Division filter for history table (defaults to ALL)
+    if (AppState.historyDivisionFilter && AppState.historyDivisionFilter !== 'ALL') {
+      list = list.filter(f => (f.division || '').toUpperCase().includes(AppState.historyDivisionFilter));
+    }
+
+    // 4. Operational Block filter (ALL, IN_BLOCK, NON_BLOCK)
+    if (AppState.historyBlockFilter && AppState.historyBlockFilter !== 'ALL') {
+      if (AppState.historyBlockFilter === 'IN_BLOCK') {
+        list = list.filter(f => {
+          const b = String(f.whetherInBlock || '').toUpperCase();
+          return b === 'YES' || b.includes('BLOCK') || b === 'Y';
+        });
+      } else if (AppState.historyBlockFilter === 'NON_BLOCK') {
+        list = list.filter(f => {
+          const b = String(f.whetherInBlock || '').toUpperCase();
+          return b !== 'YES' && !b.includes('BLOCK') && b !== 'Y';
+        });
+      }
+    }
+
+    // 4. Status filter (ALL, UNDER REPAIR, FIT)
+    if (AppState.statusFilter && AppState.statusFilter !== 'ALL') {
+      list = list.filter(f => f.status === AppState.statusFilter);
+    }
+
+    // 5. Subsystem filter
+    if (AppState.subsystemFilter && AppState.subsystemFilter !== 'ALL') {
+      list = list.filter(f => f.subsystem === AppState.subsystemFilter);
+    }
+
+    // 6. Search query
+    if (AppState.searchQuery) {
+      const q = AppState.searchQuery.toLowerCase();
+      list = list.filter(f => {
+        const str = `${f.machineNo} ${f.category} ${f.division} ${f.subsystem} ${f.component} ${f.natureOfFailure} ${f.description} ${f.rootCause} ${f.stepsTaken} ${f.actionTaken} ${f.correctiveMeasures} ${f.section}`.toLowerCase();
+        return str.includes(q);
+      });
+    }
+
+    // 7. Strict Chronological Ordering
+    list.sort((a, b) => {
+      const tA = getFailureTimestamp(a);
+      const tB = getFailureTimestamp(b);
+      if (tA === 0 && tB === 0) return 0;
+      if (tA === 0) return 1;
+      if (tB === 0) return -1;
+      if (AppState.chronologicalSortOrder === 'ASC') {
+        return tA - tB;
+      }
+      return tB - tA; // default DESC (latest first)
+    });
+
+    return list;
+  }
+
+  // Render Failure History Table (Chronological Master Timeline)
   function renderTable(list) {
     const tbody = document.getElementById('failureTableBody');
     const emptyState = document.getElementById('tableEmptyState');
+    const pagBar = document.getElementById('historyPaginationBar');
+    const visEl = document.getElementById('historyVisibleCount');
+    const totEl = document.getElementById('historyTotalCount');
+    const btnLoadMore = document.getElementById('btnLoadMoreIncidents');
+    const btnShowAll = document.getElementById('btnShowAllIncidents');
+    const badgeAll = document.getElementById('badgeAllFailures');
+    const badgeSummary = document.getElementById('allIncidentsSummaryBadge');
+
+    if (badgeAll) badgeAll.textContent = AppState.failures.length;
     if (!tbody) return;
 
     tbody.innerHTML = '';
 
-    if (list.length === 0) {
+    if (!list || list.length === 0) {
       if (emptyState) {
         emptyState.style.display = 'block';
-        if (AppState.selectedCategory !== 'ALL' && (!FLEET_DIRECTORY[AppState.selectedCategory] || FLEET_DIRECTORY[AppState.selectedCategory].length === 0)) {
-          emptyState.innerHTML = `
-            <div style="font-size: 34px; margin-bottom: 10px;">📂</div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--gold-400);">No Machines Registered in ${AppState.selectedCategory} Category</div>
-            <div style="font-size: 12.5px; color: #cbd8cf; max-width: 480px; margin: 8px auto 14px; line-height: 1.5;">
-              Upload the Indian Railways Track Machine failure history register spreadsheet (.xlsx / .xls) for this category to monitor failures, repetitive patterns, and MTTR.
-            </div>
-            <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.openUploadModalForCategory('${AppState.selectedCategory}')" style="padding: 8px 18px; font-size: 12.5px;">
-              <span>📤 Upload History Sheet for ${AppState.selectedCategory}</span>
-            </button>
-          `;
-        } else {
-          emptyState.innerHTML = `
-            <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
-            <div style="font-size: 15px; font-weight: 600; color: #e5ece6;">No failure records found matching current filters</div>
-            <div style="font-size: 12px; margin-top: 4px; color: #8da494;">Try adjusting your search criteria, category selection, or upload an Excel history sheet.</div>
-          `;
-        }
+        emptyState.innerHTML = `
+          <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
+          <div style="font-size: 15px; font-weight: 600; color: #e5ece6;">No failure records found matching current timeline filters</div>
+          <div style="font-size: 12px; margin-top: 4px; color: #8da494;">Try clearing your search query or setting status / block filters to 'All'.</div>
+        `;
       }
+      if (pagBar) pagBar.style.display = 'none';
       return;
     }
 
     if (emptyState) emptyState.style.display = 'none';
+    if (pagBar) pagBar.style.display = 'flex';
 
-    list.forEach((f, idx) => {
+    const totalCount = list.length;
+    const limit = AppState.historyLimit || 100;
+    const itemsToRender = list.slice(0, limit);
+
+    if (visEl) visEl.textContent = itemsToRender.length;
+    if (totEl) totEl.textContent = totalCount;
+    if (badgeSummary) {
+      badgeSummary.textContent = `Chronological Order · ${totalCount} Incidents (${AppState.chronologicalSortOrder === 'ASC' ? 'Oldest to Newest ⬆️' : 'Newest to Oldest ⬇️'})`;
+    }
+    const sortSelect = document.getElementById('historySortOrderSelect');
+    if (sortSelect) {
+      sortSelect.value = AppState.chronologicalSortOrder;
+    }
+    const btnSort = document.getElementById('btnToggleSort');
+    if (btnSort) {
+      btnSort.textContent = AppState.chronologicalSortOrder === 'ASC' 
+        ? '📅 Sort: Oldest First ⬆️' 
+        : '📅 Sort: Latest First ⬇️';
+    }
+
+    if (btnLoadMore) {
+      if (itemsToRender.length < totalCount) {
+        btnLoadMore.style.display = 'inline-flex';
+        btnLoadMore.textContent = `⬇️ Load Next 100 Incidents (${totalCount - itemsToRender.length} remaining)`;
+      } else {
+        btnLoadMore.style.display = 'none';
+      }
+    }
+    if (btnShowAll) {
+      btnShowAll.style.display = itemsToRender.length < totalCount ? 'inline-flex' : 'none';
+    }
+
+    itemsToRender.forEach((f, idx) => {
       const tr = document.createElement('tr');
       tr.className = 'table-row-main';
       tr.id = `allIncRow-${f.id}`;
@@ -1632,24 +2105,27 @@
       const isUnderRepair = f.status === 'UNDER REPAIR';
       const subClass = getSubsystemClass(f.subsystem);
 
+      const inBlockStr = String(f.whetherInBlock || '').toUpperCase().trim();
+      const isBlockYes = inBlockStr === 'YES' || inBlockStr.includes('BLOCK') || inBlockStr === 'Y';
+
       tr.innerHTML = `
         <td><strong>#${idx + 1}</strong></td>
         <td>
-          <div style="font-weight: 700; color: #fff;">${f.machineNo}</div>
+          <div style="font-weight: 700; color: #fff; font-size: 13.5px;">${f.machineNo}</div>
           <div style="display: flex; gap: 5px; align-items: center; margin-top: 3px;">
             <span style="font-size: 11px; color: var(--gold-400); font-weight: 600;">${f.category}</span>
             <span class="div-badge ${getDivisionClass(f.division)}">${f.division || 'SBC'}</span>
           </div>
         </td>
         <td>
-          <div style="font-size: 12px; color: #cbd8cf;">${escapeHtml(formatDateDisplay(f.breakdownTime || f.dateOfFailure))}</div>
-          <div style="font-size: 11px; color: #7f9587;">${f.section || 'Block Section'}</div>
+          <div style="font-size: 12.5px; font-weight: 700; color: #ffd700;">📅 ${escapeHtml(formatDateDisplay(f.dateOfFailure || f.breakdownTime))}</div>
+          <div style="font-size: 11px; color: #8fa596; margin-top: 2px;">${escapeHtml(f.section || 'Block Section')}</div>
         </td>
         <td>
           <span class="table-subsystem-pill ${subClass}">
             ${f.subsystem || 'Mechanical'}
           </span>
-          <div style="font-size: 11px; color: #8da494; margin-top: 3px;">${f.component || ''}</div>
+          <div style="font-size: 11px; color: #8da494; margin-top: 3px;">${escapeHtml(f.component || '')}</div>
         </td>
         <td style="max-width: 280px;">
           <div style="font-weight: 600; color: #e5ece6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(f.natureOfFailure || f.description || '')}">
@@ -1658,8 +2134,14 @@
           ${isRep ? `<span style="display:inline-block; font-size:10px; color:#ffab91; background:rgba(255,112,67,0.2); padding:1px 6px; border-radius:3px; margin-top:3px; border:1px solid rgba(255,112,67,0.4); cursor:pointer;" onclick="window.TM_APP.highlightFailure('${f.id}', '${f.subsystem}', '${f.machineNo}')" title="Click to navigate & highlight this recurring defect in subsystem desk">🔁 ${f.repeatCount || 2}x Recurring Defect</span>` : ''}
         </td>
         <td>
+          ${isBlockYes
+            ? `<span class="badge" style="background:rgba(239,68,68,0.22); color:#fca5a5; border:1px solid rgba(239,68,68,0.5); font-size:10.5px; font-weight:700;">⚠️ IN BLOCK</span>`
+            : `<span class="badge" style="background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid rgba(59,130,246,0.35); font-size:10.5px; font-weight:600;">NOT IN BLOCK</span>`
+          }
+        </td>
+        <td>
           <span style="font-family: var(--font-mono); font-weight: 700; color: ${f.downHours > 6 ? '#ff8a65' : 'var(--pista-300)'};">
-            ${f.downHours ? f.downHours + ' hrs' : 'Ongoing'}
+            ${f.downHours ? f.downHours + ' hrs' : (f.totalDownDays !== undefined && f.totalDownDays !== null ? f.totalDownDays + ' days' : '0 hrs')}
           </span>
         </td>
         <td>
@@ -1670,7 +2152,7 @@
         </td>
         <td style="white-space: nowrap;">
           <button class="btn btn-dim" style="padding: 5px 10px; font-size: 11.5px;" onclick="window.TM_APP.toggleDetails('${f.id}')">
-            🔍 Details & Corrective
+            🔍 Details
           </button>
           ${(isUnderRepair && isUserAdmin()) ? `
             <button class="btn btn-secondary-pista admin-only" style="padding: 5px 10px; font-size: 11.5px; margin-left: 4px;" onclick="window.TM_APP.openMarkFitModal('${f.id}')">
@@ -1685,7 +2167,7 @@
       trDetails.id = `details-${f.id}`;
       trDetails.className = 'table-row-details';
       trDetails.innerHTML = `
-        <td colspan="8">
+        <td colspan="9">
           <div class="detail-drawer-box">
             <div>
               <div class="detail-field-group">
@@ -1726,6 +2208,63 @@
       tbody.appendChild(tr);
       tbody.appendChild(trDetails);
     });
+  }
+
+  // Interactive controls for history view
+  function toggleChronologicalSort() {
+    AppState.chronologicalSortOrder = AppState.chronologicalSortOrder === 'ASC' ? 'DESC' : 'ASC';
+    const select = document.getElementById('historySortOrderSelect');
+    if (select) select.value = AppState.chronologicalSortOrder;
+    const btn = document.getElementById('btnToggleSort');
+    if (btn) {
+      btn.textContent = AppState.chronologicalSortOrder === 'ASC' 
+        ? '📅 Sort: Oldest First ⬆️' 
+        : '📅 Sort: Latest First ⬇️';
+    }
+    renderTable(getAllMachineIncidentsChronological());
+    showToast(`Chronological Order: ${AppState.chronologicalSortOrder === 'ASC' ? 'Oldest to Newest' : 'Newest to Oldest'}`);
+  }
+
+  function onSortSelectChange(val) {
+    AppState.chronologicalSortOrder = (val === 'ASC') ? 'ASC' : 'DESC';
+    const select = document.getElementById('historySortOrderSelect');
+    if (select) select.value = AppState.chronologicalSortOrder;
+    const btn = document.getElementById('btnToggleSort');
+    if (btn) {
+      btn.textContent = AppState.chronologicalSortOrder === 'ASC' 
+        ? '📅 Sort: Oldest First ⬆️' 
+        : '📅 Sort: Latest First ⬇️';
+    }
+    renderTable(getAllMachineIncidentsChronological());
+    showToast(`Chronological Order: ${AppState.chronologicalSortOrder === 'ASC' ? 'Oldest to Newest' : 'Newest to Oldest'}`);
+  }
+
+  function onHistoryFilterChange() {
+    const periodSelect = document.getElementById('historyPeriodFilterSelect');
+    const divSelect = document.getElementById('historyDivisionFilterSelect');
+    const blockSelect = document.getElementById('historyBlockFilterSelect');
+    const statSelect = document.getElementById('statusFilterSelect');
+    const subSelect = document.getElementById('subsystemFilterSelect');
+
+    if (periodSelect) AppState.historyPeriodFilter = periodSelect.value;
+    if (divSelect) AppState.historyDivisionFilter = divSelect.value;
+    if (blockSelect) AppState.historyBlockFilter = blockSelect.value;
+    if (statSelect) AppState.statusFilter = statSelect.value;
+    if (subSelect) AppState.subsystemFilter = subSelect.value;
+
+    AppState.historyLimit = 100;
+    renderTable(getAllMachineIncidentsChronological());
+  }
+
+  function showMoreIncidents() {
+    AppState.historyLimit = (AppState.historyLimit || 100) + 100;
+    renderTable(getAllMachineIncidentsChronological());
+  }
+
+  function showAllIncidents() {
+    AppState.historyLimit = 99999;
+    renderTable(getAllMachineIncidentsChronological());
+    showToast('Showing all incidents in chronological order.');
   }
 
   function getSubsystemClass(sub) {
@@ -1776,7 +2315,7 @@
     renderCategoryComparisonChart(list);
     renderDivisionDistributionChart(list);
     renderSubsystemChart(list);
-    renderBadActorsRadarChart(list);
+    renderBlockVsNonBlockChart(list);
 
     const activeM = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL')
       ? AppState.selectedMachine
@@ -2225,56 +2764,98 @@
     renderMachinePercentDonutChart(mId);
   }
 
-  // Chart 4: Bad Actors & Recurrent Defect Radar / Bar
-  function renderBadActorsRadarChart(list) {
-    const ctx = document.getElementById('chartBadActors');
+  // Chart 4: Fleet Operational Surveillance: In Block vs Non-Block & Repetitive Defect Breakdown
+  function renderBlockVsNonBlockChart(list) {
+    const ctx = document.getElementById('chartBlockVsNonBlock');
     if (!ctx) return;
 
-    if (AppState.charts.badActors) {
-      AppState.charts.badActors.destroy();
+    if (AppState.charts.blockVsNonBlock) {
+      AppState.charts.blockVsNonBlock.destroy();
     }
 
-    // Top machines by failure frequency
-    const machineCounts = {};
-    AppState.failures.forEach(f => {
-      machineCounts[f.machineNo] = (machineCounts[f.machineNo] || 0) + 1;
+    const isFYScope = (AppState.kpiScope === 'FY');
+    const targetPool = isFYScope
+      ? AppState.failures.filter(isFailureInCurrentFY)
+      : AppState.failures;
+
+    const categoriesWithIncidents = MACHINE_CATEGORIES.filter(cat => {
+      return targetPool.some(f => f.category === cat);
     });
 
-    const topMachines = Object.keys(machineCounts)
-      .sort((a, b) => machineCounts[b] - machineCounts[a])
-      .slice(0, 6);
+    const inBlockData = [];
+    const nonBlockData = [];
+    const repetitiveData = [];
 
-    const counts = topMachines.map(m => machineCounts[m]);
+    categoriesWithIncidents.forEach(cat => {
+      const catFailures = targetPool.filter(f => f.category === cat);
+      let inBlock = 0;
+      let nonBlock = 0;
+      let rep = 0;
 
-    AppState.charts.badActors = new Chart(ctx, {
+      catFailures.forEach(f => {
+        const b = String(f.whetherInBlock || '').toUpperCase().trim();
+        if (b === 'YES' || b.includes('BLOCK') || b === 'Y') {
+          inBlock++;
+        } else {
+          nonBlock++;
+        }
+        if (f.isRepetitive) {
+          rep++;
+        }
+      });
+
+      inBlockData.push(inBlock);
+      nonBlockData.push(nonBlock);
+      repetitiveData.push(rep);
+    });
+
+    AppState.charts.blockVsNonBlock = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: topMachines,
-        datasets: [{
-          label: 'Total Incidents',
-          data: counts,
-          backgroundColor: [
-            'rgba(255, 112, 67, 0.85)',
-            'rgba(212, 175, 55, 0.85)',
-            'rgba(147, 197, 114, 0.85)',
-            'rgba(147, 197, 114, 0.65)',
-            'rgba(147, 197, 114, 0.45)',
-            'rgba(147, 197, 114, 0.35)'
-          ],
-          borderColor: '#d4af37',
-          borderWidth: 1,
-          borderRadius: 6
-        }]
+        labels: categoriesWithIncidents,
+        datasets: [
+          {
+            label: 'In Traffic Block (⚠️ Operational Impact)',
+            data: inBlockData,
+            backgroundColor: 'rgba(239, 68, 68, 0.85)',
+            borderColor: '#ef4444',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: 'Not In Block (Depot / Stabling / Transit)',
+            data: nonBlockData,
+            backgroundColor: 'rgba(59, 130, 246, 0.85)',
+            borderColor: '#3b82f6',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: 'Repetitive Cases (🔁 Recurring Defects)',
+            data: repetitiveData,
+            backgroundColor: 'rgba(212, 175, 55, 0.85)',
+            borderColor: '#d4af37',
+            borderWidth: 1,
+            borderRadius: 4
+          }
+        ]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: '#c9ecbc',
+              font: { size: 11 },
+              boxWidth: 14
+            }
+          },
           tooltip: {
             backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#ff7043',
+            titleColor: '#ffd700',
             bodyColor: '#fff',
             borderColor: '#d4af37',
             borderWidth: 1
@@ -2282,12 +2863,15 @@
         },
         scales: {
           x: {
-            ticks: { color: '#8da494', stepSize: 1 },
+            stacked: false,
+            ticks: { color: '#8da494', font: { weight: '600' } },
             grid: { color: 'rgba(255, 255, 255, 0.05)' }
           },
           y: {
-            ticks: { color: '#e5ece6', font: { weight: 'bold' } },
-            grid: { display: false }
+            stacked: false,
+            beginAtZero: true,
+            ticks: { color: '#8da494', stepSize: 10 },
+            grid: { color: 'rgba(255, 255, 255, 0.05)' }
           }
         }
       }
@@ -3724,6 +4308,8 @@
     if (bPneu) bPneu.textContent = countPneu;
     const bElec = document.getElementById('badgeElectricalFailures');
     if (bElec) bElec.textContent = countElec;
+    const bAll = document.getElementById('badgeAllFailures');
+    if (bAll) bAll.textContent = AppState.failures.length;
   }
 
   // ==========================================================================
@@ -4946,6 +5532,8 @@
           setTimeout(() => {
             renderCharts(getFilteredFailures());
           }, 100);
+        } else if (tab === 'history-view') {
+          renderTable(getAllMachineIncidentsChronological());
         }
       });
     });
@@ -4980,7 +5568,8 @@
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         AppState.searchQuery = e.target.value.trim();
-        renderTable(getFilteredFailures());
+        AppState.historyLimit = 100;
+        renderTable(getAllMachineIncidentsChronological());
       });
     }
 
@@ -5345,7 +5934,17 @@
     jumpToSearchResult,
     exportSearchResultsToExcel,
     getUniversalSearchState: () => universalSearchState,
-    getCloudSync: () => CloudSync
+    // Financial Year Surveillance Scope Methods
+    setKpiScope,
+    isFailureInCurrentFY,
+    // All Machine Incidents Chronological Master Timeline Methods
+    toggleChronologicalSort,
+    onSortSelectChange,
+    onHistoryFilterChange,
+    showMoreIncidents,
+    showAllIncidents,
+    getAllMachineIncidentsChronological,
+    renderTable
   };
 
   // Launch on DOM ready
