@@ -3117,6 +3117,941 @@ body.role-admin .admin-only {
   }
 }
 
+/* ==========================================================================
+   OVERNIGHT TRAFFIC BLOCK (D1/D2-MM-YYYY) UI STYLES
+   ========================================================================== */
+.overnight-toggle-box {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px dashed rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
 
+.overnight-toggle-box:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.overnight-date-picker-box {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.badge-overnight-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   THEME TOGGLE & WHITE MODE (LIGHT THEME) SYSTEM
+   Indian Railways / SWR TM-FAST Multi-Theme Architecture
+   ========================================================================== */
+
+/* Universal Theme Toggle Controls (Both Dark & Light) */
+.login-theme-choice-box {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: rgba(5, 12, 8, 0.75);
+  border: 1px solid rgba(147, 197, 114, 0.3);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.login-theme-choice-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-400);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-choice-group {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-choice-btn {
+  background: rgba(14, 23, 18, 0.85);
+  color: #a4bba9;
+  border: 1px solid rgba(147, 197, 114, 0.25);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  font-family: var(--font-main);
+}
+
+.theme-choice-btn:hover {
+  background: rgba(24, 38, 29, 0.95);
+  color: #ffffff;
+  border-color: var(--pista-400);
+}
+
+.theme-choice-btn.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.3) 0%, rgba(147, 197, 114, 0.25) 100%);
+  color: #ffd700;
+  border-color: rgba(212, 175, 55, 0.8);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+  font-weight: 700;
+}
+
+.login-theme-toggle-btn {
+  margin-right: 8px;
+}
+
+.btn-theme-tab {
+  background: rgba(18, 30, 22, 0.85);
+  border-color: rgba(212, 175, 55, 0.5);
+  color: #ffd700;
+}
+
+.btn-theme-tab:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.3) 0%, rgba(147, 197, 114, 0.25) 100%);
+  border-color: #ffd700;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   LIGHT / WHITE MODE THEME OVERRIDES ([data-theme="light"])
+   ========================================================================== */
+html[data-theme="light"],
+body[data-theme="light"],
+[data-theme="light"] {
+  --bg-deep: #ebf1ed;
+  --bg-canvas: #f4f8f5;
+  --bg-surface: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.96);
+  --bg-card-hover: rgba(246, 250, 247, 0.98);
+  --bg-overlay: rgba(240, 245, 242, 0.94);
+
+  --pista-300: #1b5e20;
+  --pista-400: #2e7d32;
+  --pista-500: #1b5e20;
+  --pista-600: #144718;
+  --pista-glow: rgba(46, 125, 50, 0.18);
+  --pista-glow-intense: rgba(46, 125, 50, 0.35);
+
+  --gold-300: #7a5000;
+  --gold-400: #8c6307;
+  --gold-500: #734800;
+  --gold-600: #5c3c00;
+  --gold-glow: rgba(140, 99, 7, 0.18);
+  --gold-glow-intense: rgba(140, 99, 7, 0.35);
+
+  --border-dim: rgba(30, 80, 45, 0.18);
+  --border-pista: rgba(46, 125, 50, 0.45);
+  --border-gold: rgba(160, 110, 15, 0.45);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] body {
+  background-color: #f0f5f1;
+  color: #142217;
+}
+
+/* Light Mode Ambient Canvas */
+[data-theme="light"] .ambient-bg-watermark {
+  opacity: 0.10;
+  filter: brightness(1.2) contrast(1.05) grayscale(30%);
+}
+
+[data-theme="light"] .ambient-bg-tint {
+  background: radial-gradient(circle at 50% 35%, rgba(246, 251, 247, 0.82) 0%, rgba(230, 238, 232, 0.94) 100%);
+}
+
+/* Light Mode Authentication Overlay */
+[data-theme="light"] .login-overlay {
+  background: radial-gradient(ellipse at center, rgba(235, 245, 238, 0.88) 0%, rgba(215, 230, 220, 0.96) 100%);
+}
+
+[data-theme="light"] .login-card {
+  background: #ffffff;
+  border: 2px solid rgba(160, 110, 15, 0.5);
+  box-shadow: 0 16px 45px rgba(0, 30, 15, 0.12), 0 0 25px rgba(160, 110, 15, 0.12);
+  color: #142217;
+}
+
+[data-theme="light"] .login-subtext {
+  color: #3b5c43;
+  text-shadow: none;
+}
+
+[data-theme="light"] .login-tab-strip {
+  background: #eef4f0;
+  border: 1px solid rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="light"] .login-tab-btn {
+  color: #43644d;
+}
+
+[data-theme="light"] .login-tab-btn.active {
+  background: #ffffff;
+  color: #7a5000;
+  border: 1px solid rgba(160, 110, 15, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .login-theme-choice-box {
+  background: #eef4f0 !important;
+  border-color: rgba(46, 125, 50, 0.25) !important;
+}
+
+[data-theme="light"] .theme-choice-btn {
+  background: #ffffff;
+  color: #3b5c43;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .theme-choice-btn:hover {
+  background: #f0f6f2;
+  color: #112015;
+}
+
+[data-theme="light"] .theme-choice-btn.active {
+  background: #1b5e20;
+  color: #ffffff;
+  border-color: #1b5e20;
+  box-shadow: 0 2px 8px rgba(27, 94, 32, 0.25);
+}
+
+[data-theme="light"] .quick-fill-label {
+  color: #1b5e20;
+}
+
+[data-theme="light"] .quick-chip {
+  background: #f7faf8;
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .quick-chip:hover {
+  background: #eef5f0;
+  border-color: var(--pista-400);
+}
+
+[data-theme="light"] .quick-chip-id {
+  color: #1b5e20;
+}
+
+[data-theme="light"] .quick-chip-role {
+  color: #4b6b54;
+}
+
+[data-theme="light"] .login-top-right-tab {
+  background: #ffffff;
+  color: #7a5000;
+  border-color: rgba(160, 110, 15, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .login-top-right-tab:hover {
+  background: #fdf8eb;
+  border-color: #7a5000;
+  color: #5c3c00;
+}
+
+[data-theme="light"] .gold-text-bold {
+  color: #8c6307 !important;
+  text-shadow: none !important;
+}
+
+/* Light Mode Input Controls */
+[data-theme="light"] .form-control,
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: #ffffff !important;
+  color: #112015 !important;
+  border: 1px solid rgba(46, 125, 50, 0.3) !important;
+}
+
+[data-theme="light"] .form-control:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #2e7d32 !important;
+  box-shadow: 0 0 8px rgba(46, 125, 50, 0.25) !important;
+}
+
+[data-theme="light"] .form-control::placeholder {
+  color: #7d9685 !important;
+}
+
+[data-theme="light"] label,
+[data-theme="light"] .form-label {
+  color: #24422c !important;
+}
+
+/* Light Mode Hero Banner & Header Zone */
+[data-theme="light"] .hero-header {
+  border-color: rgba(160, 110, 15, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .hero-gradient-overlay {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(246, 251, 247, 0.90) 45%,
+    rgba(240, 247, 242, 0.85) 75%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+}
+
+[data-theme="light"] .brand-titles h1 {
+  color: #112015;
+}
+
+[data-theme="light"] .brand-title-sub {
+  color: #7a5000 !important;
+}
+
+[data-theme="light"] .brand-subtitle {
+  color: #3b5c43;
+}
+
+[data-theme="light"] .live-indicator {
+  background: rgba(46, 125, 50, 0.12);
+  border-color: rgba(46, 125, 50, 0.3);
+  color: #1b5e20;
+}
+
+[data-theme="light"] .cloud-sync-indicator {
+  background: rgba(46, 125, 50, 0.08);
+  border-color: rgba(46, 125, 50, 0.25);
+  color: #235832;
+}
+
+[data-theme="light"] .user-session-chip {
+  background: #ffffff;
+  border-color: rgba(160, 110, 15, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .session-username {
+  color: #112015;
+}
+
+[data-theme="light"] .btn-user-tab {
+  background: #f0f5f1;
+  color: #2d4633;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .btn-user-tab:hover {
+  background: #e2ede5;
+  color: #112015;
+}
+
+/* Light Mode Scope Bar & KPI Chips */
+[data-theme="light"] .fy-scope-strip {
+  background: #ffffff;
+  border-color: rgba(46, 125, 50, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .fy-scope-badge {
+  color: #142217;
+}
+
+[data-theme="light"] .fy-toggle-btn {
+  background: #f0f5f1;
+  color: #3b5c43;
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .fy-toggle-btn:hover {
+  background: #e2ede5;
+  color: #112015;
+}
+
+[data-theme="light"] .fy-toggle-btn.active {
+  background: #1b5e20;
+  color: #ffffff;
+  border-color: #1b5e20;
+}
+
+[data-theme="light"] .kpi-chip {
+  background: #ffffff;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .kpi-title {
+  color: #3b5c43;
+}
+
+[data-theme="light"] .kpi-subtext {
+  color: #5c7562;
+}
+
+[data-theme="light"] .pista-text {
+  color: #1b5e20 !important;
+}
+
+[data-theme="light"] .gold-text {
+  color: #8c6307 !important;
+}
+
+/* Light Mode Category & Machine Navigation */
+[data-theme="light"] .category-nav-section {
+  background: #ffffff;
+  border-color: rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .section-label {
+  color: #7a5000;
+}
+
+[data-theme="light"] .category-pill {
+  background: #f8faf8;
+  border-color: rgba(46, 125, 50, 0.2);
+  color: #2d4633;
+}
+
+[data-theme="light"] .category-pill:hover {
+  background: #eef5f0;
+  border-color: var(--pista-400);
+  color: #112015;
+}
+
+[data-theme="light"] .category-pill.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(46, 125, 50, 0.15));
+  border-color: #8c6307;
+  color: #112015;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(140, 99, 7, 0.2);
+}
+
+[data-theme="light"] .category-pill .pill-badge {
+  background: #e2ede5;
+  color: #112015;
+}
+
+[data-theme="light"] .machine-context-bar {
+  background: #ffffff;
+  border-color: rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .select-input {
+  background: #f8faf8;
+  color: #112015;
+  border-color: rgba(46, 125, 50, 0.3);
+}
+
+/* Light Mode Universal Search & Surveillance Alert */
+[data-theme="light"] .universal-search-card {
+  background: #ffffff;
+  border-color: rgba(160, 110, 15, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .universal-search-title {
+  color: #112015;
+}
+
+[data-theme="light"] .universal-search-subtitle {
+  color: #4b6b54;
+}
+
+[data-theme="light"] .universal-search-input {
+  background: #f8faf8;
+  color: #112015;
+  border-color: rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="light"] .search-tag {
+  background: #f0f5f1;
+  color: #2d4633;
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .search-tag:hover {
+  background: #e0eee4;
+  color: #112015;
+}
+
+[data-theme="light"] .surveillance-alert-card {
+  background: #fffbeb;
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.1);
+}
+
+[data-theme="light"] .alert-title {
+  color: #b45309;
+}
+
+[data-theme="light"] .alert-subtitle {
+  color: #78350f;
+}
+
+/* Light Mode Main Tabs Bar */
+[data-theme="light"] .main-tabs-bar {
+  border-bottom-color: rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="light"] .tab-btn {
+  background: #eef4f0;
+  color: #43644d;
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .tab-btn:hover {
+  background: #e2ede5;
+  color: #112015;
+}
+
+[data-theme="light"] .tab-btn.active {
+  background: #ffffff;
+  color: #7a5000;
+  border-color: #8c6307;
+  border-bottom: 2px solid #ffffff;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .tab-count-badge {
+  background: #f4e8cb;
+  color: #7a5000;
+  border-color: rgba(160, 110, 15, 0.35);
+}
+
+[data-theme="light"] .tab-btn.active .tab-count-badge {
+  background: #8c6307;
+  color: #ffffff;
+}
+
+/* Light Mode HRM (History Register Module) */
+[data-theme="light"] .hrm-header-card {
+  background: #ffffff;
+  border-color: rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .hrm-machine-name {
+  color: #112015;
+}
+
+[data-theme="light"] .hrm-machine-model {
+  color: #3b5c43;
+}
+
+[data-theme="light"] .hrm-age-box {
+  background: #f8faf8;
+  border-color: rgba(160, 110, 15, 0.45);
+  box-shadow: 0 2px 10px rgba(160, 110, 15, 0.1);
+}
+
+[data-theme="light"] .hrm-age-label {
+  color: #1b5e20;
+}
+
+[data-theme="light"] .hrm-age-value {
+  color: #7a5000;
+  text-shadow: none;
+}
+
+[data-theme="light"] .hrm-age-subtext {
+  color: #5c7562;
+}
+
+[data-theme="light"] .hrm-comm-label {
+  color: #7a5000;
+}
+
+[data-theme="light"] .hrm-comm-date {
+  background: #f0f5f1;
+  color: #112015;
+  border-color: rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="light"] .hrm-history-drawer {
+  background: #f7faf8 !important;
+  border-top: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .hrm-history-item-card {
+  background: #ffffff;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  color: #112015;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* Light Mode Panels, Tables & Modals */
+[data-theme="light"] .panel-card {
+  background: #ffffff;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  color: #142217;
+}
+
+[data-theme="light"] .panel-title {
+  color: #112015;
+}
+
+[data-theme="light"] .panel-header {
+  border-bottom-color: rgba(46, 125, 50, 0.15);
+}
+
+[data-theme="light"] .custom-table th,
+[data-theme="light"] .hrm-table th {
+  background: #eef4f0;
+  color: #7a5000;
+  border-bottom: 2px solid rgba(160, 110, 15, 0.4);
+  font-weight: 700;
+}
+
+[data-theme="light"] .custom-table td,
+[data-theme="light"] .hrm-table td {
+  color: #1b2e21;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .custom-table tr:hover td,
+[data-theme="light"] .hrm-table tr:hover {
+  background: rgba(46, 125, 50, 0.05);
+}
+
+[data-theme="light"] .table-row-details {
+  background: #f7faf8 !important;
+  color: #1b2e21;
+}
+
+[data-theme="light"] .modal-overlay {
+  background: rgba(30, 45, 35, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+[data-theme="light"] .modal-card {
+  background: #ffffff;
+  border: 2px solid rgba(160, 110, 15, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  color: #142217;
+}
+
+[data-theme="light"] .modal-header {
+  border-bottom: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .modal-title {
+  color: #112015;
+}
+
+[data-theme="light"] .modal-footer {
+  border-top: 1px solid rgba(46, 125, 50, 0.2);
+  background: #f8faf8;
+}
+
+[data-theme="light"] .modal-close-btn {
+  color: #4b6b54;
+}
+
+[data-theme="light"] .modal-close-btn:hover {
+  color: #112015;
+}
+
+[data-theme="light"] .overnight-toggle-box {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="light"] .overnight-date-picker-box {
+  background: #f8faf8;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="light"] .btn-dim {
+  background: #f0f5f1;
+  color: #2d4633;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+[data-theme="light"] .btn-dim:hover {
+  background: #e2ede5;
+  color: #112015;
+}
+
+[data-theme="light"] .btn-secondary-pista {
+  background: rgba(46, 125, 50, 0.12);
+  color: #1b5e20;
+  border-color: #2e7d32;
+}
+
+[data-theme="light"] .btn-secondary-pista:hover {
+  background: #1b5e20;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   HIGH-CONTRAST TYPOGRAPHY & LETTERING VISIBILITY ENGINE (WHITE MODE)
+   Guarantees 100% legibility of all gray/muted labels, subtexts, and values
+   ========================================================================== */
+
+/* 1. Universal Text & Palette Legibility in Light Mode */
+[data-theme="light"] {
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #374151;
+  --gold-50: #422006;
+  --gold-100: #713f12;
+  --gold-200: #854d0e;
+  --gold-300: #854d0e;
+  --gold-400: #78350f;
+  --gold-500: #946200;
+  --gold-600: #946200;
+  --pista-100: #14532d;
+  --pista-200: #166534;
+  --pista-300: #1b5e20;
+  --pista-400: #1b5e20;
+  --pista-500: #166534;
+  --border-dim: rgba(46, 125, 50, 0.22);
+  --border-pista: rgba(46, 125, 50, 0.4);
+  --border-gold: rgba(160, 110, 15, 0.45);
+}
+
+/* Ensure all headings, titles, and strong text are rich dark black/slate */
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4,
+[data-theme="light"] .panel-title,
+[data-theme="light"] .modal-title,
+[data-theme="light"] .search-field-primary,
+[data-theme="light"] .table-machine-text,
+[data-theme="light"] .hrm-machine-name,
+[data-theme="light"] .hrm-item-title,
+[data-theme="light"] strong:not(.badge):not(.pista-text):not(.gold-text):not(.alert-text) {
+  color: #111827 !important;
+}
+
+/* Ensure all labels and form titles are deep forest green / dark charcoal */
+[data-theme="light"] label,
+[data-theme="light"] .form-label,
+[data-theme="light"] .quick-fill-label,
+[data-theme="light"] .search-field-label,
+[data-theme="light"] .login-theme-choice-title,
+[data-theme="light"] .section-label,
+[data-theme="light"] .search-tag-label {
+  color: #1b3d22 !important;
+  font-weight: 700 !important;
+}
+
+/* Replace all faint/washed-out gray subtext with crisp dark charcoal/slate */
+[data-theme="light"] .login-subtext,
+[data-theme="light"] .login-footer-info,
+[data-theme="light"] .kpi-subtext,
+[data-theme="light"] .kpi-unit,
+[data-theme="light"] .section-label + div,
+[data-theme="light"] .hrm-machine-model,
+[data-theme="light"] .hrm-age-subtext,
+[data-theme="light"] .hrm-card-desc,
+[data-theme="light"] .hrm-history-toggle,
+[data-theme="light"] .hrm-empty-hint,
+[data-theme="light"] .history-reg-footer,
+[data-theme="light"] .mttr-step-sub,
+[data-theme="light"] .history-date-range-box,
+[data-theme="light"] .form-hint,
+[data-theme="light"] .table-sub-text,
+[data-theme="light"] .table-comp-text,
+[data-theme="light"] .desk-action-cell,
+[data-theme="light"] .desk-remarks-cell,
+[data-theme="light"] .desk-empty-sub,
+[data-theme="light"] .search-field-secondary,
+[data-theme="light"] .search-empty-sub,
+[data-theme="light"] .part-none-recorded,
+[data-theme="light"] .search-hist-count,
+[data-theme="light"] .modal-field-value,
+[data-theme="light"] .view-only-tag,
+[data-theme="light"] .admin-hint-sub,
+[data-theme="light"] #historyCountText,
+[data-theme="light"] #tableEmptyState,
+[data-theme="light"] .universal-search-subtitle {
+  color: #374151 !important;
+}
+
+/* Light Mode KPI Chip High-Contrast Values & Accents */
+[data-theme="light"] #kpiTotalFleetMachines {
+  color: #111827 !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] #kpiInBlockCases {
+  color: #b91c1c !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] #kpiInBlockCases + span {
+  color: #991b1b !important;
+  font-weight: 700 !important;
+}
+[data-theme="light"] #kpiNonBlockCases {
+  color: #1d4ed8 !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] #kpiNonBlockCases + span {
+  color: #1e40af !important;
+  font-weight: 700 !important;
+}
+
+/* High-contrast table data cells and descriptions */
+[data-theme="light"] .custom-table td,
+[data-theme="light"] .hrm-table td,
+[data-theme="light"] .table-desc-text,
+[data-theme="light"] .desk-desc-cell,
+[data-theme="light"] .search-field-value,
+[data-theme="light"] .table-row-details {
+  color: #111827 !important;
+}
+
+/* Deep gold for date stamps and highlights in white mode instead of faint yellow */
+[data-theme="light"] .table-date-text,
+[data-theme="light"] .hrm-comm-label,
+[data-theme="light"] .hrm-age-value,
+[data-theme="light"] .gold-text {
+  color: #946200 !important;
+  text-shadow: none !important;
+}
+
+/* High-Contrast Subsystem Pills in White Mode */
+[data-theme="light"] .subsystem-hydraulic { background: rgba(37, 99, 235, 0.12) !important; color: #1d4ed8 !important; border: 1px solid rgba(37, 99, 235, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-electrical { background: rgba(217, 119, 6, 0.12) !important; color: #b45309 !important; border: 1px solid rgba(217, 119, 6, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-tamping { background: rgba(22, 101, 52, 0.12) !important; color: #15803d !important; border: 1px solid rgba(22, 101, 52, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-engine { background: rgba(220, 38, 38, 0.12) !important; color: #b91c1c !important; border: 1px solid rgba(220, 38, 38, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-pneumatic { background: rgba(14, 116, 144, 0.12) !important; color: #0e7490 !important; border: 1px solid rgba(14, 116, 144, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-electronics { background: rgba(147, 51, 234, 0.12) !important; color: #7e22ce !important; border: 1px solid rgba(147, 51, 234, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-drive { background: rgba(234, 88, 12, 0.12) !important; color: #c2410c !important; border: 1px solid rgba(234, 88, 12, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .subsystem-mechanical { background: rgba(75, 85, 99, 0.12) !important; color: #1f2937 !important; border: 1px solid rgba(75, 85, 99, 0.4) !important; font-weight: 700 !important; }
+
+/* High-Contrast Standard Badges in White Mode */
+[data-theme="light"] .badge-block-yes { background: rgba(239, 68, 68, 0.12) !important; color: #b91c1c !important; border-color: rgba(220, 38, 38, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .badge-block-no { background: rgba(22, 101, 52, 0.10) !important; color: #166534 !important; border-color: rgba(22, 101, 52, 0.3) !important; font-weight: 700 !important; }
+[data-theme="light"] .badge-part-no { background: rgba(202, 138, 4, 0.12) !important; color: #854d0e !important; border-color: rgba(161, 98, 7, 0.35) !important; font-weight: 700 !important; }
+[data-theme="light"] .badge-rep-yes { background: rgba(234, 88, 12, 0.12) !important; color: #c2410c !important; border-color: rgba(194, 65, 12, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .badge-rep-no { color: #4b5563 !important; font-weight: 600 !important; }
+[data-theme="light"] .hrm-date-badge { background: rgba(46, 125, 50, 0.10) !important; color: #1b5e20 !important; border: 1px solid rgba(46, 125, 50, 0.3) !important; font-weight: 700 !important; }
+[data-theme="light"] .hrm-eh-badge { background: rgba(212, 175, 55, 0.15) !important; color: #946200 !important; border: 1px solid rgba(160, 110, 15, 0.4) !important; font-weight: 700 !important; }
+[data-theme="light"] .hrm-remarks-text { color: #374151 !important; font-weight: 500 !important; }
+[data-theme="light"] .hrm-history-toggle { background: #f0f5f1 !important; color: #1b5e20 !important; border-color: rgba(46, 125, 50, 0.25) !important; }
+
+/* Expanded Table Detail Drawer in Light Mode */
+[data-theme="light"] .detail-drawer-box {
+  background: #ffffff !important;
+  border-left: 4px solid #b45309 !important;
+  border: 1px solid rgba(46, 125, 50, 0.2) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+[data-theme="light"] .detail-field-label {
+  color: #7a5000 !important;
+  font-weight: 700 !important;
+}
+[data-theme="light"] .detail-field-content {
+  color: #111827 !important;
+  background: #f8faf8 !important;
+  border: 1px solid rgba(46, 125, 50, 0.15) !important;
+}
+[data-theme="light"] .corrective-box {
+  border-left: 4px solid #15803d !important;
+}
+[data-theme="light"] .corrective-box .detail-field-label {
+  color: #15803d !important;
+}
+
+/* Cluster Highlight Banner in Light Mode */
+[data-theme="light"] .cluster-banner {
+  background: #fffbeb !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  border-left: 5px solid #d97706 !important;
+  color: #78350f !important;
+}
+[data-theme="light"] .cluster-banner-info strong {
+  color: #92400e !important;
+}
+[data-theme="light"] .cluster-banner-subtext {
+  color: #78350f !important;
+}
+
+/* Comprehensive overrides for inline gray & muted styles (with and without space) */
+[data-theme="light"] [style*="color: #8da494"], [data-theme="light"] [style*="color:#8da494"],
+[data-theme="light"] [style*="color: #a4bba9"], [data-theme="light"] [style*="color:#a4bba9"],
+[data-theme="light"] [style*="color: #7f9787"], [data-theme="light"] [style*="color:#7f9787"],
+[data-theme="light"] [style*="color: #cbd8cf"], [data-theme="light"] [style*="color:#cbd8cf"],
+[data-theme="light"] [style*="color: #8fa696"], [data-theme="light"] [style*="color:#8fa696"],
+[data-theme="light"] [style*="color: #8fa596"], [data-theme="light"] [style*="color:#8fa596"],
+[data-theme="light"] [style*="color: #9cb2a3"], [data-theme="light"] [style*="color:#9cb2a3"],
+[data-theme="light"] [style*="color: #7b9483"], [data-theme="light"] [style*="color:#7b9483"],
+[data-theme="light"] [style*="color: #a2b8a7"], [data-theme="light"] [style*="color:#a2b8a7"],
+[data-theme="light"] [style*="color: #c4d9cb"], [data-theme="light"] [style*="color:#c4d9cb"],
+[data-theme="light"] [style*="color: #a4b8ab"], [data-theme="light"] [style*="color:#a4b8ab"],
+[data-theme="light"] [style*="color: #94a3b8"], [data-theme="light"] [style*="color:#94a3b8"],
+[data-theme="light"] [style*="color: #c4d7c8"], [data-theme="light"] [style*="color:#c4d7c8"],
+[data-theme="light"] [style*="color: #738a7a"], [data-theme="light"] [style*="color:#738a7a"],
+[data-theme="light"] [style*="color: #799181"], [data-theme="light"] [style*="color:#799181"],
+[data-theme="light"] [style*="color: #e5ece6"], [data-theme="light"] [style*="color:#e5ece6"],
+[data-theme="light"] [style*="color: #c9dbd0"], [data-theme="light"] [style*="color:#c9dbd0"],
+[data-theme="light"] [style*="color: #c9ecbc"], [data-theme="light"] [style*="color:#c9ecbc"],
+[data-theme="light"] [style*="color: #c8ecc0"], [data-theme="light"] [style*="color:#c8ecc0"],
+[data-theme="light"] [style*="color: #c0ecc5"], [data-theme="light"] [style*="color:#c0ecc5"],
+[data-theme="light"] [style*="color: #c0d3c4"], [data-theme="light"] [style*="color:#c0d3c4"],
+[data-theme="light"] [style*="color: #e0e0e0"], [data-theme="light"] [style*="color:#e0e0e0"] {
+  color: #374151 !important;
+}
+
+/* Prevent white-on-white text in white mode for inline white styles */
+[data-theme="light"] td[style*="color: #fff"], [data-theme="light"] td[style*="color:#fff"],
+[data-theme="light"] td[style*="color: white"], [data-theme="light"] td[style*="color:white"],
+[data-theme="light"] div[style*="color: #fff"]:not(.badge):not(.btn), [data-theme="light"] div[style*="color:#fff"]:not(.badge):not(.btn),
+[data-theme="light"] div[style*="color: white"]:not(.badge):not(.btn), [data-theme="light"] div[style*="color:white"]:not(.badge):not(.btn),
+[data-theme="light"] span[style*="color: #fff"]:not(.badge):not(.btn), [data-theme="light"] span[style*="color:#fff"]:not(.badge):not(.btn),
+[data-theme="light"] span[style*="color: white"]:not(.badge):not(.btn), [data-theme="light"] span[style*="color:white"]:not(.badge):not(.btn) {
+  color: #111827 !important;
+}
+
+/* Replace bright yellow inline style with deep rich gold in white mode */
+[data-theme="light"] [style*="color: #ffd700"]:not(.btn),
+[data-theme="light"] [style*="color:#ffd700"]:not(.btn) {
+  color: #946200 !important;
+  text-shadow: none !important;
+}
+
+/* Chart Canvas Containers in Light Mode */
+[data-theme="light"] .chart-container-box,
+[data-theme="light"] .chart-container-tall {
+  background: #ffffff !important;
+  border: 1px solid rgba(46, 125, 50, 0.18) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Spider radar chart card styling in White Mode */
+[data-theme="light"] #chartMachineRadar {
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.06));
+}
 
 

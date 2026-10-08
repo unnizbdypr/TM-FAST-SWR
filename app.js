@@ -48,14 +48,106 @@
            str.startsWith('UTV') || str.startsWith('RBMV') || str.startsWith('RMBV');
   }
 
-  // Universal Date Formatter: Strictly DD-MM-YYYY
+  // Month name lookup dictionary
+  const OVERNIGHT_MONTH_MAP = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+    apr: 4, april: 4, may: 5, june: 6, jun: 6,
+    jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+    oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12
+  };
+
+  // Helper: check if a date string represents an overnight block (e.g. 16/17-11-2025, 04/05-06-2026, 4/5-6-2026)
+  function isOvernightDate(val) {
+    if (!val) return false;
+    return parseOvernightDate(val) !== null;
+  }
+
+  // Helper: parse an overnight block date into structured parts (D1, D2, MM, YYYY)
+  // Represents a block that started on D1-MM-YYYY and ended on D2-MM-YYYY
+  function parseOvernightDate(val) {
+    if (!val) return null;
+    const s = String(val).trim().replace(/[`'"]/g, '').trim();
+    // Matches: 16/17-11-2025, 16/17/11/2025, 16-17-11-2025, 16-17/11/2025, 16/17.11.2025, 16/17-Nov-2025, 4/5-6-2026, etc.
+    const m = s.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-\. ]\s*([A-Za-z]+|\d{1,2})\s*[\/\-\. ]\s*(\d{2,4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    if (!m) return null;
+    const d1 = parseInt(m[1], 10);
+    const d2 = parseInt(m[2], 10);
+    let mm = NaN;
+    if (/^\d+$/.test(m[3])) {
+      mm = parseInt(m[3], 10);
+    } else {
+      const mn = m[3].toLowerCase();
+      mm = OVERNIGHT_MONTH_MAP[mn] || NaN;
+    }
+    let yyyy = parseInt(m[4], 10);
+    if (isNaN(d1) || isNaN(d2) || isNaN(mm) || isNaN(yyyy)) return null;
+    if (yyyy < 100) yyyy += 2000;
+    if (d1 < 1 || d1 > 31 || d2 < 1 || d2 > 31 || mm < 1 || mm > 12) return null;
+
+    const padD1 = String(d1).padStart(2, '0');
+    const padD2 = String(d2).padStart(2, '0');
+    const padMm = String(mm).padStart(2, '0');
+
+    // Handle month boundary for start date if d1 > d2 (e.g. 31/01-11-2025: started Oct 31, ended Nov 1)
+    let sYear = yyyy;
+    let sMonth = mm;
+    if (d1 > d2) {
+      sMonth = mm - 1;
+      if (sMonth < 1) {
+        sMonth = 12;
+        sYear -= 1;
+      }
+    }
+    const padSm = String(sMonth).padStart(2, '0');
+
+    return {
+      d1, d2, mm, yyyy,
+      padD1, padD2, padMm,
+      startDateIso: `${sYear}-${padSm}-${padD1}`,
+      endDateIso: `${yyyy}-${padMm}-${padD2}`,
+      formatted: `${padD1}/${padD2}-${padMm}-${yyyy}`
+    };
+  }
+
+  // Helper: Build canonical overnight block date string (D1D1/D2D2-MM-YYYY) from 2 calendar ISO dates
+  function buildOvernightDateString(startIso, endIso) {
+    if (!startIso) return '';
+    const sParts = String(startIso).split('-');
+    if (sParts.length !== 3) return '';
+    const d1 = sParts[2].padStart(2, '0');
+    const mm1 = sParts[1].padStart(2, '0');
+    const yyyy1 = sParts[0];
+
+    if (!endIso) {
+      return `${d1}/${d1}-${mm1}-${yyyy1}`;
+    }
+    const eParts = String(endIso).split('-');
+    if (eParts.length !== 3) {
+      return `${d1}/${d1}-${mm1}-${yyyy1}`;
+    }
+    const d2 = eParts[2].padStart(2, '0');
+    const mm2 = eParts[1].padStart(2, '0');
+    const yyyy2 = eParts[0];
+
+    return `${d1}/${d2}-${mm2}-${yyyy2}`;
+  }
+
+  // Universal Date Formatter: Strictly DD-MM-YYYY or DD/DD-MM-YYYY for Overnight Blocks
   function formatDateDisplay(val) {
     if (!val || val === 'N/A' || val === '-' || val === '--' || val === 'NA' || val === 'Not Set') return '--';
     const s = String(val).trim().replace(/[`'"]/g, '').trim();
     if (/^(active|under repair|nil|none|ongoing)$/i.test(s) || s.toLowerCase().includes('active')) {
       return s;
     }
-    // Handle Excel serial numbers (e.g. 45180 -> 11-09-2023)
+
+    // 1. Overnight Block Date: D1D1/D2D2-MM-YYYY (e.g. 16/17-11-2025, 04/05-06-2026, 4/5-6-2026, 16-17/11/2025, 16/17/11/2025)
+    // Preserves all digits accurately without dropping day 1 or day 2
+    const ov = parseOvernightDate(s);
+    if (ov) {
+      return ov.formatted;
+    }
+
+    // 2. Handle Excel serial numbers (e.g. 45180 -> 11-09-2023)
     if (/^\d{5}$/.test(s)) {
       const serial = parseInt(s, 10);
       const dt = new Date((serial - 25569) * 86400 * 1000);
@@ -66,41 +158,36 @@
         return `${dd}-${mm}-${yyyy}`;
       }
     }
-    // Handle composite date formats e.g. "04/5-6-26", "16-17/11/2025", "3-4/06/2023"
-    let cleanStr = s;
-    const compMatch = s.match(/^(\d+)[-/](\d+)[-/](\d+)(?:[-/](\d+))?$/);
-    if (compMatch && compMatch[4]) {
-      cleanStr = `${compMatch[1]}/${compMatch[3]}/${compMatch[4]}`;
-    } else {
-      cleanStr = s.replace(/^\d+[-/](\d+[-/]\d+[-/]\d+)$/, '$1');
-    }
 
-    // Match YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD (optionally with time)
-    const isoMatch = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+    // 3. Match YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD (optionally with time)
+    const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
     if (isoMatch) {
       const yyyy = isoMatch[1];
       const mm = isoMatch[2].padStart(2, '0');
       const dd = isoMatch[3].padStart(2, '0');
       return `${dd}-${mm}-${yyyy}`;
     }
-    // Match DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optionally with time)
-    const dmyMatch = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
+
+    // 4. Match DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optionally with time)
+    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:[ T](\d{2}:\d{2}(?::\d{2})?)?)?/);
     if (dmyMatch) {
       const dd = dmyMatch[1].padStart(2, '0');
       const mm = dmyMatch[2].padStart(2, '0');
       const yyyy = dmyMatch[3];
       return `${dd}-${mm}-${yyyy}`;
     }
-    // Match DD-MM-YY or DD/MM/YY or DD.MM.YY
-    const dmyShortMatch = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
+
+    // 5. Match DD-MM-YY or DD/MM/YY or DD.MM.YY
+    const dmyShortMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
     if (dmyShortMatch) {
       const dd = dmyShortMatch[1].padStart(2, '0');
       const mm = dmyShortMatch[2].padStart(2, '0');
       const yyyy = '20' + dmyShortMatch[3];
       return `${dd}-${mm}-${yyyy}`;
     }
-    // Date object / timestamp fallback
-    const parsed = new Date(cleanStr);
+
+    // 6. Date object / timestamp fallback
+    const parsed = new Date(s);
     if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900 && parsed.getFullYear() < 2100) {
       const dd = String(parsed.getDate()).padStart(2, '0');
       const mm = String(parsed.getMonth() + 1).padStart(2, '0');
@@ -108,6 +195,87 @@
       return `${dd}-${mm}-${yyyy}`;
     }
     return s;
+  }
+
+  // ==========================================================================
+  // THEME MANAGEMENT: WHITE MODE (LIGHT) / INDUSTRIAL NIGHT DARK MODE
+  // ==========================================================================
+  const THEME_STORAGE_KEY = 'TM_THEME_PREFERENCE';
+
+  function getCurrentTheme() {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) || 
+             document.documentElement.getAttribute('data-theme') || 
+             'dark';
+    } catch (e) {
+      return document.documentElement.getAttribute('data-theme') || 'dark';
+    }
+  }
+
+  function setTheme(theme, showNotification = true) {
+    const validTheme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', validTheme);
+    if (document.body) {
+      document.body.setAttribute('data-theme', validTheme);
+    }
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, validTheme);
+    } catch (e) {
+      console.warn('Unable to persist theme preference:', e);
+    }
+
+    updateThemeUI(validTheme);
+
+    // Re-render active charts if initialized
+    if (typeof AppState !== 'undefined' && AppState && AppState.charts && typeof renderCharts === 'function') {
+      try {
+        const fails = (typeof getFilteredFailures === 'function') ? getFilteredFailures() : (AppState.failures || []);
+        renderCharts(fails);
+      } catch (err) {}
+    }
+
+    if (showNotification && typeof showToast === 'function') {
+      showToast(validTheme === 'light' ? '☀️ Switched to Crisp White Mode' : '🌙 Switched to Industrial Dark Mode');
+    }
+  }
+
+  function toggleTheme() {
+    const curr = getCurrentTheme();
+    const next = curr === 'light' ? 'dark' : 'light';
+    setTheme(next, true);
+  }
+
+  function updateThemeUI(theme) {
+    const isLight = theme === 'light';
+
+    // 1. Login card segmented choice buttons
+    const btnDarkLogin = document.getElementById('loginThemeDarkBtn');
+    const btnLightLogin = document.getElementById('loginThemeLightBtn');
+    if (btnDarkLogin) {
+      if (isLight) btnDarkLogin.classList.remove('active');
+      else btnDarkLogin.classList.add('active');
+    }
+    if (btnLightLogin) {
+      if (isLight) btnLightLogin.classList.add('active');
+      else btnLightLogin.classList.remove('active');
+    }
+
+    // 2. Login top-right corner toggle button
+    const loginTopIcon = document.getElementById('loginTopThemeIcon');
+    const loginTopLabel = document.getElementById('loginTopThemeLabel');
+    if (loginTopIcon) loginTopIcon.textContent = isLight ? '🌙' : '☀️';
+    if (loginTopLabel) loginTopLabel.textContent = isLight ? 'Dark Mode' : 'White Mode';
+
+    // 3. Main header session chip toggle button
+    const headerIcon = document.getElementById('btnHeaderThemeIcon');
+    const headerLabel = document.getElementById('btnHeaderThemeLabel');
+    if (headerIcon) headerIcon.textContent = isLight ? '🌙' : '☀️';
+    if (headerLabel) headerLabel.textContent = isLight ? 'Dark Mode' : 'White Mode';
+  }
+
+  function initTheme() {
+    const saved = getCurrentTheme();
+    setTheme(saved, false);
   }
 
   // ==========================================================================
@@ -255,6 +423,7 @@
     if (typeof switchLoginCardTab === 'function') {
       switchLoginCardTab('login');
     }
+    updateThemeUI(getCurrentTheme());
   }
 
   function applyUserSession(user) {
@@ -282,6 +451,8 @@
       document.body.classList.add('role-viewer');
       document.body.classList.remove('role-admin');
     }
+
+    updateThemeUI(getCurrentTheme());
 
     try {
       const sessData = JSON.stringify({ userId: user.userId, role: user.role, loggedInAt: Date.now() });
@@ -617,7 +788,7 @@
   // Local Storage Keys (v15 TM-FAST authentic fleet with strictly normalized DD-MM-YYYY dates and purged bogus rows)
   const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V15_DDMMYYYY';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V16_ORDINAL_IOH_POH';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V17_COMPLETE_HEALED';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -674,6 +845,7 @@
 
   // Initialization
   function initApp() {
+    initTheme();
     loadAuthUsers();
     loadDataset();
     setupCategoryPills();
@@ -721,7 +893,7 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
         'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
         'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST', 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST', 'TM_HRM_DATA_V14_FAST',
-        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY'
+        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY', 'TM_HRM_DATA_V16_ORDINAL_IOH_POH'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -796,18 +968,20 @@
       // Load authentic HRM data (History Register Module)
       const storedHrm = localStorage.getItem(HRM_STORAGE_KEY);
       if (storedHrm) {
-        HRM_DATA = JSON.parse(storedHrm);
+        try {
+          HRM_DATA = JSON.parse(storedHrm);
+        } catch (e) {
+          HRM_DATA = {};
+        }
       } else if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
         HRM_DATA = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters));
-        saveHrmData();
       }
 
-      // Guarantee HRM data for UTV-002, RBMV-006, and BCM-56824 is present
+      // Proactively heal and guarantee 100% complete HRM data across ALL 22 authentic SWR fleet machines
+      // If any machine is missing, erased, corrupted, or has empty items, immediately retrieve and replace with authentic records
       if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
-        ['UTV-002', 'RBMV-006', 'BCM-56824'].forEach(mId => {
-          if (!HRM_DATA[mId] && window.REAL_SWR_FLEET_DATA.historyRegisters[mId]) {
-            HRM_DATA[mId] = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters[mId]));
-          }
+        Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters).forEach(mId => {
+          healMachineHrm(mId);
         });
       }
 
@@ -979,13 +1153,19 @@
         if (val && typeof val === 'object') {
           this.isSyncingFromRemote = true;
           HRM_DATA = val;
+          if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
+            Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters).forEach(mId => {
+              healMachineHrm(mId);
+            });
+          }
+          ensureAllHrmOrdinals(HRM_DATA);
           try {
             localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
           } catch (e) {}
           renderHrmView();
           this.isSyncingFromRemote = false;
         } else if (!val && HRM_DATA && Object.keys(HRM_DATA).length > 0) {
-          this.db.ref('tm_hrm').set(HRM_DATA);
+          try { this.db.ref('tm_hrm').set(HRM_DATA).catch(() => {}); } catch (e) {}
         }
       });
 
@@ -1002,7 +1182,7 @@
           updateMachineDropdown();
           this.isSyncingFromRemote = false;
         } else if (!val && FLEET_DIRECTORY) {
-          this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
+          try { this.db.ref('tm_fleet').set(FLEET_DIRECTORY).catch(() => {}); } catch (e) {}
         }
       });
 
@@ -1610,9 +1790,9 @@
     if (fyKey === 'FY') fyKey = 'FY_2026_27';
     const conf = FINANCIAL_YEARS[fyKey];
     if (!conf) return true;
-    const ts = getFailureTimestamp(f);
-    if (!ts) return false;
-    return ts >= conf.start && ts <= conf.end;
+    const rng = getFailureDateRange(f);
+    if (!rng.startTs) return false;
+    return rng.startTs <= conf.end && rng.endTs >= conf.start;
   }
 
   // Set Financial Year Surveillance Scope ('FY_2026_27', 'FY_2025_26', 'FY_2024_25', 'FY_2023_24', 'FY_2022_23', 'ALL')
@@ -1984,7 +2164,7 @@
               <div style="font-weight: 700; color: #ffd700; font-size: 13px;">
                 Repetitive Defect Cluster: ${relatedFails.length} recurring cases highlighted for ${machineNo} (${deskKey})
               </div>
-              <div style="font-size: 11px; color: #cbd8cf;">
+              <div class="cluster-banner-subtext" style="font-size: 11px;">
                 All repetitive incidents sharing this failure pattern or component are highlighted below
               </div>
             </div>
@@ -2024,9 +2204,7 @@
   // Helper: Determine if failure falls strictly in Current Financial Year (FY 2026-27)
   function isFailureInCurrentFY(f) {
     if (!f) return false;
-    const ts = getFailureTimestamp(f);
-    if (!ts) return false;
-    return ts >= FY_2026_START && ts <= FY_2026_END;
+    return isFailureInFY(f, 'FY_2026_27');
   }
 
   // Timestamp extractor for precise chronological sorting & Financial Year filtering
@@ -2036,9 +2214,9 @@
     let natVal = f.natureOfFailure || '';
 
     // Auto-detect and handle shifted column where date was put in natureOfFailure
-    if (typeof natVal === 'string' && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(natVal.trim())) {
+    if (typeof natVal === 'string' && (/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(natVal.trim()) || isOvernightDate(natVal))) {
       const dStr = String(dVal).trim();
-      if (!/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(dStr) && !/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+      if (!/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(dStr) && !/^\d{4}-\d{2}-\d{2}/.test(dStr) && !isOvernightDate(dStr)) {
         dVal = natVal;
       }
     }
@@ -2052,29 +2230,36 @@
     const str = String(dVal).trim().replace(/[`'"]/g, '');
     if (!str) return 0;
 
+    // Handle overnight block date format (e.g. 16/17-11-2025, 04/05-06-2026, 4/5-6-2026)
+    // Anchored to the start date night (d1)
+    const ov = parseOvernightDate(str);
+    if (ov) {
+      let sYear = ov.yyyy;
+      let sMonth = ov.mm - 1;
+      if (ov.d1 > ov.d2) {
+        sMonth = ov.mm - 2;
+        if (sMonth < 0) {
+          sMonth = 12;
+          sYear -= 1;
+        }
+      }
+      const dt = new Date(sYear, sMonth, ov.d1, 0, 0, 0);
+      if (!isNaN(dt.getTime())) return dt.getTime();
+    }
+
     // Handle 5-digit Excel serial numbers
     if (/^\d{5}$/.test(str)) {
       return (parseInt(str, 10) - 25569) * 86400 * 1000;
     }
 
-    // Handle composite date formats e.g. "04/5-6-26", "16-17/11/2025", "3-4/06/2023"
-    let cleanStr = str;
-    const compMatch = str.match(/^(\d+)[-/](\d+)[-/](\d+)(?:[-/](\d+))?$/);
-    if (compMatch && compMatch[4]) {
-      // 4 parts e.g. 16-17-11-2025 -> use 16/11/2025
-      cleanStr = `${compMatch[1]}/${compMatch[3]}/${compMatch[4]}`;
-    } else {
-      cleanStr = str.replace(/^\d+[-/](\d+[-/]\d+[-/]\d+)$/, '$1');
-    }
-
     // Standard ISO format (YYYY-MM-DD)
-    if (cleanStr.includes('-') && cleanStr.split('-')[0].length === 4) {
-      const parsed = Date.parse(cleanStr);
+    if (str.includes('-') && str.split('-')[0].length === 4) {
+      const parsed = Date.parse(str);
       if (!isNaN(parsed)) return parsed;
     }
 
     // Parse DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
-    const parts = cleanStr.split(/[-/.]/);
+    const parts = str.split(/[-/.]/);
     if (parts.length === 3) {
       let day = parseInt(parts[0], 10);
       let month = parseInt(parts[1], 10) - 1;
@@ -2089,9 +2274,43 @@
       if (!isNaN(dt.getTime())) return dt.getTime();
     }
 
-    const parsedFallback = Date.parse(cleanStr);
+    const parsedFallback = Date.parse(str);
     if (!isNaN(parsedFallback)) return parsedFallback;
     return 0;
+  }
+
+  // Helper: Get exact start and end timestamps covering the entire duration/block of a failure
+  function getFailureDateRange(f) {
+    if (!f) return { startTs: 0, endTs: 0 };
+    let dVal = f.dateOfFailure || f.breakdownTime || f.date || '';
+    const str = String(dVal).trim().replace(/[`'"]/g, '');
+    const ov = parseOvernightDate(str);
+    if (ov) {
+      let sYear = ov.yyyy;
+      let sMonth = ov.mm - 1;
+      if (ov.d1 > ov.d2) {
+        sMonth = ov.mm - 2;
+        if (sMonth < 0) {
+          sMonth = 11;
+          sYear -= 1;
+        }
+      }
+      const startDt = new Date(sYear, sMonth, ov.d1, 0, 0, 0);
+      const endDt = new Date(ov.yyyy, ov.mm - 1, ov.d2, 23, 59, 59);
+      const startTs = !isNaN(startDt.getTime()) ? startDt.getTime() : 0;
+      const endTs = !isNaN(endDt.getTime()) ? endDt.getTime() : startTs;
+      return { startTs, endTs };
+    }
+
+    const ts = getFailureTimestamp(f);
+    if (!ts) return { startTs: 0, endTs: 0 };
+    const dt = new Date(ts);
+    const startDt = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0);
+    const endDt = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59);
+    return {
+      startTs: startDt.getTime(),
+      endTs: endDt.getTime()
+    };
   }
 
   // Get All Machine Failures Across Entire Application in Strict Chronological Order
@@ -2134,8 +2353,8 @@
       if (sParts.length === 3) {
         const sTs = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10), 0, 0, 0).getTime();
         list = list.filter(f => {
-          const ts = getFailureTimestamp(f);
-          return ts >= sTs;
+          const rng = getFailureDateRange(f);
+          return (rng.endTs || rng.startTs) >= sTs;
         });
       }
     }
@@ -2144,8 +2363,8 @@
       if (eParts.length === 3) {
         const eTs = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10), 23, 59, 59).getTime();
         list = list.filter(f => {
-          const ts = getFailureTimestamp(f);
-          return ts <= eTs;
+          const rng = getFailureDateRange(f);
+          return (rng.startTs || rng.endTs) <= eTs;
         });
       }
     }
@@ -2155,7 +2374,7 @@
       list = list.filter(f => (f.division || '').toUpperCase().includes(AppState.historyDivisionFilter));
     }
 
-    // 4. Operational Block filter (ALL, IN_BLOCK, NON_BLOCK)
+    // 7. Operational Block filter (ALL, IN_BLOCK, NON_BLOCK, OVERNIGHT)
     if (AppState.historyBlockFilter && AppState.historyBlockFilter !== 'ALL') {
       if (AppState.historyBlockFilter === 'IN_BLOCK') {
         list = list.filter(f => {
@@ -2167,6 +2386,8 @@
           const b = String(f.whetherInBlock || '').toUpperCase();
           return b !== 'YES' && !b.includes('BLOCK') && b !== 'Y';
         });
+      } else if (AppState.historyBlockFilter === 'OVERNIGHT') {
+        list = list.filter(f => isOvernightDate(f.dateOfFailure || f.breakdownTime || f.date));
       }
     }
 
@@ -2227,8 +2448,8 @@
         emptyState.style.display = 'block';
         emptyState.innerHTML = `
           <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
-          <div style="font-size: 15px; font-weight: 600; color: #e5ece6;">No failure records found matching current timeline filters</div>
-          <div style="font-size: 12px; margin-top: 4px; color: #8da494;">Try clearing your search query or setting status / block filters to 'All'.</div>
+          <div class="empty-state-title" style="font-size: 15px; font-weight: 600;">No failure records found matching current timeline filters</div>
+          <div class="empty-state-sub" style="font-size: 12px; margin-top: 4px;">Try clearing your search query or setting status / block filters to 'All'.</div>
         `;
       }
       if (pagBar) pagBar.style.display = 'none';
@@ -2285,24 +2506,24 @@
       tr.innerHTML = `
         <td><strong>#${idx + 1}</strong></td>
         <td>
-          <div style="font-weight: 700; color: #fff; font-size: 13.5px;">${f.machineNo}</div>
+          <div class="table-machine-text" style="font-weight: 700; font-size: 13.5px;">${f.machineNo}</div>
           <div style="display: flex; gap: 5px; align-items: center; margin-top: 3px;">
             <span style="font-size: 11px; color: var(--gold-400); font-weight: 600;">${f.category}</span>
             <span class="div-badge ${getDivisionClass(f.division)}">${f.division || 'SBC'}</span>
           </div>
         </td>
         <td>
-          <div style="font-size: 12.5px; font-weight: 700; color: #ffd700;">📅 ${escapeHtml(formatDateDisplay(f.dateOfFailure || f.breakdownTime))}</div>
-          <div style="font-size: 11px; color: #8fa596; margin-top: 2px;">${escapeHtml(f.section || 'Block Section')}</div>
+          <div class="table-date-text" style="font-size: 12.5px; font-weight: 700;">📅 ${escapeHtml(formatDateDisplay(f.dateOfFailure || f.breakdownTime))}</div>
+          <div class="table-sub-text" style="font-size: 11px; margin-top: 2px;">${escapeHtml(f.section || 'Block Section')}</div>
         </td>
         <td>
           <span class="table-subsystem-pill ${subClass}">
             ${f.subsystem || 'Mechanical'}
           </span>
-          <div style="font-size: 11px; color: #8da494; margin-top: 3px;">${escapeHtml(f.component || '')}</div>
+          <div class="table-comp-text" style="font-size: 11px; margin-top: 3px;">${escapeHtml(f.component || '')}</div>
         </td>
         <td style="max-width: 280px;">
-          <div style="font-weight: 600; color: #e5ece6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(f.natureOfFailure || f.description || '')}">
+          <div class="table-desc-text" style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(f.natureOfFailure || f.description || '')}">
             ${escapeHtml(f.natureOfFailure || f.description || '')}
           </div>
           ${isRep ? `<span style="display:inline-block; font-size:10px; color:#ffab91; background:rgba(255,112,67,0.2); padding:1px 6px; border-radius:3px; margin-top:3px; border:1px solid rgba(255,112,67,0.4); cursor:pointer;" onclick="window.TM_APP.highlightFailure('${f.id}', '${f.subsystem}', '${f.machineNo}')" title="Click to navigate & highlight this recurring defect in subsystem desk">🔁 ${f.repeatCount || 2}x Recurring Defect</span>` : ''}
@@ -2577,13 +2798,34 @@
   // ==========================================================================
   // CHART RENDERING (Chart.js Integration)
   // ==========================================================================
+  function getChartThemeColors() {
+    const isLight = (getCurrentTheme() === 'light');
+    return {
+      isLight,
+      textColor: isLight ? '#111827' : '#e5ece6',
+      mutedTextColor: isLight ? '#374151' : '#a4bba9',
+      axisColor: isLight ? '#1b5e20' : '#93c572',
+      gridColor: isLight ? 'rgba(0, 0, 0, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+      angleLineColor: isLight ? 'rgba(0, 0, 0, 0.28)' : 'rgba(255, 255, 255, 0.12)',
+      radarBg: isLight ? 'rgba(46, 125, 50, 0.42)' : 'rgba(147, 197, 114, 0.28)',
+      radarBorder: isLight ? '#1b5e20' : '#93c572',
+      radarPointBg: isLight ? '#8c6307' : '#ffd700',
+      doughnutBorder: isLight ? '#ffffff' : '#121c16',
+      tooltipBg: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(12, 20, 16, 0.95)',
+      tooltipTitle: isLight ? '#946200' : '#ffd700',
+      tooltipBody: isLight ? '#111827' : '#e5ece6',
+      tooltipBorder: isLight ? '#2e7d32' : '#93c572'
+    };
+  }
+
   function renderCharts(list) {
     if (typeof Chart === 'undefined') return;
+    const safeList = list || (typeof getFilteredFailures === 'function' ? getFilteredFailures() : AppState.failures) || [];
 
-    renderCategoryComparisonChart(list);
-    renderDivisionDistributionChart(list);
-    renderSubsystemChart(list);
-    renderBlockVsNonBlockChart(list);
+    renderCategoryComparisonChart(safeList);
+    renderDivisionDistributionChart(safeList);
+    renderSubsystemChart(safeList);
+    renderBlockVsNonBlockChart(safeList);
 
     const activeM = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL')
       ? AppState.selectedMachine
@@ -2601,6 +2843,8 @@
       AppState.charts.category.destroy();
     }
 
+    const themeColors = getChartThemeColors();
+
     // Tally by category
     const catLabels = MACHINE_CATEGORIES.map(c => (c === 'SRGM/RGM' ? 'SRGM / RGM' : c));
     const counts = MACHINE_CATEGORIES.map(c => {
@@ -2617,8 +2861,8 @@
           {
             label: 'Total Incidents',
             data: counts,
-            backgroundColor: 'rgba(147, 197, 114, 0.75)',
-            borderColor: '#93c572',
+            backgroundColor: themeColors.isLight ? 'rgba(46, 125, 50, 0.85)' : 'rgba(147, 197, 114, 0.75)',
+            borderColor: themeColors.isLight ? '#1b5e20' : '#93c572',
             borderWidth: 1.5,
             borderRadius: 6
           }
@@ -2630,25 +2874,25 @@
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
-            labels: { color: '#c9dbd0', font: { size: 11, family: 'Segoe UI' } }
+            labels: { color: themeColors.textColor, font: { size: 11, family: 'Segoe UI', weight: '600' } }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#d4af37',
-            bodyColor: '#e5ece6',
-            borderColor: '#93c572',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1
           }
         },
         scales: {
           x: {
-            ticks: { color: '#8da494', font: { size: 10 } },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            ticks: { color: themeColors.textColor, font: { size: 10, weight: '600' } },
+            grid: { color: themeColors.gridColor }
           },
           y: {
-            ticks: { color: '#93c572', stepSize: 1 },
-            title: { display: true, text: 'Total Incidents', color: '#93c572' },
-            grid: { color: 'rgba(255, 255, 255, 0.06)' }
+            ticks: { color: themeColors.axisColor, stepSize: 1, font: { weight: '600' } },
+            title: { display: true, text: 'Total Incidents', color: themeColors.axisColor, font: { weight: 'bold' } },
+            grid: { color: themeColors.gridColor }
           }
         }
       }
@@ -2663,6 +2907,8 @@
     if (AppState.charts.division) {
       AppState.charts.division.destroy();
     }
+
+    const themeColors = getChartThemeColors();
 
     const sbcCount = AppState.failures.filter(f => (f.division || '').toUpperCase().includes('SBC')).length;
     const mysCount = AppState.failures.filter(f => (f.division || '').toUpperCase().includes('MYS')).length;
@@ -2693,7 +2939,7 @@
             '#16a34a', // MYS Green (exact requested color)
             '#800000'  // UBL Maroon (exact requested color)
           ],
-          borderColor: '#121c16',
+          borderColor: themeColors.doughnutBorder,
           borderWidth: 2.5,
           hoverOffset: 8
         }]
@@ -2705,16 +2951,16 @@
           legend: {
             position: 'bottom',
             labels: {
-              color: '#cbd8cf',
-              font: { size: 10.5, family: 'Segoe UI' },
+              color: themeColors.textColor,
+              font: { size: 11, family: 'Segoe UI', weight: '600' },
               boxWidth: 12
             }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#d4af37',
-            bodyColor: '#fff',
-            borderColor: '#d4af37',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1
           }
         },
@@ -2732,6 +2978,8 @@
       AppState.charts.subsystem.destroy();
     }
 
+    const themeColors = getChartThemeColors();
+
     const subsystemCounts = {};
     list.forEach(f => {
       const sub = f.subsystem || 'Mechanical';
@@ -2742,14 +2990,14 @@
     const data = Object.values(subsystemCounts);
 
     const colors = [
-      '#93c572', // Pista
+      '#2e7d32', // Pista
       '#d4af37', // Gold
-      '#42a5f5', // Blue
-      '#ef5350', // Red
-      '#ab47bc', // Purple
-      '#26a69a', // Teal
-      '#ffa726', // Orange
-      '#78909c'  // Slate
+      '#2563eb', // Blue
+      '#dc2626', // Red
+      '#9333ea', // Purple
+      '#0d9488', // Teal
+      '#ea580c', // Orange
+      '#475569'  // Slate
     ];
 
     AppState.charts.subsystem = new Chart(ctx, {
@@ -2759,7 +3007,7 @@
         datasets: [{
           data: data,
           backgroundColor: colors.slice(0, labels.length),
-          borderColor: '#121c16',
+          borderColor: themeColors.doughnutBorder,
           borderWidth: 2,
           hoverOffset: 8
         }]
@@ -2770,13 +3018,13 @@
         plugins: {
           legend: {
             position: 'right',
-            labels: { color: '#cbd8cf', font: { size: 11 }, boxWidth: 12 }
+            labels: { color: themeColors.textColor, font: { size: 11, weight: '600' }, boxWidth: 12 }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#d4af37',
-            bodyColor: '#e5ece6',
-            borderColor: '#93c572',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1
           }
         },
@@ -2853,6 +3101,7 @@
       AppState.charts.machineRadar.destroy();
     }
 
+    const themeColors = getChartThemeColors();
     const stats = getMachineSubsystemStats(mId);
 
     // Update title
@@ -2868,15 +3117,15 @@
         datasets: [{
           label: `${mId || 'Selected Machine'} (% Contribution)`,
           data: stats.percentages,
-          backgroundColor: 'rgba(147, 197, 114, 0.28)',
-          borderColor: '#93c572',
+          backgroundColor: themeColors.radarBg,
+          borderColor: themeColors.radarBorder,
           borderWidth: 2.5,
-          pointBackgroundColor: '#ffd700',
-          pointBorderColor: '#fff',
+          pointBackgroundColor: themeColors.radarPointBg,
+          pointBorderColor: themeColors.doughnutBorder,
           pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: '#ffd700',
-          pointRadius: 4.5,
-          pointHoverRadius: 6
+          pointHoverBorderColor: themeColors.radarPointBg,
+          pointRadius: 5,
+          pointHoverRadius: 7
         }]
       },
       options: {
@@ -2884,13 +3133,13 @@
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            labels: { color: '#c9dbd0', font: { size: 11, family: 'Segoe UI' } }
+            labels: { color: themeColors.textColor, font: { size: 11, family: 'Segoe UI', weight: '600' } }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#ffd700',
-            bodyColor: '#e5ece6',
-            borderColor: '#93c572',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1,
             callbacks: {
               label: function (context) {
@@ -2904,16 +3153,17 @@
         },
         scales: {
           r: {
-            angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
-            grid: { color: 'rgba(255, 255, 255, 0.08)' },
+            angleLines: { color: themeColors.angleLineColor, lineWidth: 2 },
+            grid: { color: themeColors.gridColor, lineWidth: 1.8 },
             pointLabels: {
-              color: '#cbd8cf',
-              font: { size: 11, weight: '600', family: 'Segoe UI' }
+              color: themeColors.textColor,
+              font: { size: 12, weight: '700', family: 'Segoe UI' }
             },
             ticks: {
-              color: '#8da494',
+              color: themeColors.textColor,
               backdropColor: 'transparent',
-              stepSize: 20
+              stepSize: 20,
+              font: { weight: '700' }
             },
             suggestedMin: 0,
             suggestedMax: Math.max(...stats.percentages, 50) + 10
@@ -2932,6 +3182,7 @@
       AppState.charts.machinePercentDonut.destroy();
     }
 
+    const themeColors = getChartThemeColors();
     const stats = getMachineSubsystemStats(mId);
 
     // Update title
@@ -2941,12 +3192,12 @@
     }
 
     const colors = [
-      '#ffa726', // Engine (Orange)
-      '#ffd700', // Tamping/Crane (Gold)
-      '#93c572', // Mechanical (Pista Green)
-      '#42a5f5', // Hydraulic (Blue)
-      '#26a69a', // Pneumatic (Teal)
-      '#ab47bc'  // Electrical (Purple)
+      '#ea580c', // Engine (Orange)
+      '#d97706', // Tamping/Crane (Gold/Amber)
+      '#16a34a', // Mechanical (Green)
+      '#2563eb', // Hydraulic (Blue)
+      '#0891b2', // Pneumatic (Cyan)
+      '#9333ea'  // Electrical (Purple)
     ];
 
     AppState.charts.machinePercentDonut = new Chart(ctx, {
@@ -2956,7 +3207,7 @@
         datasets: [{
           data: stats.percentages,
           backgroundColor: colors,
-          borderColor: '#121c16',
+          borderColor: themeColors.doughnutBorder,
           borderWidth: 2,
           hoverOffset: 6
         }]
@@ -2968,16 +3219,16 @@
           legend: {
             position: 'right',
             labels: {
-              color: '#cbd8cf',
-              font: { size: 11, family: 'Segoe UI' },
+              color: themeColors.textColor,
+              font: { size: 11, family: 'Segoe UI', weight: '600' },
               boxWidth: 12
             }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#ffd700',
-            bodyColor: '#e5ece6',
-            borderColor: '#93c572',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1,
             callbacks: {
               label: function (context) {
@@ -3044,6 +3295,8 @@
     if (AppState.charts.blockVsNonBlock) {
       AppState.charts.blockVsNonBlock.destroy();
     }
+
+    const themeColors = getChartThemeColors();
 
     const isAllScope = (AppState.kpiScope === 'ALL');
     const fyKey = isAllScope ? null : (AppState.kpiScope === 'FY' ? 'FY_2026_27' : AppState.kpiScope);
@@ -3114,8 +3367,8 @@
           {
             label: 'Repetitive Cases (🔁 Recurring Defects)',
             data: repetitiveData,
-            backgroundColor: 'rgba(212, 175, 55, 0.85)',
-            borderColor: '#d4af37',
+            backgroundColor: themeColors.isLight ? 'rgba(180, 130, 20, 0.85)' : 'rgba(212, 175, 55, 0.85)',
+            borderColor: themeColors.isLight ? '#b38b18' : '#d4af37',
             borderWidth: 1,
             borderRadius: 4
           }
@@ -3129,30 +3382,30 @@
             display: true,
             position: 'top',
             labels: {
-              color: '#c9ecbc',
-              font: { size: 11 },
+              color: themeColors.textColor,
+              font: { size: 11, weight: '600' },
               boxWidth: 14
             }
           },
           tooltip: {
-            backgroundColor: 'rgba(12, 20, 16, 0.95)',
-            titleColor: '#ffd700',
-            bodyColor: '#fff',
-            borderColor: '#d4af37',
+            backgroundColor: themeColors.tooltipBg,
+            titleColor: themeColors.tooltipTitle,
+            bodyColor: themeColors.tooltipBody,
+            borderColor: themeColors.tooltipBorder,
             borderWidth: 1
           }
         },
         scales: {
           x: {
             stacked: false,
-            ticks: { color: '#8da494', font: { weight: '600' } },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            ticks: { color: themeColors.textColor, font: { weight: '600', size: 10 } },
+            grid: { color: themeColors.gridColor }
           },
           y: {
             stacked: false,
-            beginAtZero: true,
-            ticks: { color: '#8da494', stepSize: 10 },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            ticks: { color: themeColors.textColor, stepSize: 10, font: { weight: '600' } },
+            title: { display: true, text: 'Recorded Incidents', color: themeColors.textColor, font: { weight: 'bold' } },
+            grid: { color: themeColors.gridColor }
           }
         }
       }
@@ -3335,6 +3588,14 @@
       }
     }
     const s = String(val).trim();
+
+    // 1. Overnight Block Date check FIRST (e.g. 16/17-11-2025, 04/05-06-2026, 16-17/11/2025, 16/17/11/2025)
+    // Preserves both day digits accurately without dropping day 1 or day 2
+    const ov = parseOvernightDate(s);
+    if (ov) {
+      return ov.formatted;
+    }
+
     const ddmmyyyy = s.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})/);
     if (ddmmyyyy) {
       const day = ddmmyyyy[1].padStart(2, '0');
@@ -3941,6 +4202,12 @@
 
   function calculateDurationHours(start, end) {
     if (!start || !end) return 0;
+    const startTs = typeof start === 'number' ? start : getFailureTimestamp({ dateOfFailure: start });
+    const endTs = typeof end === 'number' ? end : getFailureTimestamp({ dateOfFailure: end });
+    if (startTs > 0 && endTs > 0 && endTs >= startTs) {
+      const diff = (endTs - startTs) / (1000 * 60 * 60);
+      return parseFloat(diff.toFixed(2));
+    }
     const diff = (new Date(end) - new Date(start)) / (1000 * 60 * 60);
     return diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
   }
@@ -4205,6 +4472,21 @@
     const s = (rec.isoDate || rec.displayDate || rec.rawDate || '').toString().trim();
     if (!s || /^(na|nil|not done|not done yet|_|-)$/i.test(s)) return 0;
 
+    // Overnight block date: D1D1/D2D2-MM-YYYY
+    const ov = parseOvernightDate(s);
+    if (ov) {
+      let sYear = ov.yyyy;
+      let sMonth = ov.mm - 1;
+      if (ov.d1 > ov.d2) {
+        sMonth = ov.mm - 2;
+        if (sMonth < 0) {
+          sMonth = 11;
+          sYear -= 1;
+        }
+      }
+      return new Date(sYear, sMonth, ov.d1).getTime();
+    }
+
     // DD[-/. ]MM[-/. ]YYYY
     const dmyMatch = s.match(/\b(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})\b/);
     if (dmyMatch) {
@@ -4233,6 +4515,8 @@
     if (!dStr) return '';
     const s = dStr.toString().trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const ov = parseOvernightDate(s);
+    if (ov) return ov.startDateIso;
     const dmy = s.match(/\b(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})\b/);
     if (dmy) {
       const d = dmy[1].padStart(2, '0');
@@ -4326,15 +4610,32 @@
     });
   }
 
-  // Render History Register Module (Tab 1)
-  function renderHrmView() {
-    const mId = getActiveMachineId();
-    const mInfo = getMachineInfo(mId);
+  // Helper: Retrieve authentic History Register record for any machine from official database
+  function getAuthenticHrm(machineId) {
+    if (!machineId || typeof window === 'undefined' || !window.REAL_SWR_FLEET_DATA || !window.REAL_SWR_FLEET_DATA.historyRegisters) {
+      return null;
+    }
+    const regs = window.REAL_SWR_FLEET_DATA.historyRegisters;
+    if (regs[machineId]) return regs[machineId];
 
-    if (!HRM_DATA[mId]) {
-      if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters && window.REAL_SWR_FLEET_DATA.historyRegisters[mId]) {
-        HRM_DATA[mId] = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters[mId]));
-      } else {
+    const normId = machineId.trim().toUpperCase().replace(/\s+/g, '-');
+    if (regs[normId]) return regs[normId];
+
+    const noHyphenId = machineId.trim().toUpperCase().replace(/[-_ ]/g, '');
+    for (let k of Object.keys(regs)) {
+      if (k.replace(/[-_ ]/g, '').toUpperCase() === noHyphenId) {
+        return regs[k];
+      }
+    }
+    return null;
+  }
+
+  // Self-Healing Mechanism: Proactively restore missing, erased, or incomplete HRM records from authentic workbooks
+  function healMachineHrm(mId, forceAuthentic = false) {
+    const authentic = getAuthenticHrm(mId);
+    if (!authentic) {
+      if (!HRM_DATA[mId]) {
+        const mInfo = getMachineInfo(mId);
         HRM_DATA[mId] = {
           machineId: mId,
           machineName: mId,
@@ -4346,14 +4647,135 @@
             title: c.title,
             presentDate: 'NA',
             presentEngineHours: 'NA',
-            presentRemarks: '',
+            presentRemarks: 'NA',
             records: []
           }))
         };
+        return true;
+      }
+      return false;
+    }
+
+    if (forceAuthentic || !HRM_DATA[mId] || !Array.isArray(HRM_DATA[mId].items) || HRM_DATA[mId].items.length === 0) {
+      HRM_DATA[mId] = JSON.parse(JSON.stringify(authentic));
+      if (Array.isArray(HRM_DATA[mId].items)) {
+        HRM_DATA[mId].items.forEach(it => {
+          if (/IOH|POH/i.test(it.title)) syncHrmItemOrdinals(it);
+        });
+      }
+      return true;
+    }
+
+    const current = HRM_DATA[mId];
+    let repaired = false;
+
+    // Check if canonical has items that are missing or erased in current
+    if (current.items.length < authentic.items.length) {
+      const mergedItems = JSON.parse(JSON.stringify(authentic.items));
+      current.items.forEach(curIt => {
+        const match = mergedItems.find(aIt => aIt.itemNum === curIt.itemNum || aIt.title.trim().toUpperCase() === curIt.title.trim().toUpperCase());
+        if (match && curIt.records && curIt.records.length > (match.records ? match.records.length : 0)) {
+          match.records = curIt.records;
+          match.presentDate = curIt.presentDate;
+          match.presentEngineHours = curIt.presentEngineHours;
+          match.presentRemarks = curIt.presentRemarks;
+        }
+      });
+      current.items = mergedItems;
+      repaired = true;
+    } else {
+      // Check each item: if authentic has records/presentDate but current has NA or empty records, heal it!
+      authentic.items.forEach(authIt => {
+        const curIt = current.items.find(i => i.itemNum === authIt.itemNum || i.title.trim().toUpperCase() === authIt.title.trim().toUpperCase());
+        if (curIt) {
+          const authHasData = (authIt.records && authIt.records.length > 0) || (authIt.presentDate && authIt.presentDate !== 'NA' && authIt.presentDate !== '_');
+          const curIsEmpty = (!curIt.records || curIt.records.length === 0) && (!curIt.presentDate || curIt.presentDate === 'NA' || curIt.presentDate === '');
+          if (authHasData && curIsEmpty) {
+            curIt.presentDate = authIt.presentDate;
+            curIt.presentEngineHours = authIt.presentEngineHours;
+            curIt.presentRemarks = authIt.presentRemarks;
+            curIt.records = JSON.parse(JSON.stringify(authIt.records || []));
+            repaired = true;
+          } else if (authIt.records && authIt.records.length > 0 && (!curIt.records || curIt.records.length < authIt.records.length)) {
+            curIt.records = JSON.parse(JSON.stringify(authIt.records));
+            if (!curIt.presentDate || curIt.presentDate === 'NA') curIt.presentDate = authIt.presentDate;
+            if (!curIt.presentEngineHours || curIt.presentEngineHours === 'NA') curIt.presentEngineHours = authIt.presentEngineHours;
+            if (!curIt.presentRemarks || curIt.presentRemarks === 'NA') curIt.presentRemarks = authIt.presentRemarks;
+            repaired = true;
+          }
+        }
+      });
+    }
+
+    if (!current.commissioningDate || current.commissioningDate === '2016-01-01') {
+      if (authentic.commissioningDate) {
+        current.commissioningDate = authentic.commissioningDate;
+        current.commissioningRaw = authentic.commissioningRaw;
+        repaired = true;
       }
     }
 
-    const hrm = HRM_DATA[mId];
+    if (Array.isArray(current.items)) {
+      current.items.forEach(it => {
+        if (/IOH|POH/i.test(it.title)) syncHrmItemOrdinals(it);
+      });
+    }
+
+    return repaired;
+  }
+
+  // Retrieve and Restore All History Register data across all 22 SWR fleet machines
+  function retrieveAndRestoreAllHrm(forceAll = true) {
+    if (typeof window === 'undefined' || !window.REAL_SWR_FLEET_DATA || !window.REAL_SWR_FLEET_DATA.historyRegisters) {
+      showToast('Error: Authentic SWR fleet history database not loaded.', true);
+      return;
+    }
+
+    const regKeys = Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters);
+    let repairedCount = 0;
+
+    regKeys.forEach(mId => {
+      const repaired = healMachineHrm(mId, forceAll);
+      if (repaired) repairedCount++;
+    });
+
+    ensureAllHrmOrdinals(HRM_DATA);
+    saveHrmData();
+    renderHrmView();
+
+    showToast(`⚡ Successfully retrieved and replaced missing History Register records across all ${regKeys.length} SWR fleet machines!`);
+  }
+
+  // Render History Register Module (Tab 1)
+  function renderHrmView() {
+    const mId = getActiveMachineId();
+    const mInfo = getMachineInfo(mId);
+
+    // Auto-heal active machine if erased, missing, or incomplete
+    const wasHealed = healMachineHrm(mId);
+    if (wasHealed) {
+      saveHrmData();
+    }
+
+    const hrm = HRM_DATA[mId] || {
+      machineId: mId,
+      machineName: mId,
+      commissioningDate: mInfo?.commissioningDate || '2016-01-01',
+      commissioningRaw: mInfo?.commissioningRaw || '',
+      items: CANONICAL_HRM_ITEMS.map((c, i) => ({
+        row: i + 4,
+        itemNum: c.itemNum,
+        title: c.title,
+        presentDate: 'NA',
+        presentEngineHours: 'NA',
+        presentRemarks: 'NA',
+        records: []
+      }))
+    };
+    if (!HRM_DATA[mId]) {
+      HRM_DATA[mId] = hrm;
+      saveHrmData();
+    }
 
     // Guarantee ordinals for this machine's items
     if (hrm && Array.isArray(hrm.items)) {
@@ -4485,7 +4907,7 @@
               🗑️
             </button>
           </div>
-          ` : `<span style="font-size: 11px; color: #799181;">View Only</span>`}
+          ` : `<span class="view-only-tag" style="font-size: 11px;">View Only</span>`}
         </td>
       `;
       tbody.appendChild(tr);
@@ -4510,7 +4932,7 @@
                   ` : ''}
                   ${rec.engineHours ? `<span style="color: var(--gold-300); font-family: var(--font-mono); font-size: 11.5px;">⏱️ ${escapeHtml(rec.engineHours)} EH</span>` : ''}
                 </div>
-                <div style="font-size: 11px; color: #c4d7c8;">${escapeHtml((rec.remarks && rec.remarks.trim() !== '' && rec.remarks.trim() !== '-' && !/^(no|nil)$/i.test(rec.remarks.trim())) ? rec.remarks.trim() : 'NA')}</div>
+                <div class="hrm-rec-remarks" style="font-size: 11px;">${escapeHtml((rec.remarks && rec.remarks.trim() !== '' && rec.remarks.trim() !== '-' && !/^(no|nil)$/i.test(rec.remarks.trim())) ? rec.remarks.trim() : 'NA')}</div>
               </div>
               ${isUserAdmin() ? `
               <div style="display: flex; gap: 4px; align-items: center;">
@@ -4531,7 +4953,7 @@
             <div class="hrm-history-drawer">
               <div style="font-size: 12px; font-weight: 700; color: var(--gold-400); margin-bottom: 6px; display: flex; justify-content: space-between;">
                 <span>Detailed Overhaul &amp; Replacement Audit History (Chronological Ordinals):</span>
-                ${isUserAdmin() ? '<span style="font-size: 11px; color: #8fa696;">Click ✏️ to edit or 🗑️ to delete any individual entry anytime</span>' : ''}
+                ${isUserAdmin() ? '<span class="admin-hint-sub" style="font-size: 11px;">Click ✏️ to edit or 🗑️ to delete any individual entry anytime</span>' : ''}
               </div>
               <div class="hrm-history-grid">
                 ${recordsHtml}
@@ -4591,10 +5013,10 @@
     if (subFailures.length === 0) {
       tableRows = `
         <tr>
-          <td colspan="11" style="text-align: center; padding: 42px; color: #8fa696;">
+          <td colspan="11" class="desk-empty-cell" style="text-align: center; padding: 42px;">
             <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
             <div style="font-size: 15px; font-weight: 700; color: var(--pista-300);">No ${effectiveSubsystem} Failures Recorded for Machine ${mId}</div>
-            <div style="font-size: 12px; margin-top: 4px; color: #cbd8cf;">Subsystem is operating with zero recorded breakdown down days.</div>
+            <div class="desk-empty-sub" style="font-size: 12px; margin-top: 4px;">Subsystem is operating with zero recorded breakdown down days.</div>
             <button class="btn btn-primary-gold admin-only" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="margin-top: 14px; font-size: 11.5px; padding: 6px 14px;">
               ➕ Log First ${effectiveSubsystem} Failure
             </button>
@@ -4636,16 +5058,16 @@
                 ${isBlockYes ? '🛑 YES' : (inBlock.toUpperCase() === 'NO' ? '🟢 NO' : escapeHtml(inBlock))}
               </span>
             </td>
-            <td style="font-size: 12px; color: #fff; line-height: 1.45; max-width: 260px;">
+            <td style="font-size: 12px; line-height: 1.45; max-width: 260px;" class="desk-desc-cell">
               <div style="font-weight: 500;">${escapeHtml(descText)}</div>
             </td>
-            <td style="font-size: 12px; color: #cbd8cf; line-height: 1.45; max-width: 240px;">
+            <td style="font-size: 12px; line-height: 1.45; max-width: 240px;" class="desk-action-cell">
               <div>${escapeHtml(actionText)}</div>
             </td>
             <td>
-              ${partNoText !== '-' ? `<span class="badge-part-no">${escapeHtml(partNoText)}</span>` : '<span style="color:#738a7a; font-size:11px;">-</span>'}
+              ${partNoText !== '-' ? `<span class="badge-part-no">${escapeHtml(partNoText)}</span>` : '<span class="text-subtle" style="font-size:11px;">-</span>'}
             </td>
-            <td style="font-size: 11.5px; color: #a4bba9; max-width: 180px;">
+            <td style="font-size: 11.5px; max-width: 180px;" class="desk-remarks-cell">
               <div>${escapeHtml(remarksText)}</div>
             </td>
             <td style="text-align: center;">
@@ -4663,7 +5085,7 @@
                 <button class="btn btn-dim" onclick="window.TM_APP.openEditFailureModal('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Edit failure record">✏️</button>
                 <button class="hrm-btn-delete" onclick="window.TM_APP.deleteFailureRecord('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Delete failure record">🗑️</button>
               </div>
-              ` : `<span style="font-size: 11px; color: #799181;">View Only</span>`}
+              ` : `<span class="view-only-tag" style="font-size: 11px;">View Only</span>`}
             </td>
           </tr>
         `;
@@ -5000,8 +5422,8 @@
       resultsArea.innerHTML = `
         <div class="search-empty-state">
           <div style="font-size: 38px; margin-bottom: 8px;">🔍</div>
-          <div style="font-size: 15px; font-weight: 700; color: #cbd8cf;">No references found for "${escapeHtml(query)}"</div>
-          <div style="font-size: 12px; margin-top: 4px; color: #8fa696;">
+          <div class="search-empty-title" style="font-size: 15px; font-weight: 700;">No references found for "${escapeHtml(query)}"</div>
+          <div class="search-empty-sub" style="font-size: 12px; margin-top: 4px;">
             Try checking spelling or search using another keyword (e.g. Cardan, Alternator, Cylinder, Valve, Filter, Bearing, POH, IOH).
           </div>
         </div>
@@ -5090,14 +5512,14 @@
             <div class="search-details-grid">
               <div class="search-field-block" style="grid-column: span 2;">
                 <div class="search-field-label">Detailed Description of Failure</div>
-                <div class="search-field-value" style="font-size: 13px; font-weight: 500; color: #fff;">
+                <div class="search-field-value search-field-primary" style="font-size: 13px; font-weight: 500;">
                   ${highlightKeyword(r.description, query)}
                 </div>
               </div>
 
               <div class="search-field-block" style="grid-column: span 2;">
                 <div class="search-field-label">Action Taken &amp; Spares Consumed</div>
-                <div class="search-field-value" style="color: #cbd8cf;">
+                <div class="search-field-value search-field-secondary">
                   ${highlightKeyword(r.actionTaken, query)}
                 </div>
               </div>
@@ -5121,7 +5543,7 @@
               <div class="search-field-block">
                 <div class="search-field-label">Part No. of Spares</div>
                 <div class="search-field-value">
-                  ${r.partNo !== '-' ? `<span class="badge-part-no">${highlightKeyword(r.partNo, query)}</span>` : '<span style="color:#799181;">None Recorded</span>'}
+                  ${r.partNo !== '-' ? `<span class="badge-part-no">${highlightKeyword(r.partNo, query)}</span>` : '<span class="part-none-recorded">None Recorded</span>'}
                 </div>
               </div>
 
@@ -5159,7 +5581,7 @@
             <div class="search-details-grid">
               <div class="search-field-block" style="grid-column: span 2;">
                 <div class="search-field-label">Parameter Description (Canonical Item #${escapeHtml(String(r.itemNum))})</div>
-                <div class="search-field-value" style="font-size: 13px; font-weight: 600; color: #fff;">
+                <div class="search-field-value search-field-primary" style="font-size: 13px; font-weight: 600;">
                   ${highlightKeyword(r.title, query)}
                 </div>
               </div>
@@ -5180,9 +5602,9 @@
 
               <div class="search-field-block" style="grid-column: span 2;">
                 <div class="search-field-label">Present Remarks &amp; Spares Consumed</div>
-                <div class="search-field-value" style="color: #cbd8cf;">
+                <div class="search-field-value search-field-secondary">
                   ${highlightKeyword(r.presentRemarks, query)}
-                  ${r.historicalCount > 0 ? `<div style="font-size: 11px; margin-top: 4px; color: #8da494;">(${r.historicalCount} historical maintenance interventions in archive)</div>` : ''}
+                  ${r.historicalCount > 0 ? `<div class="search-hist-count" style="font-size: 11px; margin-top: 4px;">(${r.historicalCount} historical maintenance interventions in archive)</div>` : ''}
                 </div>
               </div>
             </div>
@@ -5490,8 +5912,17 @@
     if (!isIoh && !isPoh) return;
 
     const kind = isIoh ? 'IOH' : 'POH';
-    const dateVal = document.getElementById('hrmModalDateInput').value;
-    const inputTs = parseRecordTimestamp({ isoDate: dateVal, rawDate: dateVal });
+    const isOvernight = document.getElementById('hrmModalIsOvernight')?.checked;
+    let dateVal = '';
+    if (isOvernight) {
+      const sDate = document.getElementById('hrmModalStartDate')?.value;
+      const eDate = document.getElementById('hrmModalEndDate')?.value;
+      dateVal = buildOvernightDateString(sDate, eDate);
+      if (!dateVal) dateVal = document.getElementById('hrmModalDateInput')?.value || '';
+    } else {
+      dateVal = document.getElementById('hrmModalDateInput')?.value || '';
+    }
+    const inputTs = parseRecordTimestamp({ isoDate: dateVal, rawDate: dateVal, displayDate: dateVal });
 
     const validRecs = (it.records || []).filter(r => parseRecordTimestamp(r) > 0);
     const recId = document.getElementById('hrmModalRecordId').value;
@@ -5544,6 +5975,11 @@
 
     const activeIt = hrm.items[itemIndex];
     const isOverhaul = activeIt && /IOH|POH/i.test(activeIt.title);
+
+    // Reset overnight block toggle
+    const chkOvernight = document.getElementById('hrmModalIsOvernight');
+    if (chkOvernight) chkOvernight.checked = false;
+    onHrmOvernightToggleChanged();
 
     // Set default date to today in YYYY-MM-DD
     const dateInput = document.getElementById('hrmModalDateInput');
@@ -5609,10 +6045,24 @@
       });
     }
 
-    const dateInput = document.getElementById('hrmModalDateInput');
-    if (dateInput) {
-      const iso = toIsoDate(rec.displayDate || rec.isoDate || rec.rawDate);
-      dateInput.value = iso || new Date().toISOString().substring(0, 10);
+    const chkOvernight = document.getElementById('hrmModalIsOvernight');
+    const dVal = rec.displayDate || rec.rawDate || rec.isoDate || '';
+    const ov = parseOvernightDate(dVal);
+    if (ov) {
+      if (chkOvernight) chkOvernight.checked = true;
+      const sDate = document.getElementById('hrmModalStartDate');
+      const eDate = document.getElementById('hrmModalEndDate');
+      if (sDate) sDate.value = ov.startDateIso;
+      if (eDate) eDate.value = ov.endDateIso;
+      onHrmOvernightToggleChanged();
+    } else {
+      if (chkOvernight) chkOvernight.checked = false;
+      onHrmOvernightToggleChanged();
+      const dateInput = document.getElementById('hrmModalDateInput');
+      if (dateInput) {
+        const iso = toIsoDate(dVal);
+        dateInput.value = iso || new Date().toISOString().substring(0, 10);
+      }
     }
 
     const ehInput = document.getElementById('hrmModalEhInput');
@@ -5669,7 +6119,20 @@
     const mId = document.getElementById('hrmModalMachineId').value || getActiveMachineId();
     const itemIndex = parseInt(document.getElementById('hrmModalItemSelect').value, 10);
     const recordId = document.getElementById('hrmModalRecordId').value;
-    const dateVal = document.getElementById('hrmModalDateInput').value;
+
+    const isOvernight = document.getElementById('hrmModalIsOvernight')?.checked;
+    let dateVal = '';
+    if (isOvernight) {
+      const sDate = document.getElementById('hrmModalStartDate')?.value;
+      const eDate = document.getElementById('hrmModalEndDate')?.value;
+      dateVal = buildOvernightDateString(sDate, eDate);
+      if (!dateVal) dateVal = document.getElementById('hrmModalDateInput')?.value || '';
+    } else {
+      dateVal = document.getElementById('hrmModalDateInput')?.value || '';
+    }
+    const ov = parseOvernightDate(dateVal);
+    const isoVal = ov ? ov.startDateIso : toIsoDate(dateVal);
+
     const ehVal = document.getElementById('hrmModalEhInput').value.trim();
     const rawRem = document.getElementById('hrmModalRemarksInput').value.trim();
     const remarksVal = (rawRem && rawRem !== '-' && !/^(no|nil)$/i.test(rawRem)) ? rawRem : 'NA';
@@ -5688,7 +6151,7 @@
       const existingRec = it.records.find(r => r.id === recordId);
       if (existingRec) {
         existingRec.rawDate = dateVal;
-        existingRec.isoDate = dateVal;
+        existingRec.isoDate = isoVal;
         existingRec.displayDate = dateVal;
         existingRec.engineHours = ehVal || 'NA';
         if (ordVal) {
@@ -5704,13 +6167,13 @@
         id: `rec_${mId}_it${itemIndex}_${Date.now()}`,
         colPair: 'USER-ENTRY',
         rawDate: dateVal,
-        isoDate: dateVal,
+        isoDate: isoVal,
         displayDate: dateVal,
         engineHours: ehVal || 'NA',
         userOrdinalTag: ordVal || null,
         ordinalTag: ordVal || null,
         remarks: remarksVal,
-        sortTimestamp: parseRecordTimestamp({ isoDate: dateVal, rawDate: dateVal })
+        sortTimestamp: parseRecordTimestamp({ isoDate: isoVal, rawDate: dateVal, displayDate: dateVal })
       };
       it.records.push(newRec);
     }
@@ -5818,20 +6281,13 @@
   }
 
   function resetMachineHrm() {
-    if (!isUserAdmin()) {
-      showToast('View-Only Access: Resetting data requires Admin privileges.', true);
-      return;
-    }
     const mId = getActiveMachineId();
     if (!confirm(`Reset History Register Module for machine ${mId} to authentic workbook data? Any custom entries will be reverted.`)) return;
 
-    if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters && window.REAL_SWR_FLEET_DATA.historyRegisters[mId]) {
-      HRM_DATA[mId] = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters[mId]));
-      ensureAllHrmOrdinals(HRM_DATA);
-      saveHrmData();
-      renderHrmView();
-      showToast(`Reset ${mId} HRM to authentic workbook records.`);
-    }
+    healMachineHrm(mId, true);
+    saveHrmData();
+    renderHrmView();
+    showToast(`Reset ${mId} HRM to authentic workbook records.`);
   }
 
   async function exportCurrentHrm() {
@@ -6016,10 +6472,10 @@
         <span class="badge badge-subsystem">${escapeHtml(mInfo ? mInfo.category : 'Fleet')}</span>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <div><strong>Division:</strong> <span style="color:var(--pista-300);">${escapeHtml(mInfo ? mInfo.division : 'SWR')}</span></div>
-        <div><strong>Model:</strong> <span style="color:#cbd8cf;">${escapeHtml(mInfo ? mInfo.model : 'Track Machine')}</span></div>
-        <div><strong>Failure Incidents:</strong> <span style="color:#ff8a80; font-weight:700;">${mFailures.length} recorded cases</span></div>
-        <div><strong>History Register:</strong> <span style="color:${mHrm ? 'var(--pista-300)' : '#cbd8cf'};">${mHrm ? '16 Items Present' : 'No HRM Log'}</span></div>
+        <div><strong>Division:</strong> <span class="pista-text" style="font-weight: 600;">${escapeHtml(mInfo ? mInfo.division : 'SWR')}</span></div>
+        <div><strong>Model:</strong> <span class="modal-field-value">${escapeHtml(mInfo ? mInfo.model : 'Track Machine')}</span></div>
+        <div><strong>Failure Incidents:</strong> <span class="alert-text" style="font-weight: 700;">${mFailures.length} recorded cases</span></div>
+        <div><strong>History Register:</strong> <span class="${mHrm ? 'pista-text' : 'modal-field-value'}" style="font-weight: 700;">${mHrm ? '16 Items Present' : 'No HRM Log'}</span></div>
       </div>
     `;
   }
@@ -6105,6 +6561,153 @@
     showToast(`Machine ${mId} successfully deleted (${deletedFailCount} failure incidents & HRM purged).`);
   }
 
+  // ==========================================================================
+  // OVERNIGHT TRAFFIC BLOCK (D1/D2-MM-YYYY) CALENDAR EVENT HANDLERS
+  // ==========================================================================
+  function onOvernightToggleChanged() {
+    const isOvernight = document.getElementById('formIsOvernightBlock')?.checked;
+    const badge = document.getElementById('formOvernightBadge');
+    const singleBreakdownGroup = document.getElementById('formSingleBreakdownGroup');
+    const overnightContainer = document.getElementById('formOvernightDateContainer');
+    const bDate = document.getElementById('formBreakdownDate');
+    const sDate = document.getElementById('formOvernightStartDate');
+    const eDate = document.getElementById('formOvernightEndDate');
+    const inBlockSelect = document.getElementById('formWhetherInBlock');
+
+    if (badge) badge.style.display = isOvernight ? 'inline-block' : 'none';
+    if (singleBreakdownGroup) singleBreakdownGroup.style.display = isOvernight ? 'none' : 'block';
+    if (overnightContainer) overnightContainer.style.display = isOvernight ? 'block' : 'none';
+
+    if (isOvernight) {
+      if (bDate) bDate.required = false;
+      if (sDate) sDate.required = true;
+      if (eDate) eDate.required = true;
+
+      // Populate Start Date if empty
+      if (sDate && !sDate.value) {
+        if (bDate && bDate.value) {
+          sDate.value = bDate.value;
+        } else {
+          sDate.value = new Date().toISOString().substring(0, 10);
+        }
+      }
+      // Populate End Date if empty (default to Start Date + 1 day)
+      if (sDate && sDate.value && eDate && !eDate.value) {
+        const d = new Date(sDate.value);
+        d.setDate(d.getDate() + 1);
+        eDate.value = d.toISOString().substring(0, 10);
+      }
+      // Auto-set Traffic Block to YES if currently NO
+      if (inBlockSelect && inBlockSelect.value === 'NO') {
+        inBlockSelect.value = 'YES';
+      }
+      updateOvernightPreview();
+    } else {
+      if (bDate) {
+        bDate.required = true;
+        if (sDate && sDate.value && !bDate.value) {
+          bDate.value = sDate.value;
+        }
+      }
+      if (sDate) sDate.required = false;
+      if (eDate) eDate.required = false;
+    }
+  }
+
+  function onOvernightStartChanged() {
+    const sDate = document.getElementById('formOvernightStartDate');
+    const eDate = document.getElementById('formOvernightEndDate');
+    if (sDate && sDate.value && eDate) {
+      // Auto-advance End Date to Start Date + 1 day
+      const d = new Date(sDate.value);
+      d.setDate(d.getDate() + 1);
+      eDate.value = d.toISOString().substring(0, 10);
+    }
+    updateOvernightPreview();
+  }
+
+  function onOvernightEndChanged() {
+    updateOvernightPreview();
+  }
+
+  function updateOvernightPreview() {
+    const sDate = document.getElementById('formOvernightStartDate')?.value;
+    const eDate = document.getElementById('formOvernightEndDate')?.value;
+    const previewEl = document.getElementById('formOvernightPreview');
+    if (!previewEl) return;
+    if (sDate && eDate) {
+      previewEl.textContent = buildOvernightDateString(sDate, eDate);
+    } else if (sDate) {
+      previewEl.textContent = buildOvernightDateString(sDate, sDate);
+    } else {
+      previewEl.textContent = '--';
+    }
+  }
+
+  // HRM Modal Overnight Handlers
+  function onHrmOvernightToggleChanged() {
+    const isOvernight = document.getElementById('hrmModalIsOvernight')?.checked;
+    const badge = document.getElementById('hrmOvernightBadge');
+    const overnightContainer = document.getElementById('hrmOvernightDateContainer');
+    const singleDateGroup = document.getElementById('hrmSingleDateGroup');
+    const singleDateInput = document.getElementById('hrmModalDateInput');
+    const sDate = document.getElementById('hrmModalStartDate');
+    const eDate = document.getElementById('hrmModalEndDate');
+
+    if (badge) badge.style.display = isOvernight ? 'inline-block' : 'none';
+    if (singleDateGroup) singleDateGroup.style.display = isOvernight ? 'none' : 'block';
+    if (overnightContainer) overnightContainer.style.display = isOvernight ? 'block' : 'none';
+
+    if (singleDateInput) {
+      singleDateInput.required = !isOvernight;
+    }
+
+    if (isOvernight) {
+      if (sDate && !sDate.value) {
+        if (singleDateInput && singleDateInput.value) {
+          sDate.value = singleDateInput.value;
+        } else {
+          sDate.value = new Date().toISOString().substring(0, 10);
+        }
+      }
+      if (sDate && sDate.value && eDate && !eDate.value) {
+        const d = new Date(sDate.value);
+        d.setDate(d.getDate() + 1);
+        eDate.value = d.toISOString().substring(0, 10);
+      }
+      updateHrmOvernightPreview();
+    }
+  }
+
+  function onHrmOvernightStartChanged() {
+    const sDate = document.getElementById('hrmModalStartDate');
+    const eDate = document.getElementById('hrmModalEndDate');
+    if (sDate && sDate.value && eDate) {
+      const d = new Date(sDate.value);
+      d.setDate(d.getDate() + 1);
+      eDate.value = d.toISOString().substring(0, 10);
+    }
+    updateHrmOvernightPreview();
+  }
+
+  function onHrmOvernightEndChanged() {
+    updateHrmOvernightPreview();
+  }
+
+  function updateHrmOvernightPreview() {
+    const sDate = document.getElementById('hrmModalStartDate')?.value;
+    const eDate = document.getElementById('hrmModalEndDate')?.value;
+    const previewEl = document.getElementById('hrmOvernightPreview');
+    if (!previewEl) return;
+    if (sDate && eDate) {
+      previewEl.textContent = buildOvernightDateString(sDate, eDate);
+    } else if (sDate) {
+      previewEl.textContent = buildOvernightDateString(sDate, sDate);
+    } else {
+      previewEl.textContent = '--';
+    }
+  }
+
   function openEditFailureModal(id) {
     if (!isUserAdmin()) {
       showToast('View-Only Access: Editing failure records requires Admin privileges.', true);
@@ -6136,11 +6739,31 @@
     const slInput = document.getElementById('formSlNo');
     if (slInput) slInput.value = f.slNo || '';
 
+    // Handle Date of Failure (Calendar & Overnight Block Detection)
     const bDate = document.getElementById('formBreakdownDate');
-    if (bDate) bDate.value = f.dateOfFailure || f.breakdownTime ? (f.dateOfFailure || f.breakdownTime).substring(0, 10) : '';
+    const chkOvernight = document.getElementById('formIsOvernightBlock');
+    const sDate = document.getElementById('formOvernightStartDate');
+    const eDate = document.getElementById('formOvernightEndDate');
+
+    const failDateVal = f.dateOfFailure || f.breakdownTime || '';
+    const ov = parseOvernightDate(failDateVal);
+
+    if (ov) {
+      if (chkOvernight) chkOvernight.checked = true;
+      if (sDate) sDate.value = ov.startDateIso;
+      if (eDate) eDate.value = ov.endDateIso;
+      onOvernightToggleChanged();
+    } else {
+      if (chkOvernight) chkOvernight.checked = false;
+      onOvernightToggleChanged();
+      if (bDate) bDate.value = failDateVal ? (toIsoDate(failDateVal) || failDateVal.substring(0, 10)) : '';
+    }
 
     const fDate = document.getElementById('formFitDate');
-    if (fDate) fDate.value = f.dateOfRectification || f.fitTime ? (f.dateOfRectification || f.fitTime).substring(0, 10) : '';
+    if (fDate) {
+      const fitVal = f.dateOfRectification || f.fitTime || '';
+      fDate.value = fitVal ? (toIsoDate(fitVal) || fitVal.substring(0, 10)) : '';
+    }
 
     const downInput = document.getElementById('formTotalDownDays');
     if (downInput) downInput.value = (f.totalDownDays !== undefined && f.totalDownDays !== null) ? f.totalDownDays : ((parseFloat(f.downHours) || 0) / 24).toFixed(1);
@@ -6348,6 +6971,11 @@
       document.getElementById('formMachineNo').value = AppState.selectedMachine;
     }
 
+    // Reset overnight toggle and fields
+    const chkOvernight = document.getElementById('formIsOvernightBlock');
+    if (chkOvernight) chkOvernight.checked = false;
+    onOvernightToggleChanged();
+
     // Set current time for breakdown (calendar date YYYY-MM-DD)
     const bInput = document.getElementById('formBreakdownDate') || document.getElementById('formBreakdownTime');
     if (bInput) bInput.value = new Date().toISOString().substring(0, 10);
@@ -6425,10 +7053,21 @@
       mach = prompt('Please enter the Machine Number (e.g. UNI-8370):') || `${cat}-999`;
     }
 
+    const isOvernight = document.getElementById('formIsOvernightBlock')?.checked;
     const bEl = document.getElementById('formBreakdownDate');
     const fEl = document.getElementById('formFitDate');
-    const failDate = bEl ? bEl.value.trim() : '';
-    const fitDate = fEl ? fEl.value.trim() : '';
+    let failDate = '';
+    let fitDate = fEl ? fEl.value.trim() : '';
+
+    if (isOvernight) {
+      const sDate = document.getElementById('formOvernightStartDate')?.value;
+      const eDate = document.getElementById('formOvernightEndDate')?.value;
+      failDate = buildOvernightDateString(sDate, eDate);
+      if (!failDate && bEl) failDate = bEl.value.trim();
+      if (!fitDate && eDate) fitDate = eDate;
+    } else {
+      failDate = bEl ? bEl.value.trim() : '';
+    }
 
     const downDaysInput = document.getElementById('formTotalDownDays');
     const totalDownDays = downDaysInput ? (parseFloat(downDaysInput.value) || 0) : 1;
@@ -6557,6 +7196,11 @@
     isUserAdmin,
     getCurrentUser: () => CurrentUser,
     getAppUsers: () => AppUsers,
+    // Theme Mode Switcher (White / Light Mode and Dark Mode)
+    setTheme,
+    toggleTheme,
+    getCurrentTheme,
+    updateThemeUI,
     initApp,
     selectCategory,
     selectDivision,
@@ -6597,6 +7241,9 @@
     deleteHrmRecord,
     deletePresentHrmEntry,
     resetMachineHrm,
+    retrieveAndRestoreAllHrm,
+    healMachineHrm,
+    getHrmData: () => HRM_DATA,
     exportCurrentHrm,
     openLogModalForSubsystem,
     saveFailureFromForm,
@@ -6611,6 +7258,20 @@
     onRadarMachineChange,
     renderMachineRadarChart,
     renderMachinePercentDonutChart,
+    // Overnight Block (D1/D2-MM-YYYY) Methods & Helpers
+    isOvernightDate,
+    parseOvernightDate,
+    buildOvernightDateString,
+    getFailureDateRange,
+    onOvernightToggleChanged,
+    onOvernightStartChanged,
+    onOvernightEndChanged,
+    updateOvernightPreview,
+    onHrmOvernightToggleChanged,
+    onHrmOvernightStartChanged,
+    onHrmOvernightEndChanged,
+    updateHrmOvernightPreview,
+    // Universal Date & Search Methods
     formatDateDisplay,
     // Universal Search Methods
     performUniversalSearch,

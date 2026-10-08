@@ -39,6 +39,16 @@
 
   <!-- Atmospheric Background Image Fallback Data for Complete Cross-System Portability -->
   <script src="background_data.js"></script>
+
+  <!-- Immediate Theme Loader to Prevent Theme Flicker -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('TM_THEME_PREFERENCE') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -50,8 +60,11 @@
        AUTHENTICATION OVERLAY SCREEN (INDIAN RAILWAYS / SWR TM-FAST)
        ==================================================================== -->
   <div class="login-overlay active" id="loginOverlay">
-    <!-- Top-Right End Shortcut for Change Password on Opening Page -->
+    <!-- Top-Right End Shortcut for Change Password and Theme Toggle on Opening Page -->
     <div class="login-top-right-strip">
+      <button type="button" class="login-top-right-tab login-theme-toggle-btn" id="loginTopThemeToggleBtn" onclick="window.TM_APP.toggleTheme()" title="Switch Display Theme (White Mode / Dark Mode)">
+        <span id="loginTopThemeIcon">☀️</span> <span id="loginTopThemeLabel">White Mode</span>
+      </button>
       <button type="button" class="login-top-right-tab" id="loginTopRightTabBtn" onclick="window.TM_APP.toggleLoginTabShortcut()" title="Switch between Sign In and Change Password">
         <span id="loginTopRightTabLabel">🔑 Change Password</span>
       </button>
@@ -64,6 +77,21 @@
         <div class="login-subtext" style="font-size: 14.5px; font-weight: 700; color: var(--gold-400); margin-top: 4px; letter-spacing: 0.3px;">(Failure Analysis and Surveillance Tool )</div>
         <div class="login-subtext" style="font-size: 11.5px; opacity: 0.85; margin-top: 4px;">South Western Railway · Track Machine Surveillance &amp; Failure Analysis</div>
         <div class="login-lock-badge">🔒 SECURE FLEET PORTAL</div>
+      </div>
+
+      <!-- Option to View in White Mode / Dark Mode Themes Upon Login -->
+      <div class="login-theme-choice-box" id="loginThemeChoiceBox">
+        <span class="login-theme-choice-title">
+          <span>🎨</span> <span>Theme Option:</span>
+        </span>
+        <div class="theme-choice-group">
+          <button type="button" class="theme-choice-btn active" id="loginThemeDarkBtn" onclick="window.TM_APP.setTheme('dark')" title="Industrial Night Dark Mode">
+            <span>🌙 Dark Mode</span>
+          </button>
+          <button type="button" class="theme-choice-btn" id="loginThemeLightBtn" onclick="window.TM_APP.setTheme('light')" title="Crisp White / Light Mode">
+            <span>☀️ White Mode</span>
+          </button>
+        </div>
       </div>
       
       <!-- Navigation Tabs: Sign In & Change Password -->
@@ -266,6 +294,9 @@
                 <span class="role-badge admin" id="loggedInRoleDisplay">ADMIN</span>
               </div>
               <div class="session-actions-divider"></div>
+              <button type="button" class="btn-user-tab btn-theme-tab btn-user-action" id="btnHeaderThemeToggle" onclick="window.TM_APP.toggleTheme()" title="Switch Display Theme (White Mode / Dark Mode)">
+                <span id="btnHeaderThemeIcon">☀️</span> <span id="btnHeaderThemeLabel">White Mode</span>
+              </button>
               <button type="button" class="btn-user-tab btn-changepw-tab btn-user-action" id="btnHeaderChangePassword" onclick="window.TM_APP.openChangePasswordModal()" title="Change Account Password">
                 <span>🔑 Change Password</span>
               </button>
@@ -623,13 +654,16 @@
           </div>
 
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-primary-gold" onclick="window.TM_APP.retrieveAndRestoreAllHrm(true)" style="font-size: 12px; padding: 6px 14px; font-weight: 700; box-shadow: 0 0 10px rgba(228, 193, 83, 0.35);" title="Retrieve and replace all missing or erased History Register records across all 22 SWR fleet machines immediately from authentic workbooks">
+              ⚡ Retrieve &amp; Replace All Missing HRM Data
+            </button>
             <button class="btn btn-secondary-pista admin-only" onclick="window.TM_APP.openAddHrmEntryModal()" style="font-size: 12px; padding: 6px 14px;">
               ➕ Add / Update Entry
             </button>
             <button class="btn btn-dim" onclick="window.TM_APP.exportCurrentHrm()" style="font-size: 12px; padding: 6px 12px;">
               📥 Export HRM
             </button>
-            <button class="btn btn-dim admin-only" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
+            <button class="btn btn-dim" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
               🔄 Reset to Workbook
             </button>
             <button class="btn btn-danger-dim admin-only" onclick="window.TM_APP.openDeleteMachineModal()" style="font-size: 12px; padding: 6px 12px;" title="Delete this machine entirely if uploaded wrongly">
@@ -909,6 +943,7 @@
               <option value="ALL">🚦 All Operational Impacts</option>
               <option value="IN_BLOCK">⚠️ In Traffic Block Only</option>
               <option value="NON_BLOCK">ℹ️ Not In Block Only</option>
+              <option value="OVERNIGHT">🌙 Overnight Blocks Only (D1/D2)</option>
             </select>
 
             <!-- Repair Status Filter -->
@@ -1121,13 +1156,44 @@
             </div>
           </div>
 
+          <!-- Overnight Traffic Block Toggle -->
+          <div class="overnight-toggle-box" style="margin-bottom: 12px; background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 13px; font-weight: 600; color: #fbbf24;">
+              <input type="checkbox" id="formIsOvernightBlock" onchange="window.TM_APP.onOvernightToggleChanged()" style="accent-color: #f59e0b; width: 16px; height: 16px; cursor: pointer;">
+              <span>🌙 Overnight Traffic Block (Spanning 2 Dates: D1/D2-MM-YYYY)</span>
+            </label>
+            <span id="formOvernightBadge" class="badge" style="display: none; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 11px;">🌙 Overnight Mode Active</span>
+          </div>
+
+          <!-- Dual Calendar Pickers for Overnight Block Mode -->
+          <div id="formOvernightDateContainer" style="display: none; background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <div style="font-size: 12px; color: #fbbf24; margin-bottom: 8px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+              <span>📅 Overnight Block Calendar Pickers (Night Start ➔ Morning End):</span>
+              <span style="font-size: 11px; color: #94a3b8;">Format: D1D1/D2D2-MM-YYYY</span>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label gold-label" for="formOvernightStartDate">🌙 Block Start Date (Night - D1) *</label>
+                <input type="date" id="formOvernightStartDate" class="form-control" onchange="window.TM_APP.onOvernightStartChanged()">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label gold-label" for="formOvernightEndDate">☀️ Block End Date (Morning - D2) *</label>
+                <input type="date" id="formOvernightEndDate" class="form-control" onchange="window.TM_APP.onOvernightEndChanged()">
+              </div>
+            </div>
+            <div style="margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+              <span style="color: var(--pista-300);">Formatted Overnight Date: <strong id="formOvernightPreview" style="color: #38bdf8; font-family: monospace; font-size: 13px;">--</strong></span>
+              <span style="color: #8da494; font-size: 11px;">Saved strictly without losing day digits</span>
+            </div>
+          </div>
+
           <div class="form-grid-2">
-            <div class="form-group">
+            <div class="form-group" id="formSingleBreakdownGroup">
               <label class="form-label gold-label" for="formBreakdownDate">📅 Date of Failure (Calendar) *</label>
               <input type="date" id="formBreakdownDate" class="form-control" required>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" id="formFitDateGroup">
               <label class="form-label gold-label" for="formFitDate">📅 Date of Rectification (Calendar)</label>
               <input type="date" id="formFitDate" class="form-control" placeholder="Leave blank if currently under repair">
             </div>
@@ -1223,8 +1289,35 @@
             </select>
           </div>
 
+          <!-- Overnight Block Toggle for HRM -->
+          <div class="overnight-toggle-box" style="margin-bottom: 10px; background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 12px; font-weight: 600; color: #fbbf24;">
+              <input type="checkbox" id="hrmModalIsOvernight" onchange="window.TM_APP.onHrmOvernightToggleChanged()" style="accent-color: #f59e0b; width: 15px; height: 15px; cursor: pointer;">
+              <span>🌙 Overnight / Multi-Day Block Date (D1/D2-MM-YYYY)</span>
+            </label>
+            <span id="hrmOvernightBadge" class="badge" style="display: none; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 10.5px;">Overnight Active</span>
+          </div>
+
+          <!-- Dual Calendar Pickers for HRM Overnight Mode -->
+          <div id="hrmOvernightDateContainer" style="display: none; background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+            <div class="form-grid-2">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label gold-label" for="hrmModalStartDate">🌙 Block Start Date (Night - D1) *</label>
+                <input type="date" id="hrmModalStartDate" class="form-control" onchange="window.TM_APP.onHrmOvernightStartChanged()">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label gold-label" for="hrmModalEndDate">☀️ Block End Date (Morning - D2) *</label>
+                <input type="date" id="hrmModalEndDate" class="form-control" onchange="window.TM_APP.onHrmOvernightEndChanged()">
+              </div>
+            </div>
+            <div style="margin-top: 7px; display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+              <span style="color: var(--pista-300);">Formatted Date: <strong id="hrmOvernightPreview" style="color: #38bdf8; font-family: monospace;">--</strong></span>
+              <span style="color: #8da494; font-size: 10.5px;">Saved as D1D1/D2D2-MM-YYYY</span>
+            </div>
+          </div>
+
           <div class="form-grid-2">
-            <div class="form-group">
+            <div class="form-group" id="hrmSingleDateGroup">
               <label class="form-label gold-label" for="hrmModalDateInput">📅 Date of Event / Replacement * (Calendar)</label>
               <input type="date" id="hrmModalDateInput" class="form-control" required onchange="window.TM_APP.onHrmModalDateChanged()">
             </div>
@@ -1314,7 +1407,7 @@
   <!-- ====================================================================
        CHANGE PASSWORD MODAL
        ==================================================================== -->
-  <div class="modal-backdrop" id="changePasswordModal">
+  <div class="modal-overlay" id="changePasswordModal">
     <div class="modal-card" style="max-width: 440px;">
       <div class="modal-header">
         <div class="modal-title">
