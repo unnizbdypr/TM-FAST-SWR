@@ -433,8 +433,13 @@
         <div class="section-label">
           <span>STEP 1: SELECT TRACK MACHINE CATEGORY</span>
         </div>
-        <div style="font-size: 11px; color: #8da494;">
-          Filter fleet by classification
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-dim" onclick="window.TM_APP.openParetoForFleet(window.TM_APP.getAppState().selectedCategory)" style="padding: 4px 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" title="View Subsystem Defect Pareto analysis for active category">
+            <span>📊 Subsystem Pareto Graph</span>
+          </button>
+          <div style="font-size: 11px; color: #8da494;">
+            Filter fleet by classification
+          </div>
         </div>
       </div>
       <div class="category-scroll-container" id="categoryScrollContainer">
@@ -456,6 +461,9 @@
           </select>
           <span class="select-arrow">▼</span>
         </div>
+        <button class="btn btn-dim" id="btnQuickFleetPareto" onclick="window.TM_APP.openParetoForFleet(window.TM_APP.getAppState().selectedCategory)" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;" title="Open Subsystem Pareto analysis for active fleet">
+          <span>📊 Subsystem Pareto</span>
+        </button>
         <button class="btn btn-primary-gold admin-only" id="btnSingleUploadExcel" onclick="window.TM_APP.openUploadModalForSelectedMachine()" style="padding: 8px 18px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Track Machine Excel workbook (.xlsx/.xls)">
           <span>📤 Upload Machine Excel Sheet</span>
         </button>
@@ -788,15 +796,15 @@
         </div>
       </div>
 
-      <!-- Fleet Overview Grid: Category Incidents, Division Distribution, Subsystem Pareto & Bad Actors -->
-      <div class="grid-3col" style="margin-bottom: 22px;">
+      <!-- Fleet Overview Grid: Category Incidents & Division Breakdown -->
+      <div class="grid-2col" style="margin-bottom: 22px;">
         <div class="panel-card gold-focus">
           <div class="panel-header">
             <div class="panel-title gold-accent">
               <span class="indicator-circle"></span>
               <span>Category Total Incidents</span>
             </div>
-            <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">14 Categories</span>
+            <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">15 Fleet Categories</span>
           </div>
           <div class="chart-container-box">
             <canvas id="chartCategoryComparison"></canvas>
@@ -815,18 +823,79 @@
             <canvas id="chartDivisionDistribution"></canvas>
           </div>
         </div>
+      </div>
 
-        <div class="panel-card">
-          <div class="panel-header">
-            <div class="panel-title">
-              <span class="indicator-circle"></span>
-              <span>Subsystem Defect Pareto</span>
+      <!-- ====================================================================
+           SUBSYSTEM DEFECT PARETO ANALYSIS FOR ALL MACHINE FLEETS
+           Ranked Frequency (Bars) + Cumulative % Curve (Line) + 80/20 Benchmark
+           Dynamic Fleet Scope: Entire Fleet + All 15 Machine Categories
+           ==================================================================== -->
+      <div class="panel-card gold-focus pareto-panel-card" id="paretoCardContainer" style="margin-bottom: 22px;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+          <div class="panel-title gold-accent" style="display: flex; align-items: center; gap: 8px;">
+            <span class="indicator-circle" style="background: var(--gold-400); box-shadow: 0 0 8px var(--gold-400);"></span>
+            <span>Subsystem Defect Pareto Analysis</span>
+            <span class="badge badge-subsystem" id="paretoFleetBadge" style="font-size: 11px; font-weight: 700; background: rgba(46, 125, 50, 0.25); border: 1px solid var(--border-gold); color: var(--gold-400);">Entire Fleet (All 15 Fleets)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label for="paretoFleetSelect" style="font-size: 11.5px; font-weight: 700; color: var(--pista-300); margin: 0; white-space: nowrap;">🎯 Machine Fleet:</label>
+              <select id="paretoFleetSelect" class="filter-select" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700; min-width: 180px; border-radius: 6px; background: var(--bg-surface); color: var(--text-primary); border: 1.5px solid var(--border-gold);" onchange="window.TM_APP.onParetoFleetChange(this.value)">
+                <option value="ALL">🌐 Entire Fleet (All 15 Fleets Combined)</option>
+                <optgroup label="── Track Tampers ──">
+                  <option value="CSM">CSM (Continuous Action Tamping)</option>
+                  <option value="DTE">DTE (Dynamic Tamping Express)</option>
+                  <option value="DUO">DUO (Duomatic Two Sleeper Tamping)</option>
+                  <option value="UNI/PCTM">UNI/PCTM (Points &amp; Crossing Tamping)</option>
+                  <option value="MPT">MPT (Multi-Purpose Tamping)</option>
+                </optgroup>
+                <optgroup label="── Ballast &amp; Formation Machines ──">
+                  <option value="BCM">BCM (Ballast Cleaning Machine)</option>
+                  <option value="SBCM/FRM">SBCM (Shoulder Ballast Cleaning Machine)</option>
+                  <option value="BRM">BRM (Ballast Regulating Machine)</option>
+                </optgroup>
+                <optgroup label="── Relay &amp; Stabilizing Machines ──">
+                  <option value="SQRS">SQRS (Simplex Quick Relaying System)</option>
+                  <option value="T28">T28 (Turnout Renewal)</option>
+                  <option value="DGS">DGS (Dynamic Track Stabilizer)</option>
+                </optgroup>
+                <optgroup label="── Heavy Utility &amp; Rail Processing ──">
+                  <option value="UTV">UTV (Utility Vehicle)</option>
+                  <option value="SRGM/RGM">SRGM / RGM (Switch Rail Grinding Machine / Rail Grinding Machine)</option>
+                  <option value="RBMV">RBMV (Rail Borne Maintenance Vehicle)</option>
+                  <option value="MDU">MDU (Muck Disposal Units)</option>
+                </optgroup>
+                <optgroup label="── Isolated Machine Scope ──">
+                  <option value="CURRENT_MACHINE">🔍 Active Selected Machine View</option>
+                </optgroup>
+              </select>
             </div>
-            <span style="font-size: 11px; color: var(--pista-300);">Fleet-Wide Pareto</span>
+            <span style="font-size: 11px; color: var(--gold-400); font-family: var(--font-mono);">Ranked Frequency + Cumulative % (80/20 Rule)</span>
           </div>
-          <div class="chart-container-box">
-            <canvas id="chartSubsystemDistribution"></canvas>
+        </div>
+
+        <!-- Pareto Fleet Quick Filter Pills (Clickable for instant fleet switching across all 15 fleets) -->
+        <div class="pareto-quick-pills" id="paretoQuickPills">
+          <!-- Dynamically populated fleet quick pills with counts -->
+        </div>
+
+        <!-- Dynamic Pareto KPI Metric Bar -->
+        <div class="pareto-metrics-bar" id="paretoMetricsBar">
+          <!-- Injected dynamically -->
+        </div>
+
+        <div class="chart-container-box" style="height: 340px; position: relative;">
+          <canvas id="chartSubsystemDistribution"></canvas>
+          <div id="paretoZeroStateOverlay" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: rgba(10, 20, 15, 0.88); backdrop-filter: blur(4px); border-radius: 8px; padding: 20px;">
+            <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--gold-400); margin-bottom: 6px;" id="paretoZeroStateTitle">100% Operational Availability — Zero Subsystem Defects Logged</div>
+            <div style="font-size: 12px; color: var(--text-secondary); max-width: 480px; line-height: 1.5;" id="paretoZeroStateMsg">This machine fleet has logged 0 breakdown outages across Mechanical, Electrical, Engine, Hydraulic, Pneumatic, and Work Unit systems during the current surveillance cycle.</div>
           </div>
+        </div>
+
+        <!-- Vital Subsystems Detailed List / Pills -->
+        <div id="paretoSubsystemBreakdownList" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 11.5px;">
+          <!-- Dynamic subsystem breakdown cards -->
         </div>
       </div>
 
@@ -889,20 +958,20 @@
             <select id="historyCategoryFilterSelect" class="filter-select" onchange="window.TM_APP.onHistoryCategoryFilterChange(this.value)" title="Filter failures machine category wise">
               <option value="ALL">🏷️ All Categories (15 Categories)</option>
               <option value="CSM">CSM (Continuous Action Tamping)</option>
-              <option value="DUO">DUOMAT (Two Sleeper Tamping)</option>
+              <option value="DTE">DTE (Dynamic Tamping Express)</option>
+              <option value="DUO">DUO (Duomatic Two Sleeper Tamping)</option>
               <option value="UNI/PCTM">UNI/PCTM (Points &amp; Crossing Tamping)</option>
               <option value="MPT">MPT (Multi-Purpose Tamping)</option>
-              <option value="BCM">BCM (Ballast Cleaning)</option>
-              <option value="SBCM/FRM">SBCM / FRM (Shoulder Cleaning)</option>
-              <option value="BRM">BRM (Ballast Regulating)</option>
-              <option value="SQRS">SQRS (Quick Relaying System)</option>
-              <option value="T28">T-28 (Turnout Renewal)</option>
+              <option value="BCM">BCM (Ballast Cleaning Machine)</option>
+              <option value="SBCM/FRM">SBCM (Shoulder Ballast Cleaning Machine)</option>
+              <option value="BRM">BRM (Ballast Regulating Machine)</option>
+              <option value="SQRS">SQRS (Simplex Quick Relaying System)</option>
+              <option value="T28">T28 (Turnout Renewal)</option>
               <option value="DGS">DGS (Dynamic Track Stabilizer)</option>
-              <option value="UTV">UTV (Utility Track Vehicle)</option>
-              <option value="SRGM/RGM">SRGM / RGM (Switch Rail Grinding / Rail Grinding Machine)</option>
-              <option value="RBMV">RBMV (Rail Bound Maintenance)</option>
-              <option value="MDU">MDU (Mobile Diagnostics)</option>
-              <option value="DTE">DTE</option>
+              <option value="UTV">UTV (Utility Vehicle)</option>
+              <option value="SRGM/RGM">SRGM / RGM (Switch Rail Grinding Machine / Rail Grinding Machine)</option>
+              <option value="RBMV">RBMV (Rail Borne Maintenance Vehicle)</option>
+              <option value="MDU">MDU (Muck Disposal Units)</option>
             </select>
 
             <!-- Machine Wise Filter -->

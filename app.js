@@ -16,20 +16,25 @@
   // Category Full Names & Descriptions
   const CATEGORY_FULL_NAMES = {
     'CSM': 'Continuous Action Tamping',
-    'DTE': 'Dynamic Track Equalizer',
+    'DTE': 'Dynamic Tamping Express',
     'DUO': 'Duomatic Two Sleeper Tamping',
     'UNI/PCTM': 'Points & Crossing Tamping',
     'MPT': 'Multi-Purpose Tamping',
     'BCM': 'Ballast Cleaning Machine',
-    'SBCM/FRM': 'Shoulder Cleaning / Formation Rehabilitation',
+    'SBCM': 'Shoulder Ballast Cleaning Machine',
+    'SBCM/FRM': 'Shoulder Ballast Cleaning Machine',
+    'FRM': 'Shoulder Ballast Cleaning Machine',
     'BRM': 'Ballast Regulating Machine',
-    'SQRS': 'Quick Relaying System',
+    'SQRS': 'Simplex Quick Relaying System',
     'T28': 'Turnout Renewal',
     'DGS': 'Dynamic Track Stabilizer',
-    'UTV': 'Utility Track Vehicle',
+    'UTV': 'Utility Vehicle',
     'SRGM/RGM': 'Switch Rail Grinding Machine / Rail Grinding Machine',
+    'SRGM': 'Switch Rail Grinding Machine / Rail Grinding Machine',
+    'RGM': 'Switch Rail Grinding Machine / Rail Grinding Machine',
     'RBMV': 'Rail Borne Maintenance Vehicle',
-    'MDU': 'Muck Disposal Unit'
+    'RMBV': 'Rail Borne Maintenance Vehicle',
+    'MDU': 'Muck Disposal Units'
   };
 
   function getCategoryFullName(cat) {
@@ -37,7 +42,28 @@
     if (cat === 'SRGM/RGM' || cat === 'SRGM / RGM' || cat === 'SRGM' || cat === 'RGM') {
       return 'Switch Rail Grinding Machine / Rail Grinding Machine';
     }
+    if (cat === 'SBCM/FRM' || cat === 'SBCM' || cat === 'FRM') {
+      return 'Shoulder Ballast Cleaning Machine';
+    }
+    if (cat === 'RBMV' || cat === 'RMBV') {
+      return 'Rail Borne Maintenance Vehicle';
+    }
     return CATEGORY_FULL_NAMES[cat] || cat;
+  }
+
+  function getCategoryDisplayNameWithFull(cat) {
+    if (!cat) return '';
+    let shortName = cat;
+    if (cat === 'SBCM/FRM' || cat === 'FRM') {
+      shortName = 'SBCM';
+    } else if (cat === 'SRGM/RGM' || cat === 'SRGM / RGM') {
+      shortName = 'SRGM / RGM';
+    }
+    const fullName = getCategoryFullName(cat);
+    if (fullName && fullName !== shortName) {
+      return `${shortName} (${fullName})`;
+    }
+    return shortName;
   }
 
   // Helper: check if machine or category belongs to Crane-equipped fleet (UTV / RBMV)
@@ -757,22 +783,22 @@
     ],
     'BRM': [],
     'SQRS': [
-      { id: 'SQRS-7&8', model: 'Semi Quick Relaying System 7&8', division: 'SBC', depot: 'BYPL', year: 2018, status: 'FIT' }
+      { id: 'SQRS-7&8', model: 'Simplex Quick Relaying System 7&8', division: 'SBC', depot: 'BYPL', year: 2018, status: 'FIT' }
     ],
     'T28': [],
     'DGS': [],
     'UTV': [
-      { id: 'UTV-001', model: 'Utility Track Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
-      { id: 'UTV-002', model: 'Utility Track Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' }
+      { id: 'UTV-001', model: 'Utility Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
+      { id: 'UTV-002', model: 'Utility Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' }
     ],
     'SRGM/RGM': [],
     'RBMV': [
       { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
     ],
     'MDU': [
-      { id: 'MDU-57218', model: 'Muck Disposal Unit 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-57220', model: 'Muck Disposal Unit 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-57222', model: 'Muck Disposal Unit 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
+      { id: 'MDU-57218', model: 'Muck Disposal Units 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57220', model: 'Muck Disposal Units 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57222', model: 'Muck Disposal Units 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
     ]
   };
 
@@ -840,6 +866,7 @@
     historyEndDate: '',
     historyLimit: 100,
     kpiScope: 'FY_2026_27', // Default Surveillance Highlights Scope: Current Financial Year 2026-27 (01.04.2026 to Present)
+    paretoFleetScope: 'ALL', // Subsystem Defect Pareto Scope: 'ALL' or specific category
     charts: {}
   };
 
@@ -926,8 +953,14 @@
       // Normalize models in FLEET_DIRECTORY
       Object.keys(FLEET_DIRECTORY).forEach(cat => {
         FLEET_DIRECTORY[cat].forEach(m => {
-          if (m.model && m.model.includes('Mobile Diagnostic Unit')) {
-            m.model = m.model.replace('Mobile Diagnostic Unit', 'Muck Disposal Unit');
+          if (m.model && (m.model.includes('Mobile Diagnostic Unit') || m.model.includes('Muck Disposal Unit'))) {
+            m.model = m.model.replace(/Mobile Diagnostic Unit(s)?|Muck Disposal Unit(?!\w)/g, 'Muck Disposal Units');
+          }
+          if (m.model && m.model.includes('Semi Quick Relaying System')) {
+            m.model = m.model.replace('Semi Quick Relaying System', 'Simplex Quick Relaying System');
+          }
+          if (m.model && m.model.includes('Utility Track Vehicle')) {
+            m.model = m.model.replace('Utility Track Vehicle', 'Utility Vehicle');
           }
           if (m.model && m.model.includes('4S Points')) {
             m.model = m.model.replace('4S Points', '3S Points');
@@ -1464,10 +1497,9 @@
         }
         return f.category === cat;
       }).length;
-      const displayLabel = (cat === 'SRGM/RGM' || cat === 'SRGM / RGM') ? 'SRGM / RGM' : cat;
-      const fullName = getCategoryFullName(cat);
+      const displayLabel = getCategoryDisplayNameWithFull(cat);
       pill.innerHTML = `<span>${displayLabel}</span><span class="pill-badge">${count}</span>`;
-      pill.title = `${displayLabel} (${fullName})`;
+      pill.title = displayLabel;
       pill.addEventListener('click', () => selectCategory(cat));
       container.appendChild(pill);
     });
@@ -1476,6 +1508,7 @@
   // Select Category Handler
   function selectCategory(category) {
     AppState.selectedCategory = category;
+    AppState.paretoFleetScope = category;
 
     // Auto-select first machine in category if available, so HRM & subsystem tabs stay focused
     if (category !== 'ALL' && FLEET_DIRECTORY[category] && FLEET_DIRECTORY[category].length > 0) {
@@ -1534,7 +1567,7 @@
     defaultOpt.value = 'ALL';
     defaultOpt.textContent = AppState.selectedCategory === 'ALL' 
       ? '🌐 All Fleet Machines (Entire Fleet)' 
-      : `📋 All Machines in ${AppState.selectedCategory}`;
+      : `📋 All Machines in ${getCategoryDisplayNameWithFull(AppState.selectedCategory)}`;
     select.appendChild(defaultOpt);
 
     // Gather machines
@@ -1566,7 +1599,7 @@
     if (AppState.selectedCategory !== 'ALL' && machineList.length === 0) {
       const emptyOpt = document.createElement('option');
       emptyOpt.value = 'NONE';
-      emptyOpt.textContent = `⚠️ No machines registered in ${AppState.selectedCategory} (Upload history sheet to register)`;
+      emptyOpt.textContent = `⚠️ No machines registered in ${getCategoryDisplayNameWithFull(AppState.selectedCategory)} (Upload history sheet to register)`;
       emptyOpt.disabled = true;
       select.appendChild(emptyOpt);
     } else {
@@ -1602,9 +1635,7 @@
         : [];
       
       if (AppState.selectedCategory !== 'ALL' && catMachines.length === 0) {
-        const catLabel = (AppState.selectedCategory === 'SRGM/RGM' || AppState.selectedCategory === 'SRGM / RGM')
-          ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)'
-          : `${AppState.selectedCategory} Category`;
+        const catLabel = getCategoryDisplayNameWithFull(AppState.selectedCategory);
         metaContainer.innerHTML = `
           <span class="meta-chip">Scope: <strong>${catLabel}</strong></span>
           <span class="meta-chip" style="color: var(--gold-400);">Fleet: <strong>0 Machines Registered</strong></span>
@@ -1617,9 +1648,10 @@
 
       const activeRepairs = filtered.filter(f => f.status === 'UNDER REPAIR').length;
       const repeats = filtered.filter(f => f.isRepetitive).length;
+      const scopeDisplay = AppState.selectedCategory === 'ALL' ? 'Entire Fleet' : getCategoryDisplayNameWithFull(AppState.selectedCategory);
 
       metaContainer.innerHTML = `
-        <span class="meta-chip">Scope: <strong>${AppState.selectedCategory === 'ALL' ? 'Entire Fleet' : AppState.selectedCategory}</strong></span>
+        <span class="meta-chip">Scope: <strong>${scopeDisplay}</strong></span>
         <span class="meta-chip">Monitored Machines: <strong>${new Set(filtered.map(f => f.machineNo)).size}</strong></span>
         <span class="meta-chip">Total Incidents: <strong>${filtered.length}</strong></span>
         ${activeRepairs > 0 ? `<span class="meta-status-badge status-repair-pill">⚠️ ${activeRepairs} Under Repair</span>` : `<span class="meta-status-badge status-fit-pill">✅ 100% Fit</span>`}
@@ -2507,8 +2539,8 @@
         <td><strong>#${idx + 1}</strong></td>
         <td>
           <div class="table-machine-text" style="font-weight: 700; font-size: 13.5px;">${f.machineNo}</div>
-          <div style="display: flex; gap: 5px; align-items: center; margin-top: 3px;">
-            <span style="font-size: 11px; color: var(--gold-400); font-weight: 600;">${f.category}</span>
+          <div style="display: flex; gap: 5px; align-items: center; margin-top: 3px; flex-wrap: wrap;">
+            <span style="font-size: 11px; color: var(--gold-400); font-weight: 600;" title="${escapeHtml(getCategoryDisplayNameWithFull(f.category))}">${escapeHtml(getCategoryDisplayNameWithFull(f.category))}</span>
             <span class="div-badge ${getDivisionClass(f.division)}">${f.division || 'SBC'}</span>
           </div>
         </td>
@@ -2824,7 +2856,7 @@
 
     renderCategoryComparisonChart(safeList);
     renderDivisionDistributionChart(safeList);
-    renderSubsystemChart(safeList);
+    renderSubsystemChart(AppState.paretoFleetScope || AppState.selectedCategory || 'ALL');
     renderBlockVsNonBlockChart(safeList);
 
     const activeM = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL')
@@ -2969,68 +3001,495 @@
     });
   }
 
-  // Chart 2: Subsystem Failure Distribution (Donut Chart)
-  function renderSubsystemChart(list) {
+  // ==========================================================================
+  // SUBSYSTEM DEFECT PARETO ANALYSIS ENGINE (FOR ALL MACHINE FLEETS)
+  // Ranked Frequency (Left Y-Axis) + Cumulative % Curve (Right Y-Axis) + 80/20 Cutoff
+  // ==========================================================================
+
+  // Helper to retrieve failures for a given fleet or machine scope for Pareto analysis
+  function getFleetFailuresForPareto(scope) {
+    const targetScope = scope || AppState.paretoFleetScope || AppState.selectedCategory || 'ALL';
+
+    if (targetScope === 'CURRENT_MACHINE' || targetScope === 'MACHINE') {
+      const mId = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL')
+        ? AppState.selectedMachine
+        : getActiveMachineId();
+      if (!mId || mId === 'ALL') return AppState.failures;
+      return AppState.failures.filter(f => f.machineNo === mId);
+    }
+
+    if (targetScope === 'ALL') {
+      // Entire SWR Fleet: All 15 Fleets Combined
+      return AppState.failures;
+    }
+
+    // Specific Fleet Category (supporting aliases & directory match)
+    const isRbmv = (targetScope === 'RBMV' || targetScope === 'RMBV');
+    const isSrgm = (targetScope === 'SRGM/RGM' || targetScope === 'SRGM / RGM' || targetScope === 'SRGM' || targetScope === 'RGM');
+
+    return AppState.failures.filter(f => {
+      if (isRbmv) return (f.category === 'RBMV' || f.category === 'RMBV');
+      if (isSrgm) return (f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM');
+      if (f.category === targetScope) return true;
+      if (FLEET_DIRECTORY[targetScope] && FLEET_DIRECTORY[targetScope].some(m => m.id === f.machineNo)) return true;
+      return false;
+    });
+  }
+
+  // Canonical Indian Railways Track Machine Subsystems Classifier
+  function getCanonicalSubsystem(f) {
+    const sub = (f.subsystem || '').trim();
+    if (sub) {
+      const sLower = sub.toLowerCase();
+      if (sLower === 'engine' || sLower.includes('engine') || sLower.includes('diesel') || sLower.includes('fuel')) return 'Engine';
+      if (sLower === 'mechanical' || sLower.includes('mech') || sLower.includes('gear') || sLower.includes('shaft') || sLower.includes('bogie')) return 'Mechanical';
+      if (sLower === 'electrical' || sLower.includes('elec') || sLower.includes('battery') || sLower.includes('alternator') || sLower.includes('starter')) return 'Electrical';
+      if (sLower === 'hydraulic' || sLower.includes('hyd') || sLower.includes('valve') || sLower.includes('pump') || sLower.includes('cylinder')) return 'Hydraulic';
+      if (sLower === 'pneumatic' || sLower.includes('pneu') || sLower.includes('air') || sLower.includes('brake') || sLower.includes('compressor')) return 'Pneumatic';
+      if (sLower === 'tamping unit' || sLower.includes('tamp') || sLower.includes('squeeze') || sLower.includes('cutter')) return 'Tamping Unit';
+      if (sLower === 'crane' || sLower.includes('crane') || sLower.includes('winch') || sLower.includes('boom')) return 'Crane';
+      return sub;
+    }
+    const desc = ((f.natureOfFailure || '') + ' ' + (f.component || '') + ' ' + (f.sheet || '')).toLowerCase();
+    if (desc.includes('engine') || desc.includes('diesel')) return 'Engine';
+    if (desc.includes('crane')) return 'Crane';
+    if (desc.includes('tamp') || desc.includes('squeeze')) return 'Tamping Unit';
+    if (desc.includes('hyd') || desc.includes('valve')) return 'Hydraulic';
+    if (desc.includes('pneu') || desc.includes('air') || desc.includes('brake')) return 'Pneumatic';
+    if (desc.includes('elec') || desc.includes('alternator')) return 'Electrical';
+    return 'Mechanical';
+  }
+
+  // Subsystem Icons Mapping
+  const SUBSYSTEM_ICONS = {
+    'Mechanical': '🔩',
+    'Electrical': '⚡',
+    'Engine': '⚙️',
+    'Tamping Unit': '🔨',
+    'Tamping / Work Unit': '🔨',
+    'Hydraulic': '💧',
+    'Pneumatic': '💨',
+    'Crane': '🏗️',
+    'Electronics': '📟'
+  };
+
+  // Dedicated Handler: Change Pareto Fleet Scope
+  function onParetoFleetChange(scope) {
+    AppState.paretoFleetScope = scope;
+    renderSubsystemChart(scope);
+  }
+
+  // Dedicated Handler: Open & Navigate to Pareto Chart for any Fleet
+  function openParetoForFleet(scope) {
+    const target = scope || AppState.selectedCategory || 'ALL';
+    AppState.paretoFleetScope = target;
+    
+    // Switch to fleet-view tab
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-tab') === 'fleet-view');
+    });
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.classList.toggle('active', p.id === 'fleet-view');
+    });
+    AppState.activeTab = 'fleet-view';
+
+    renderCharts();
+    renderSubsystemChart(target);
+
+    setTimeout(() => {
+      const container = document.getElementById('paretoCardContainer');
+      if (container) {
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+  }
+
+  // Chart 2: Authentic Subsystem Defect Pareto Graph (Ranked Bars + Cumulative % Curve + 80% Cutoff)
+  function renderSubsystemChart(fleetScope) {
     const ctx = document.getElementById('chartSubsystemDistribution');
     if (!ctx) return;
 
     if (AppState.charts.subsystem) {
       AppState.charts.subsystem.destroy();
+      AppState.charts.subsystem = null;
     }
 
-    const themeColors = getChartThemeColors();
+    const targetScope = fleetScope || AppState.paretoFleetScope || (AppState.selectedCategory !== 'ALL' ? AppState.selectedCategory : 'ALL');
+    AppState.paretoFleetScope = targetScope;
 
-    const subsystemCounts = {};
-    list.forEach(f => {
-      const sub = f.subsystem || 'Mechanical';
-      subsystemCounts[sub] = (subsystemCounts[sub] || 0) + 1;
+    const themeColors = getChartThemeColors();
+    const fails = getFleetFailuresForPareto(targetScope);
+    const totalCount = fails.length;
+
+    // Determine human-readable fleet title
+    let fleetDisplayName = 'Entire Fleet (All 15 Fleets Combined)';
+    if (targetScope === 'CURRENT_MACHINE' || targetScope === 'MACHINE') {
+      const mId = (AppState.selectedMachine && AppState.selectedMachine !== 'ALL') ? AppState.selectedMachine : getActiveMachineId();
+      fleetDisplayName = `Machine ${mId} (Isolated Scope)`;
+    } else if (targetScope !== 'ALL') {
+      fleetDisplayName = getCategoryDisplayNameWithFull(targetScope);
+    }
+
+    // Sync Fleet Selector Dropdown
+    const fleetSelect = document.getElementById('paretoFleetSelect');
+    if (fleetSelect && fleetSelect.value !== targetScope) {
+      fleetSelect.value = targetScope;
+    }
+
+    // Sync Fleet Badge
+    const badgeEl = document.getElementById('paretoFleetBadge');
+    if (badgeEl) {
+      badgeEl.textContent = `${fleetDisplayName} • ${totalCount} Breakdown${totalCount === 1 ? '' : 's'}`;
+    }
+
+    // Render Quick Switcher Pills for all 15 fleets + Entire Fleet
+    renderParetoQuickPills(targetScope);
+
+    // Tally by Canonical Subsystems
+    const counts = {};
+    fails.forEach(f => {
+      const sub = getCanonicalSubsystem(f);
+      counts[sub] = (counts[sub] || 0) + 1;
     });
 
-    const labels = Object.keys(subsystemCounts);
-    const data = Object.values(subsystemCounts);
+    let sortedSubs = [];
+    let labels = [];
+    let barData = [];
+    let cumPctData = [];
+    let threshold80Data = [];
 
-    const colors = [
-      '#2e7d32', // Pista
-      '#d4af37', // Gold
-      '#2563eb', // Blue
-      '#dc2626', // Red
-      '#9333ea', // Purple
-      '#0d9488', // Teal
-      '#ea580c', // Orange
-      '#475569'  // Slate
-    ];
+    const overlay = document.getElementById('paretoZeroStateOverlay');
 
+    if (totalCount > 0) {
+      if (overlay) overlay.style.display = 'none';
+
+      // Sort descending by incident count (standard Pareto requirement)
+      sortedSubs = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      labels = sortedSubs.map(e => e[0]);
+      barData = sortedSubs.map(e => e[1]);
+
+      let cum = 0;
+      cumPctData = sortedSubs.map(e => {
+        cum += e[1];
+        return parseFloat(((cum / totalCount) * 100).toFixed(1));
+      });
+      threshold80Data = labels.map(() => 80);
+    } else {
+      // Zero-defect fleet handling: render standard baseline axes with 0 counts
+      if (overlay) {
+        overlay.style.display = 'flex';
+        const titleEl = document.getElementById('paretoZeroStateTitle');
+        const msgEl = document.getElementById('paretoZeroStateMsg');
+        if (titleEl) {
+          titleEl.textContent = `100% Operational Availability — Zero Subsystem Defects for ${fleetDisplayName}`;
+        }
+        if (msgEl) {
+          msgEl.textContent = `The ${fleetDisplayName} has maintained pristine reliability with 0 breakdown incidents across Mechanical, Electrical, Engine, Hydraulic, Pneumatic, and Work Unit systems.`;
+        }
+      }
+
+      labels = ['Mechanical', 'Electrical', 'Engine', 'Hydraulic', 'Pneumatic', 'Tamping Unit'];
+      barData = [0, 0, 0, 0, 0, 0];
+      cumPctData = [0, 0, 0, 0, 0, 0];
+      threshold80Data = [80, 80, 80, 80, 80, 80];
+    }
+
+    // Identify Vital Few Subsystems Driving 80% of Failures (Pareto Principle)
+    const vitalFew = [];
+    if (totalCount > 0) {
+      for (let i = 0; i < sortedSubs.length; i++) {
+        vitalFew.push(sortedSubs[i][0]);
+        if (cumPctData[i] >= 80) break;
+      }
+    }
+
+    // Render Dynamic Pareto Metrics Summary Bar
+    renderParetoMetricsBar(totalCount, sortedSubs, vitalFew, cumPctData, targetScope, fleetDisplayName);
+
+    // Render Subsystem Breakdown Detail List
+    renderParetoBreakdownList(sortedSubs, totalCount, cumPctData, vitalFew);
+
+    // Subsystem Color Palette (High contrast in both Light & Dark modes)
+    const isLight = themeColors.isLight;
+    const SUBSYSTEM_COLORS = {
+      'Mechanical': {
+        bg: isLight ? 'rgba(21, 128, 61, 0.85)' : 'rgba(34, 197, 94, 0.75)',
+        border: isLight ? '#15803d' : '#22c55e'
+      },
+      'Electrical': {
+        bg: isLight ? 'rgba(126, 34, 206, 0.85)' : 'rgba(168, 85, 247, 0.75)',
+        border: isLight ? '#7e22ce' : '#a855f7'
+      },
+      'Engine': {
+        bg: isLight ? 'rgba(194, 65, 12, 0.85)' : 'rgba(249, 115, 22, 0.75)',
+        border: isLight ? '#c2410c' : '#f97316'
+      },
+      'Tamping Unit': {
+        bg: isLight ? 'rgba(180, 83, 9, 0.85)' : 'rgba(245, 158, 11, 0.75)',
+        border: isLight ? '#b45309' : '#f59e0b'
+      },
+      'Tamping / Work Unit': {
+        bg: isLight ? 'rgba(180, 83, 9, 0.85)' : 'rgba(245, 158, 11, 0.75)',
+        border: isLight ? '#b45309' : '#f59e0b'
+      },
+      'Hydraulic': {
+        bg: isLight ? 'rgba(29, 78, 216, 0.85)' : 'rgba(59, 130, 246, 0.75)',
+        border: isLight ? '#1d4ed8' : '#3b82f6'
+      },
+      'Pneumatic': {
+        bg: isLight ? 'rgba(14, 116, 144, 0.85)' : 'rgba(6, 182, 212, 0.75)',
+        border: isLight ? '#0e7490' : '#06b6d4'
+      },
+      'Crane': {
+        bg: isLight ? 'rgba(190, 24, 93, 0.85)' : 'rgba(236, 72, 153, 0.75)',
+        border: isLight ? '#be185d' : '#ec4899'
+      }
+    };
+
+    const bgColors = labels.map(l => (SUBSYSTEM_COLORS[l]?.bg || (isLight ? 'rgba(46, 125, 50, 0.85)' : 'rgba(147, 197, 114, 0.75)')));
+    const borderColors = labels.map(l => (SUBSYSTEM_COLORS[l]?.border || (isLight ? '#1b5e20' : '#93c572')));
+
+    // Build Dual-Axis Pareto Combo Chart
     AppState.charts.subsystem = new Chart(ctx, {
-      type: 'doughnut',
+      type: 'bar',
       data: {
         labels: labels,
-        datasets: [{
-          data: data,
-          backgroundColor: colors.slice(0, labels.length),
-          borderColor: themeColors.doughnutBorder,
-          borderWidth: 2,
-          hoverOffset: 8
-        }]
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Failure Count (Incidents)',
+            data: barData,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            yAxisID: 'yCount',
+            order: 2
+          },
+          {
+            type: 'line',
+            label: 'Cumulative %',
+            data: cumPctData,
+            borderColor: isLight ? '#b45309' : '#ffd700',
+            backgroundColor: isLight ? '#b45309' : '#ffd700',
+            borderWidth: 2.8,
+            pointRadius: 4.5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: isLight ? '#b45309' : '#ffd700',
+            pointBorderColor: isLight ? '#ffffff' : '#0c1410',
+            pointBorderWidth: 2,
+            fill: false,
+            tension: 0.2,
+            yAxisID: 'yPercent',
+            order: 1
+          },
+          {
+            type: 'line',
+            label: '80% Pareto Benchmark',
+            data: threshold80Data,
+            borderColor: isLight ? 'rgba(220, 38, 38, 0.85)' : 'rgba(248, 113, 113, 0.85)',
+            borderDash: [6, 6],
+            borderWidth: 1.6,
+            pointRadius: 0,
+            fill: false,
+            yAxisID: 'yPercent',
+            order: 3
+          }
+        ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
-            position: 'right',
-            labels: { color: themeColors.textColor, font: { size: 11, weight: '600' }, boxWidth: 12 }
+            position: 'top',
+            labels: {
+              color: themeColors.textColor,
+              font: { size: 11, family: 'Segoe UI', weight: '600' },
+              boxWidth: 14,
+              padding: 12
+            }
           },
           tooltip: {
             backgroundColor: themeColors.tooltipBg,
             titleColor: themeColors.tooltipTitle,
             bodyColor: themeColors.tooltipBody,
             borderColor: themeColors.tooltipBorder,
-            borderWidth: 1
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: function (context) {
+                if (context.dataset.yAxisID === 'yPercent') {
+                  if (context.datasetIndex === 2) {
+                    return ' 80% Pareto Cutoff Benchmark (80/20 Vital Few)';
+                  }
+                  return ` Cumulative Contribution: ${context.parsed.y}%`;
+                }
+                const cnt = context.parsed.y;
+                const pct = totalCount > 0 ? ((cnt / totalCount) * 100).toFixed(1) : 0;
+                return ` Defect Incidents: ${cnt} (${pct}% of fleet failures)`;
+              }
+            }
           }
         },
-        cutout: '62%'
+        scales: {
+          x: {
+            ticks: {
+              color: themeColors.textColor,
+              font: { size: 11, weight: '700', family: 'Segoe UI' }
+            },
+            grid: { color: themeColors.gridColor }
+          },
+          yCount: {
+            type: 'linear',
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Defect Incident Count',
+              color: themeColors.axisColor,
+              font: { weight: 'bold', size: 11 }
+            },
+            ticks: {
+              color: themeColors.textColor,
+              stepSize: 1,
+              font: { weight: '600' }
+            },
+            grid: { color: themeColors.gridColor },
+            min: 0,
+            suggestedMax: totalCount > 0 ? Math.ceil(Math.max(...barData) * 1.15) : 5
+          },
+          yPercent: {
+            type: 'linear',
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Cumulative Percentage (%)',
+              color: isLight ? '#b45309' : '#ffd700',
+              font: { weight: 'bold', size: 11 }
+            },
+            ticks: {
+              color: isLight ? '#b45309' : '#ffd700',
+              callback: function (val) { return val + '%'; },
+              stepSize: 20,
+              font: { weight: '600' }
+            },
+            grid: { drawOnChartArea: false },
+            min: 0,
+            max: 100
+          }
+        }
       }
     });
+  }
+
+  // Render Interactive Quick Switcher Pills for all 15 fleets + Entire Fleet
+  function renderParetoQuickPills(activeScope) {
+    const container = document.getElementById('paretoQuickPills');
+    if (!container) return;
+
+    const allFleetsList = [
+      { id: 'ALL', label: '🌐 Entire Fleet' },
+      ...MACHINE_CATEGORIES.map(c => ({ id: c, label: getCategoryDisplayNameWithFull(c) }))
+    ];
+
+    container.innerHTML = allFleetsList.map(fl => {
+      const fails = getFleetFailuresForPareto(fl.id);
+      const count = fails.length;
+      const isActive = (activeScope === fl.id);
+      return `
+        <button class="pareto-pill ${isActive ? 'active' : ''}" 
+                onclick="window.TM_APP.onParetoFleetChange('${fl.id}')" 
+                title="${fl.id === 'ALL' ? 'All 15 Fleets Combined' : fl.label}">
+          <span>${fl.label}</span>
+          <span class="pareto-pill-count">${count}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  // Render Dynamic Pareto Metrics Summary Bar
+  function renderParetoMetricsBar(totalCount, sortedSubs, vitalFew, cumPctData, targetScope, fleetDisplayName) {
+    const bar = document.getElementById('paretoMetricsBar');
+    if (!bar) return;
+
+    if (totalCount === 0) {
+      bar.innerHTML = `
+        <div class="pareto-metric-item">
+          <span class="pareto-metric-label">Active Fleet Scope</span>
+          <span class="pareto-metric-val" style="color: var(--pista-300);">${fleetDisplayName}</span>
+        </div>
+        <div class="pareto-metric-item">
+          <span class="pareto-metric-label">Total Recorded Incidents</span>
+          <span class="pareto-metric-val" style="color: #22c55e;">0 Defects</span>
+        </div>
+        <div class="pareto-metric-item">
+          <span class="pareto-metric-label">Fleet Reliability Status</span>
+          <span class="pareto-metric-val" style="color: #22c55e;">🛡️ 100% Operational Availability</span>
+        </div>
+        <div class="pareto-metric-item">
+          <span class="pareto-metric-label">Pareto 80/20 Action</span>
+          <span class="pareto-metric-val" style="color: var(--text-secondary);">Optimal Baseline (Preventive Maintenance Mode)</span>
+        </div>
+      `;
+      return;
+    }
+
+    const topSub = sortedSubs[0];
+    const topPct = ((topSub[1] / totalCount) * 100).toFixed(1);
+    const vitalPct = vitalFew.length > 0 ? cumPctData[vitalFew.length - 1] : 0;
+
+    bar.innerHTML = `
+      <div class="pareto-metric-item">
+        <span class="pareto-metric-label">Active Fleet Scope</span>
+        <span class="pareto-metric-val" style="color: var(--pista-300);">${fleetDisplayName}</span>
+      </div>
+      <div class="pareto-metric-item">
+        <span class="pareto-metric-label">Total Incidents</span>
+        <span class="pareto-metric-val">${totalCount} Cases</span>
+      </div>
+      <div class="pareto-metric-item">
+        <span class="pareto-metric-label">#1 Leading Culprit Subsystem</span>
+        <span class="pareto-metric-val" style="color: #ef4444;">${SUBSYSTEM_ICONS[topSub[0]] || '⚠️'} ${topSub[0]} (${topSub[1]} cases • ${topPct}%)</span>
+      </div>
+      <div class="pareto-metric-item">
+        <span class="pareto-metric-label">80/20 Vital Drivers (Top ${vitalFew.length})</span>
+        <span class="pareto-metric-val" style="color: var(--gold-400);">${vitalFew.join(', ')} (${vitalPct}% of defects)</span>
+      </div>
+    `;
+  }
+
+  // Render Detailed Subsystem Breakdown Cards / Badges
+  function renderParetoBreakdownList(sortedSubs, totalCount, cumPctData, vitalFew) {
+    const list = document.getElementById('paretoSubsystemBreakdownList');
+    if (!list) return;
+
+    if (totalCount === 0) {
+      list.innerHTML = `
+        <div style="font-size: 11.5px; color: var(--text-secondary); padding: 4px 8px;">
+          ✅ All core subsystems (Engine, Mechanical, Electrical, Hydraulic, Pneumatic, Work Units) have zero recorded failures in this fleet.
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = sortedSubs.map(([sub, count], idx) => {
+      const pct = ((count / totalCount) * 100).toFixed(1);
+      const cumPct = cumPctData[idx];
+      const isVital = vitalFew.includes(sub);
+      const icon = SUBSYSTEM_ICONS[sub] || '⚙️';
+      return `
+        <div class="pareto-sub-chip ${isVital ? 'vital-driver' : ''}" title="${sub}: ${count} defects (${pct}%), Cumulative: ${cumPct}%">
+          <span style="font-size: 13px;">${icon}</span>
+          <strong>${sub}</strong>:
+          <span style="font-family: var(--font-mono); font-weight: 700; color: var(--gold-400);">${count}</span>
+          <span style="color: var(--text-secondary); font-size: 10.5px;">(${pct}%)</span>
+          <span style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.25); color: ${isVital ? 'var(--gold-400)' : 'var(--text-secondary)'};">
+            Cum: ${cumPct}% ${isVital ? '★ Vital' : ''}
+          </span>
+        </div>
+      `;
+    }).join('');
   }
 
   // Helper: Subsystem percentage contribution calculation for a machine
@@ -3502,7 +3961,7 @@
     MACHINE_CATEGORIES.forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
-      opt.textContent = (cat === 'SRGM/RGM') ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)' : cat;
+      opt.textContent = getCategoryDisplayNameWithFull(cat);
       catSelect.appendChild(opt);
     });
     if (prevVal && MACHINE_CATEGORIES.includes(prevVal)) {
@@ -6956,7 +7415,7 @@
     MACHINE_CATEGORIES.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c;
-      opt.textContent = (c === 'SRGM/RGM') ? 'SRGM / RGM (Switch Rail Grinding / Rail Grinding)' : c;
+      opt.textContent = getCategoryDisplayNameWithFull(c);
       if (AppState.selectedCategory === c) opt.selected = true;
       catSelect.appendChild(opt);
     });
@@ -7300,6 +7759,11 @@
     showAllIncidents,
     getAllMachineIncidentsChronological,
     renderTable,
+    // Subsystem Defect Pareto Analysis Methods (All Machine Fleets)
+    onParetoFleetChange,
+    openParetoForFleet,
+    renderSubsystemChart,
+    getFleetFailuresForPareto,
     getAppState: () => AppState,
     selectCategory,
     populateModalCategories

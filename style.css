@@ -835,14 +835,18 @@ body {
 }
 .category-pill[data-category="BCM"].active .pill-badge { background: #ef4444; color: #450a0a; }
 
-.category-pill[data-category="SBCM/FRM"] .pill-dot { color: #f43f5e; }
-.category-pill[data-category="SBCM/FRM"]:hover { border-color: #f43f5e; background: rgba(244, 63, 94, 0.12); }
-.category-pill[data-category="SBCM/FRM"].active {
+.category-pill[data-category="SBCM/FRM"] .pill-dot,
+.category-pill[data-category="SBCM"] .pill-dot { color: #f43f5e; }
+.category-pill[data-category="SBCM/FRM"]:hover,
+.category-pill[data-category="SBCM"]:hover { border-color: #f43f5e; background: rgba(244, 63, 94, 0.12); }
+.category-pill[data-category="SBCM/FRM"].active,
+.category-pill[data-category="SBCM"].active {
   background: linear-gradient(135deg, rgba(244, 63, 94, 0.32), rgba(190, 18, 60, 0.35));
   border: 1.5px solid #f43f5e;
   box-shadow: 0 0 16px rgba(244, 63, 94, 0.4);
 }
-.category-pill[data-category="SBCM/FRM"].active .pill-badge { background: #f43f5e; color: #4c0519; }
+.category-pill[data-category="SBCM/FRM"].active .pill-badge,
+.category-pill[data-category="SBCM"].active .pill-badge { background: #f43f5e; color: #4c0519; }
 
 .category-pill[data-category="BRM"] .pill-dot { color: #d97706; }
 .category-pill[data-category="BRM"]:hover { border-color: #d97706; background: rgba(217, 119, 6, 0.12); }
@@ -4053,5 +4057,213 @@ body[data-theme="light"],
 [data-theme="light"] #chartMachineRadar {
   filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.06));
 }
+
+/* ====================================================================
+   SUBSYSTEM DEFECT PARETO CARD & FLEET ANALYSIS COMPONENTS
+   ==================================================================== */
+.pareto-panel-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+}
+
+.pareto-quick-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 0 10px 0;
+  border-bottom: 1px solid var(--border-dim);
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+}
+
+.pareto-quick-pills::-webkit-scrollbar {
+  height: 5px;
+}
+.pareto-quick-pills::-webkit-scrollbar-thumb {
+  background: var(--border-dim);
+  border-radius: 4px;
+}
+
+.pareto-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-dim);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.pareto-pill:hover {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: var(--pista-400);
+  color: var(--pista-300);
+  transform: translateY(-1px);
+}
+
+.pareto-pill.active {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: var(--gold-400);
+  color: var(--gold-400);
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.25);
+}
+
+.pareto-pill-count {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.pareto-pill.active .pareto-pill-count {
+  background: var(--gold-400);
+  color: #0c1410;
+}
+
+.pareto-metrics-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+}
+
+.pareto-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pareto-metric-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.pareto-metric-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--gold-400);
+  font-family: var(--font-mono);
+}
+
+.pareto-sub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  background: rgba(18, 28, 22, 0.7);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.pareto-sub-chip.vital-driver {
+  border-color: var(--border-gold);
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.pareto-sub-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Light Mode Overrides for Pareto Components */
+[data-theme="light"] .pareto-panel-card {
+  background: #ffffff !important;
+  border: 1.5px solid rgba(46, 125, 50, 0.25) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .pareto-pill {
+  background: #f3f4f6 !important;
+  border: 1px solid #d1d5db !important;
+  color: #374151 !important;
+}
+
+[data-theme="light"] .pareto-pill:hover {
+  background: #e8f5e9 !important;
+  border-color: #2e7d32 !important;
+  color: #1b5e20 !important;
+}
+
+[data-theme="light"] .pareto-pill.active {
+  background: #fef3c7 !important;
+  border-color: #d97706 !important;
+  color: #92400e !important;
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.25) !important;
+}
+
+[data-theme="light"] .pareto-pill-count {
+  background: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .pareto-pill.active .pareto-pill-count {
+  background: #d97706 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .pareto-metrics-bar {
+  background: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="light"] .pareto-metric-label {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .pareto-metric-val {
+  color: #946200 !important;
+}
+
+[data-theme="light"] .pareto-sub-chip {
+  background: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .pareto-sub-chip.vital-driver {
+  background: #fffbeb !important;
+  border-color: #f59e0b !important;
+}
+
+[data-theme="light"] #paretoZeroStateOverlay {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1.5px solid rgba(46, 125, 50, 0.28) !important;
+}
+
+[data-theme="light"] #paretoZeroStateTitle {
+  color: #15803d !important;
+}
+
+[data-theme="light"] #paretoZeroStateMsg {
+  color: #374151 !important;
+}
+
 
 
