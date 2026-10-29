@@ -212,7 +212,7 @@ body {
 /* App Container */
 .app-container {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   max-width: 1720px;
   margin: 0 auto;
   padding: 18px 24px 60px 24px;
@@ -3279,19 +3279,25 @@ body[data-theme="light"],
   color: #142217;
 }
 
-/* Light Mode Ambient Canvas */
+/* Light Mode Ambient Canvas (Visible Ken-Burns Zoom In/Out Image at Background) */
 [data-theme="light"] .ambient-bg-watermark {
-  opacity: 0.10;
-  filter: brightness(1.2) contrast(1.05) grayscale(30%);
+  opacity: 0.48;
+  filter: brightness(1.04) contrast(1.18) saturate(1.12);
+  animation: ambientZoom 18s ease-in-out infinite;
+  display: block !important;
+  visibility: visible !important;
 }
 
 [data-theme="light"] .ambient-bg-tint {
-  background: radial-gradient(circle at 50% 35%, rgba(246, 251, 247, 0.82) 0%, rgba(230, 238, 232, 0.94) 100%);
+  background: radial-gradient(circle at 50% 35%, rgba(245, 250, 246, 0.22) 0%, rgba(225, 236, 228, 0.58) 100%);
+  display: block !important;
+  visibility: visible !important;
 }
 
-/* Light Mode Authentication Overlay */
+/* Light Mode Authentication Overlay (Translucent so Zoom Image is Clearly Visible Behind) */
 [data-theme="light"] .login-overlay {
-  background: radial-gradient(ellipse at center, rgba(235, 245, 238, 0.88) 0%, rgba(215, 230, 220, 0.96) 100%);
+  background: radial-gradient(ellipse at center, rgba(235, 245, 238, 0.38) 0%, rgba(210, 226, 215, 0.68) 100%);
+  backdrop-filter: blur(1.5px);
 }
 
 [data-theme="light"] .login-card {
@@ -3420,14 +3426,21 @@ body[data-theme="light"],
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
+[data-theme="light"] .hero-background-image {
+  filter: brightness(0.96) contrast(1.14) saturate(1.12);
+  opacity: 0.65;
+  animation: ambientZoom 20s ease-in-out infinite;
+}
+
 [data-theme="light"] .hero-gradient-overlay {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(246, 251, 247, 0.90) 45%,
-    rgba(240, 247, 242, 0.85) 75%,
-    rgba(255, 255, 255, 0.96) 100%
+    rgba(255, 255, 255, 0.76) 0%,
+    rgba(245, 250, 246, 0.68) 45%,
+    rgba(238, 246, 240, 0.62) 75%,
+    rgba(255, 255, 255, 0.80) 100%
   );
+  backdrop-filter: blur(1px);
 }
 
 [data-theme="light"] .brand-titles h1 {

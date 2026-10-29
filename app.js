@@ -160,7 +160,7 @@
 
   // Universal Date Formatter: Strictly DD-MM-YYYY or DD/DD-MM-YYYY for Overnight Blocks
   function formatDateDisplay(val) {
-    if (!val || val === 'N/A' || val === '-' || val === '--' || val === 'NA' || val === 'Not Set') return '--';
+    if (!val || val === 'N/A' || val === '-' || val === '--' || val === 'NA' || val === 'Not Set' || val === '_' || val === '-------' || val === '--------') return '--';
     const s = String(val).trim().replace(/[`'"]/g, '').trim();
     if (/^(active|under repair|nil|none|ongoing)$/i.test(s) || s.toLowerCase().includes('active')) {
       return s;
@@ -173,9 +173,10 @@
       return ov.formatted;
     }
 
-    // 2. Handle Excel serial numbers (e.g. 45180 -> 11-09-2023)
-    if (/^\d{5}$/.test(s)) {
-      const serial = parseInt(s, 10);
+    // 2. Handle Excel serial numbers (e.g. 45180 or 44652.0 -> 11-09-2023)
+    const serialMatch = s.match(/^(\d{5})(?:\.0+)?$/);
+    if (serialMatch) {
+      const serial = parseInt(serialMatch[1], 10);
       const dt = new Date((serial - 25569) * 86400 * 1000);
       if (!isNaN(dt.getTime())) {
         const dd = String(dt.getUTCDate()).padStart(2, '0');
@@ -756,49 +757,77 @@
     'CSM': [
       { id: 'CSM-945', model: '09-32 CSM Continuous Action Tamper', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' }
     ],
-    'DTE': [],
+    'DTE': [
+      { id: 'DTE-57083', model: '09-3X Dynamic Tamping Express 57083', division: 'UBL', depot: 'UBL', year: 2022, status: 'FIT' }
+    ],
     'DUO': [
       { id: 'DUO-8112', model: '08-32 Duomatic Track Tamper', division: 'SBC', depot: 'SBC', year: 2015, status: 'FIT' },
       { id: 'DUO-3324', model: '08-32 Duomatic Track Tamper', division: 'MYS', depot: 'MYS', year: 2014, status: 'FIT' },
-      { id: 'DUO-8128', model: '08-32 Duomatic Tamper (Ex-UBL)', division: 'MYS', depot: 'SKLR', year: 2016, status: 'FIT' }
+      { id: 'DUO-8128', model: '08-32 Duomatic Tamper (Ex-UBL)', division: 'MYS', depot: 'SKLR', year: 2016, status: 'FIT' },
+      { id: 'DUO-8154', model: '08-32 Duomatic Track Tamper 8154', division: 'UBL', depot: 'UBL', year: 2019, status: 'FIT' },
+      { id: 'DUO-57434', model: '08-32 Duomatic Track Tamper 57434', division: 'UBL', depot: 'UBL', year: 2026, status: 'FIT' },
+      { id: 'DUO-8106', model: '08-32 Duomatic Track Tamper 8106', division: 'MYS', depot: 'MYS', year: 2015, status: 'FIT' }
     ],
     'UNI/PCTM': [
-      { id: 'UNIMAT-8269', model: 'Unimat 08-475 3S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' }
+      { id: 'UNIMAT-8269', model: 'Unimat 08-475 3S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' },
+      { id: 'UNIMAT-8427', model: '08-475 Unimat-4S Points & Crossing Tamper 8427', division: 'UBL', depot: 'UBL', year: 2017, status: 'FIT' },
+      { id: 'PCTM-26', model: 'Points & Crossing Tamper 26', division: 'SBC', depot: 'SBC', year: 2023, status: 'FIT' },
+      { id: 'PCTM-27', model: 'Points & Crossing Tamper 27', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
     ],
     'MPT': [
       { id: 'MPT-12015', model: 'Multi-Purpose Tamper 12015', division: 'SBC', depot: 'KJM', year: 2019, status: 'FIT' },
       { id: 'MPT-12008', model: 'Multi-Purpose Tamper 12008', division: 'UBL', depot: 'UBL', year: 2020, status: 'FIT' },
       { id: 'MPT-56577', model: 'Multi-Purpose Tamper 56577', division: 'UBL', depot: 'BAY', year: 2021, status: 'FIT' },
-      { id: 'MPT-56944', model: 'Multi-Purpose Tamper 56944', division: 'UBL', depot: 'BJP', year: 2022, status: 'FIT' }
+      { id: 'MPT-56944', model: 'Multi-Purpose Tamper 56944', division: 'UBL', depot: 'BJP', year: 2022, status: 'FIT' },
+      { id: 'MPT-2014', model: 'Multi-Purpose Tamper 2014', division: 'MYS', depot: 'MYS', year: 2013, status: 'FIT' }
     ],
     'BCM': [
       { id: 'BCM-351', model: 'RM-80 Ballast Cleaning Machine', division: 'UBL', depot: 'UBL', year: 2015, status: 'FIT' },
       { id: 'BCM-400', model: 'RM-80 High Output Ballast Cleaner', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
-      { id: 'BCM-56824', model: 'RM-80 Ballast Cleaning Machine 56824', division: 'SBC', depot: 'SBC / BYPL', year: 2021, status: 'FIT' }
+      { id: 'BCM-56824', model: 'RM-80 Ballast Cleaning Machine 56824', division: 'SBC', depot: 'SBC / BYPL', year: 2021, status: 'FIT' },
+      { id: 'BCM-712', model: 'RM-80 Ballast Cleaning Machine 712', division: 'MYS', depot: 'MYS', year: 2017, status: 'FIT' }
     ],
     'SBCM/FRM': [
       { id: 'FRM-1889', model: 'Formation Rehabilitation Machine FRM-80', division: 'MYS', depot: 'MYS', year: 2016, status: 'FIT' },
       { id: 'FRM-1899', model: 'Formation Rehabilitation Machine FRM-80', division: 'UBL', depot: 'HPT', year: 2017, status: 'FIT' },
       { id: 'FRM-57160', model: 'Shoulder Ballast Cleaning Machine', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' }
     ],
-    'BRM': [],
+    'BRM': [
+      { id: 'BRM-56669', model: 'Ballast Regulating Machine 56669', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' },
+      { id: 'BRM-04', model: 'Ballast Regulating Machine 04', division: 'SBC', depot: 'SBC', year: 2009, status: 'FIT' }
+    ],
     'SQRS': [
       { id: 'SQRS-7&8', model: 'Simplex Quick Relaying System 7&8', division: 'SBC', depot: 'BYPL', year: 2018, status: 'FIT' }
     ],
-    'T28': [],
+    'T28': [
+      { id: 'T-28', model: 'T-28 Points & Crossing Change Machine (403&404)', division: 'SBC', depot: 'SBC', year: 2004, status: 'FIT' },
+      { id: 'T-28-908', model: 'T-28 Points & Crossing Change Machine (908A&B)', division: 'UBL', depot: 'UBL', year: 2022, status: 'FIT' }
+    ],
     'DGS': [],
     'UTV': [
       { id: 'UTV-001', model: 'Utility Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
-      { id: 'UTV-002', model: 'Utility Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' }
+      { id: 'UTV-002', model: 'Utility Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' },
+      { id: 'UTV-08', model: 'Utility Vehicle UTV-08', division: 'MYS', depot: 'MYS', year: 2009, status: 'FIT' },
+      { id: 'UTV-040', model: 'Utility Vehicle UTV-040', division: 'SBC', depot: 'SBC', year: 2012, status: 'FIT' },
+      { id: 'UTV-058', model: 'Utility Vehicle UTV-058', division: 'UBL', depot: 'UBL', year: 2014, status: 'FIT' },
+      { id: 'UTV-077', model: 'Utility Vehicle UTV-077', division: 'MYS', depot: 'MYS', year: 2015, status: 'FIT' }
     ],
-    'SRGM/RGM': [],
+    'SRGM/RGM': [
+      { id: 'SRGM-IR20-04', model: 'Switch Rail Grinding Machine IR20-04', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'RGM-96-07', model: 'Rail Grinding Machine 96-07', division: 'SBC', depot: 'SBC', year: 2024, status: 'FIT' }
+    ],
     'RBMV': [
       { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
     ],
     'MDU': [
       { id: 'MDU-57218', model: 'Muck Disposal Units 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
       { id: 'MDU-57220', model: 'Muck Disposal Units 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-57222', model: 'Muck Disposal Units 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
+      { id: 'MDU-57222', model: 'Muck Disposal Units 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-837', model: 'Muck Disposal Units 837', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' },
+      { id: 'MDU-845', model: 'Muck Disposal Units 845', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' },
+      { id: 'MDU-848', model: 'Muck Disposal Units 848', division: 'MYS', depot: 'MYS', year: 2025, status: 'FIT' },
+      { id: 'MDU-849', model: 'Muck Disposal Units 849', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' },
+      { id: 'MDU-850', model: 'Muck Disposal Units 850', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' }
     ]
   };
 
@@ -811,10 +840,10 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v15 TM-FAST authentic fleet with strictly normalized DD-MM-YYYY dates and purged bogus rows)
+  // Local Storage Keys (v18 TM-FAST authentic fleet with exact Excel commissioning & HRM synchronization)
   const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
-  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V15_DDMMYYYY';
-  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V17_COMPLETE_HEALED';
+  const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V18_EXACT_SYNC';
+  const HRM_STORAGE_KEY = 'TM_HRM_DATA_V18_EXACT_EXCEL_SYNC';
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -998,6 +1027,11 @@
         });
       }
 
+      // Clean up older stale storage keys to guarantee exact sync with authentic Excel data
+      ['TM_HRM_DATA_V17_COMPLETE_HEALED', 'TM_HRM_DATA_V16_EXCEL_PARSED', 'TM_FAILURE_FLEET_DIRECTORY_V15_DDMMYYYY'].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+
       // Load authentic HRM data (History Register Module)
       const storedHrm = localStorage.getItem(HRM_STORAGE_KEY);
       if (storedHrm) {
@@ -1010,7 +1044,7 @@
         HRM_DATA = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters));
       }
 
-      // Proactively heal and guarantee 100% complete HRM data across ALL 22 authentic SWR fleet machines
+      // Proactively heal and guarantee 100% complete HRM data across ALL authentic SWR fleet machines
       // If any machine is missing, erased, corrupted, or has empty items, immediately retrieve and replace with authentic records
       if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
         Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters).forEach(mId => {
@@ -4038,15 +4072,18 @@
     if (val instanceof Date && !isNaN(val.getTime())) {
       return val.toISOString().substring(0, 10);
     }
-    if (typeof val === 'number') {
-      if (val > 25000 && val < 65000) {
-        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+
+    // Numeric serial check (handles numbers and numeric strings like "44820" or "44652.0")
+    const s = String(val).trim();
+    if (typeof val === 'number' || /^\d{5}(?:\.0+)?$/.test(s)) {
+      const num = typeof val === 'number' ? val : parseFloat(s);
+      if (!isNaN(num) && num >= 25000 && num <= 65000) {
+        const date = new Date(Math.round((num - 25569) * 86400 * 1000));
         if (!isNaN(date.getTime())) {
           return date.toISOString().substring(0, 10);
         }
       }
     }
-    const s = String(val).trim();
 
     // 1. Overnight Block Date check FIRST (e.g. 16/17-11-2025, 04/05-06-2026, 16-17/11/2025, 16/17/11/2025)
     // Preserves both day digits accurately without dropping day 1 or day 2
@@ -4055,24 +4092,40 @@
       return ov.formatted;
     }
 
-    const ddmmyyyy = s.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})/);
+    // 2. Standard DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
+    const ddmmyyyy = s.match(/(?:^|[^\d])(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})(?:[^\d]|$)/);
     if (ddmmyyyy) {
       const day = ddmmyyyy[1].padStart(2, '0');
       const mon = ddmmyyyy[2].padStart(2, '0');
       const yr = ddmmyyyy[3];
       return `${yr}-${mon}-${day}`;
     }
-    const yymmdd = s.match(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})/);
+
+    // 3. Short 2-digit year: DD.MM.YY or DD/MM/YY or DD-MM-YY
+    const ddmmyy = s.match(/(?:^|[^\d])(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{2})(?:[^\d]|$)/);
+    if (ddmmyy) {
+      const day = ddmmyy[1].padStart(2, '0');
+      const mon = ddmmyy[2].padStart(2, '0');
+      const yr = `20${ddmmyy[3]}`;
+      return `${yr}-${mon}-${day}`;
+    }
+
+    // 4. ISO YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+    const yymmdd = s.match(/(?:^|[^\d])(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})(?:[^\d]|$)/);
     if (yymmdd) {
       const yr = yymmdd[1];
       const mon = yymmdd[2].padStart(2, '0');
       const day = yymmdd[3].padStart(2, '0');
       return `${yr}-${mon}-${day}`;
     }
+
+    // 5. ISO timestamp string like 2024-05-12T...
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
       return s.substring(0, 10);
     }
-    return s.substring(0, 10);
+
+    // Return string intact (do NOT slice to 10 chars to avoid truncating remarks)
+    return s;
   }
 
   // Unified Workbook Parser (supports multi-sheet IR Track Machine Failure Registers and flat spreadsheets)
@@ -4166,51 +4219,89 @@
     }
 
     // 4.5. Parse HISTORY REGISTER sheet to populate HRM_DATA (Tab 1)
-    const historySheetName = workbook.SheetNames.find(s => s.toUpperCase().includes('HISTORY'));
+    const historySheetName = workbook.SheetNames.find(s => {
+      const up = s.toUpperCase().trim();
+      return up.includes('HISTORY') || up === 'HRM' || up.includes('HISTORY REGISTER') || (up.includes('REGISTER') && !up.includes('FAILURE') && !up.includes('BREAKDOWN'));
+    });
     if (historySheetName) {
       const hWs = workbook.Sheets[historySheetName];
       const hRows = XLSX.utils.sheet_to_json(hWs, { header: 1, defval: '' });
       let commDate = '';
       let commRaw = '';
 
-      // Find commissioning date in header rows
-      for (let r = 0; r < Math.min(hRows.length, 12); r++) {
+      // Find commissioning date in header rows (first 15 rows)
+      for (let r = 0; r < Math.min(hRows.length, 15); r++) {
         const row = hRows[r] || [];
         for (let c = 0; c < row.length; c++) {
-          const cellStr = String(row[c]).toLowerCase();
-          if (cellStr.includes('commission')) {
-            const rawVal = row[c + 1] || row[c + 2] || row[c];
-            commRaw = String(rawVal || '');
-            commDate = formatExcelDate(rawVal) || String(rawVal || '');
-            break;
+          const cellStr = String(row[c] || '').trim();
+          if (/commission|commissinig/i.test(cellStr)) {
+            // Check adjacent columns (c+1 to c+4)
+            for (let nextC = c + 1; nextC <= Math.min(row.length - 1, c + 4); nextC++) {
+              const val = row[nextC];
+              const sVal = String(val !== undefined && val !== null ? val : '').trim();
+              if (sVal && !/commission|commissinig/i.test(sVal) && sVal !== ':' && !/^(date|engine|hours|no|machine)$/i.test(sVal)) {
+                commRaw = sVal;
+                commDate = formatExcelDate(val);
+                break;
+              }
+            }
+            // Check if date is embedded in the cell string itself
+            if (!commDate) {
+              const match = cellStr.match(/(?:on|:)?\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})/i);
+              if (match) {
+                commRaw = cellStr;
+                commDate = formatExcelDate(match[1]);
+              }
+            }
+            if (commDate) break;
           }
         }
         if (commDate) break;
       }
 
-      // Parse canonical items from row 4 to 25
-      const parsedItems = [];
-      for (let r = 3; r < Math.min(hRows.length, 25); r++) {
+      // Dynamic header detection to find the exact start row of canonical items
+      let headerRowIndex = 2; // Default to row 3 (0-based 2)
+      for (let r = 1; r <= Math.min(hRows.length - 1, 8); r++) {
         const row = hRows[r] || [];
-        const itemNum = String(row[0] || '').trim();
-        const itemTitle = String(row[1] || '').trim();
+        const colB = String(row[1] || '').toUpperCase();
+        const colC = String(row[2] || '').toUpperCase();
+        if (colB.includes('ALL DETAILS REQUIRED') || colC === 'DATE' || colC.includes('ENGINE') || colC.includes('GC-1')) {
+          headerRowIndex = r;
+          const nextRow = hRows[r + 1] || [];
+          const nextC = String(nextRow[2] || '').toUpperCase();
+          if (nextC === 'DATE' || nextC.includes('ENGINE')) {
+            headerRowIndex = r + 1;
+          }
+        }
+      }
+      const dataStartRow = headerRowIndex + 1;
+
+      // Parse canonical items from dataStartRow
+      const parsedItems = [];
+      for (let r = dataStartRow; r < Math.min(hRows.length, dataStartRow + 25); r++) {
+        const row = hRows[r] || [];
+        const rawItemNum = String(row[0] !== undefined ? row[0] : '').trim();
+        const itemTitle = String(row[1] !== undefined ? row[1] : '').replace(/\r?\n/g, ' ').trim();
         if (!itemTitle || itemTitle.length < 2) continue;
+        if (/ALL DETAILS REQUIRED|DATE OF MACHINE|SOUTH WESTERN/i.test(itemTitle)) continue;
 
         const records = [];
         // Even columns (2, 4, 6, 8, ...) are Dates/Remarks, odd columns (3, 5, 7, 9, ...) are Engine Hours
         for (let col = 2; col < row.length; col += 2) {
           const dateOrRemark = row[col];
           const eh = row[col + 1];
-          if ((dateOrRemark !== undefined && String(dateOrRemark).trim() !== '') || (eh !== undefined && String(eh).trim() !== '')) {
-            const formattedD = formatExcelDate(dateOrRemark) || String(dateOrRemark).trim();
-            const rawRem = String(dateOrRemark || '').trim();
-            const recRemarks = (rawRem && rawRem !== '-' && !/^\d{4}-\d{2}-\d{2}$/.test(rawRem) && !/^(no|nil)$/i.test(rawRem)) ? rawRem : 'NA';
+          const sDate = (dateOrRemark !== undefined && dateOrRemark !== null) ? String(dateOrRemark).trim() : '';
+          const sEh = (eh !== undefined && eh !== null) ? String(eh).trim() : '';
+
+          if (sDate !== '' || sEh !== '') {
+            const formattedD = formatExcelDate(dateOrRemark) || sDate;
+            const recRemarks = (sDate && sDate !== '-' && !/^\d{4}-\d{2}-\d{2}$/.test(formattedD) && !/^(no|nil|na)$/i.test(sDate)) ? sDate : 'NA';
             records.push({
               id: `rec_${chosenMachine}_r${r}_c${col}`,
-              rawDate: rawRem,
+              rawDate: sDate,
               displayDate: formattedD,
               isoDate: /^\d{4}-\d{2}-\d{2}$/.test(formattedD) ? formattedD : '',
-              engineHours: String(eh || 'NA').trim(),
+              engineHours: sEh || 'NA',
               remarks: recRemarks
             });
           }
@@ -4230,7 +4321,7 @@
 
         parsedItems.push({
           row: r + 1,
-          itemNum: itemNum || String(parsedItems.length + 1),
+          itemNum: rawItemNum || String(parsedItems.length + 1),
           title: itemTitle,
           presentDate: presentDate,
           presentEngineHours: presentEh,
@@ -4240,13 +4331,14 @@
       }
 
       if (parsedItems.length > 0) {
+        const authenticEntry = (window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) ? window.REAL_SWR_FLEET_DATA.historyRegisters[chosenMachine] : null;
         HRM_DATA[chosenMachine] = {
           machineId: chosenMachine,
           machineName: chosenMachine,
           category: chosenCategory,
           division: chosenDivision,
-          commissioningDate: commDate || '2016-01-01',
-          commissioningRaw: commRaw,
+          commissioningDate: commDate || (authenticEntry && authenticEntry.commissioningDate) || '2016-01-01',
+          commissioningRaw: commRaw || (authenticEntry && authenticEntry.commissioningRaw) || '',
           items: parsedItems
         };
         saveHrmData();
@@ -4854,7 +4946,12 @@
     
     let from = null;
     const s = fromDateStr.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    if (/^\d{5}(?:\.0+)?$/.test(s)) {
+      const num = parseFloat(s);
+      if (num >= 25000 && num <= 65000) {
+        from = new Date(Math.round((num - 25569) * 86400 * 1000));
+      }
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const parts = s.split('-');
       from = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     } else if (/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/.test(s)) {
@@ -5128,11 +5225,28 @@
     const current = HRM_DATA[mId];
     let repaired = false;
 
+    function isHrmItemMatch(a, b) {
+      if (!a || !b) return false;
+      const tA = (a.title || '').trim().toUpperCase();
+      const tB = (b.title || '').trim().toUpperCase();
+      if (tA && tB && tA === tB) return true;
+      if (a.row && b.row && a.row === b.row) return true;
+      if (a.itemNum && b.itemNum && a.itemNum === b.itemNum) {
+        const isAConveyor = tA.includes('CONVEYOR');
+        const isBConveyor = tB.includes('CONVEYOR');
+        const isAAxle = tA.includes('AXLE');
+        const isBAxle = tB.includes('AXLE');
+        if ((isAConveyor && isBAxle) || (isAAxle && isBConveyor)) return false;
+        return true;
+      }
+      return false;
+    }
+
     // Check if canonical has items that are missing or erased in current
     if (current.items.length < authentic.items.length) {
       const mergedItems = JSON.parse(JSON.stringify(authentic.items));
       current.items.forEach(curIt => {
-        const match = mergedItems.find(aIt => aIt.itemNum === curIt.itemNum || aIt.title.trim().toUpperCase() === curIt.title.trim().toUpperCase());
+        const match = mergedItems.find(aIt => isHrmItemMatch(aIt, curIt));
         if (match && curIt.records && curIt.records.length > (match.records ? match.records.length : 0)) {
           match.records = curIt.records;
           match.presentDate = curIt.presentDate;
@@ -5145,7 +5259,7 @@
     } else {
       // Check each item: if authentic has records/presentDate but current has NA or empty records, heal it!
       authentic.items.forEach(authIt => {
-        const curIt = current.items.find(i => i.itemNum === authIt.itemNum || i.title.trim().toUpperCase() === authIt.title.trim().toUpperCase());
+        const curIt = current.items.find(i => isHrmItemMatch(i, authIt));
         if (curIt) {
           const authHasData = (authIt.records && authIt.records.length > 0) || (authIt.presentDate && authIt.presentDate !== 'NA' && authIt.presentDate !== '_');
           const curIsEmpty = (!curIt.records || curIt.records.length === 0) && (!curIt.presentDate || curIt.presentDate === 'NA' || curIt.presentDate === '');
@@ -5166,7 +5280,7 @@
       });
     }
 
-    if (!current.commissioningDate || current.commissioningDate === '2016-01-01') {
+    if (!current.commissioningDate || current.commissioningDate === '2016-01-01' || (authentic.commissioningDate && authentic.commissioningDate !== '2016-01-01' && current.commissioningDate !== authentic.commissioningDate)) {
       if (authentic.commissioningDate) {
         current.commissioningDate = authentic.commissioningDate;
         current.commissioningRaw = authentic.commissioningRaw;
