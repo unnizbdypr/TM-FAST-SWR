@@ -342,6 +342,15 @@ body {
   color: var(--pista-300);
   font-size: 11px;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.live-indicator:hover {
+  background: rgba(147, 197, 114, 0.28);
+  border-color: var(--pista-400);
+  transform: translateY(-1px);
 }
 
 .pulse-dot {
@@ -392,6 +401,14 @@ body {
   color: #fca5a5;
 }
 
+.cloud-sync-indicator.rules-locked {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: #f87171;
+  color: #fecaca;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+  animation: pulseAnimation 2s infinite ease-in-out;
+}
+
 .cloud-dot {
   width: 8px;
   height: 8px;
@@ -414,6 +431,63 @@ body {
 .cloud-sync-indicator.offline .cloud-dot {
   background-color: #ef4444;
   box-shadow: 0 0 8px #ef4444;
+}
+
+.cloud-sync-indicator.rules-locked .cloud-dot {
+  background-color: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+}
+
+/* Cloud Rules Warning Banner */
+.cloud-rules-warning-banner {
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.95), rgba(185, 28, 28, 0.95));
+  color: #fff;
+  border: 1px solid #f87171;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 10px 0 16px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  z-index: 50;
+  animation: pulseAnimation 3s infinite ease-in-out;
+}
+
+.cloud-rules-warning-banner .banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cloud-rules-warning-banner .banner-icon {
+  font-size: 22px;
+}
+
+.cloud-rules-warning-banner .banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.cloud-rules-warning-banner .banner-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.cloud-rules-warning-banner .banner-close:hover {
+  opacity: 1;
 }
 
 .header-right-zone {
@@ -1618,6 +1692,38 @@ body {
 
 .custom-table tr:hover td {
   background: rgba(147, 197, 114, 0.05);
+}
+
+.custom-table tr.table-row-main {
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.custom-table tr.table-row-main:hover td {
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+[data-theme="light"] .custom-table tr.table-row-main:hover td {
+  background: rgba(212, 175, 55, 0.16) !important;
+}
+
+.custom-table tr.desk-failure-row {
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.custom-table tr.desk-failure-row:hover td {
+  background: rgba(147, 197, 114, 0.08) !important;
+}
+
+.btn-go-desk {
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-go-desk:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(147, 197, 114, 0.35);
 }
 
 .table-subsystem-pill {
@@ -3467,6 +3573,18 @@ body[data-theme="light"],
   color: #235832;
 }
 
+[data-theme="light"] .cloud-sync-indicator.rules-locked {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+[data-theme="light"] .cloud-rules-warning-banner {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  color: #ffffff;
+  border-color: #f87171;
+}
+
 [data-theme="light"] .user-session-chip {
   background: #ffffff;
   border-color: rgba(160, 110, 15, 0.4);
@@ -4273,10 +4391,31 @@ body[data-theme="light"],
 [data-theme="light"] #paretoZeroStateTitle {
   color: #15803d !important;
 }
-
 [data-theme="light"] #paretoZeroStateMsg {
   color: #374151 !important;
 }
 
-
-
+/* Clickable Machine Cell Navigation & Highlighting */
+.clickable-machine-cell {
+  transition: background 0.18s ease;
+}
+.clickable-machine-cell:hover {
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+.clickable-machine-cell:hover .table-machine-text {
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  color: #fef08a !important;
+}
+[data-theme="light"] .clickable-machine-cell:hover {
+  background: rgba(217, 119, 6, 0.08) !important;
+}
+[data-theme="light"] .clickable-machine-cell:hover .table-machine-text {
+  color: #b45309 !important;
+}
+.machine-jump-link {
+  transition: transform 0.15s ease;
+}
+.clickable-machine-cell:hover .machine-jump-link {
+  transform: translateX(2px);
+}

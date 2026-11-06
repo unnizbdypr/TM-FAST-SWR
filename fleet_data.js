@@ -1,82 +1,733 @@
 ﻿// SWR Track Machine Real Fleet & Complete Subsystem Failure Incident Database
 window.REAL_SWR_FLEET_DATA = {
     "fleetDirectory": {
-        "CSM": [
-            { "id": "CSM-945", "model": "09-32 CSM Continuous Action Tamper", "division": "UBL", "depot": "UBL", "year": 2016, "status": "FIT" }
-        ],
-        "DTE": [
-            { "id": "DTE-57083", "model": "09-3X Dynamic Tamping Express 57083", "division": "UBL", "depot": "UBL", "year": 2022, "status": "FIT" }
-        ],
-        "DUO": [
-            { "id": "DUO-8112", "model": "08-32 Duomatic Track Tamper", "division": "SBC", "depot": "SBC", "year": 2015, "status": "FIT" },
-            { "id": "DUO-3324", "model": "08-32 Duomatic Track Tamper", "division": "MYS", "depot": "MYS", "year": 2014, "status": "FIT" },
-            { "id": "DUO-8128", "model": "08-32 Duomatic Tamper (Ex-UBL)", "division": "MYS", "depot": "SKLR", "year": 2016, "status": "FIT" },
-            { "id": "DUO-8154", "model": "08-32 Duomatic Track Tamper 8154", "division": "UBL", "depot": "UBL", "year": 2019, "status": "FIT" },
-            { "id": "DUO-57434", "model": "08-32 Duomatic Track Tamper 57434", "division": "UBL", "depot": "UBL", "year": 2026, "status": "FIT" },
-            { "id": "DUO-8106", "model": "08-32 Duomatic Track Tamper 8106", "division": "MYS", "depot": "MYS", "year": 2015, "status": "FIT" }
-        ],
-        "UNI/PCTM": [
-            { "id": "UNIMAT-8269", "model": "Unimat 08-475 3S Points & Crossing Tamper", "division": "SBC", "depot": "YPR / BYPL", "year": 2017, "status": "FIT" },
-            { "id": "UNIMAT-8427", "model": "08-475 Unimat-4S Points & Crossing Tamper 8427", "division": "UBL", "depot": "UBL", "year": 2017, "status": "FIT" },
-            { "id": "PCTM-26", "model": "Points & Crossing Tamper 26", "division": "SBC", "depot": "SBC", "year": 2023, "status": "FIT" },
-            { "id": "PCTM-27", "model": "Points & Crossing Tamper 27", "division": "UBL", "depot": "UBL", "year": 2023, "status": "FIT" }
-        ],
-        "MPT": [
-            { "id": "MPT-12015", "model": "Multi-Purpose Tamper 12015", "division": "SBC", "depot": "KJM", "year": 2019, "status": "FIT" },
-            { "id": "MPT-12008", "model": "Multi-Purpose Tamper 12008", "division": "UBL", "depot": "UBL", "year": 2020, "status": "FIT" },
-            { "id": "MPT-56577", "model": "Multi-Purpose Tamper 56577", "division": "UBL", "depot": "BAY", "year": 2021, "status": "FIT" },
-            { "id": "MPT-56944", "model": "Multi-Purpose Tamper 56944", "division": "UBL", "depot": "BJP", "year": 2022, "status": "FIT" },
-            { "id": "MPT-2014", "model": "Multi-Purpose Tamper 2014", "division": "MYS", "depot": "MYS", "year": 2013, "status": "FIT" }
-        ],
-        "BCM": [
-            { "id": "BCM-351", "model": "RM-80 Ballast Cleaning Machine", "division": "UBL", "depot": "UBL", "year": 2015, "status": "FIT" },
-            { "id": "BCM-400", "model": "RM-80 High Output Ballast Cleaner", "division": "UBL", "depot": "UBL", "year": 2018, "status": "FIT" },
-            { "id": "BCM-56824", "model": "RM-80 Ballast Cleaning Machine 56824", "division": "SBC", "depot": "SBC / BYPL", "year": 2021, "status": "FIT" },
-            { "id": "BCM-712", "model": "RM-80 Ballast Cleaning Machine 712", "division": "MYS", "depot": "MYS", "year": 2017, "status": "FIT" }
-        ],
-        "SBCM/FRM": [
-            { "id": "FRM-1889", "model": "Formation Rehabilitation Machine FRM-80", "division": "MYS", "depot": "MYS", "year": 2016, "status": "FIT" },
-            { "id": "FRM-1899", "model": "Formation Rehabilitation Machine FRM-80", "division": "UBL", "depot": "HPT", "year": 2017, "status": "FIT" },
-            { "id": "FRM-57160", "model": "Shoulder Ballast Cleaning Machine", "division": "UBL", "depot": "UBL", "year": 2021, "status": "FIT" }
-        ],
-        "BRM": [
-            { "id": "BRM-56669", "model": "Ballast Regulating Machine 56669", "division": "UBL", "depot": "UBL", "year": 2021, "status": "FIT" },
-            { "id": "BRM-04", "model": "Ballast Regulating Machine 04", "division": "SBC", "depot": "SBC", "year": 2009, "status": "FIT" }
-        ],
-        "SQRS": [
-            { "id": "SQRS-7&8", "model": "Simplex Quick Relaying System 7&8", "division": "SBC", "depot": "BYPL", "year": 2018, "status": "FIT" }
-        ],
-        "T28": [
-            { "id": "T-28", "model": "T-28 Points & Crossing Change Machine (403&404)", "division": "SBC", "depot": "SBC", "year": 2004, "status": "FIT" },
-            { "id": "T-28-908", "model": "T-28 Points & Crossing Change Machine (908A&B)", "division": "UBL", "depot": "UBL", "year": 2022, "status": "FIT" }
-        ],
-        "DGS": [],
-        "UTV": [
-            { "id": "UTV-001", "model": "Utility Vehicle UTV-001", "division": "UBL", "depot": "UBL", "year": 2018, "status": "FIT" },
-            { "id": "UTV-002", "model": "Utility Vehicle UTV-002", "division": "SBC", depot: "SBC", "year": 2017, "status": "FIT" },
-            { "id": "UTV-08", "model": "Utility Vehicle UTV-08", "division": "MYS", "depot": "MYS", "year": 2009, "status": "FIT" },
-            { "id": "UTV-040", "model": "Utility Vehicle UTV-040", "division": "SBC", "depot": "SBC", "year": 2012, "status": "FIT" },
-            { "id": "UTV-058", "model": "Utility Vehicle UTV-058", "division": "UBL", "depot": "UBL", "year": 2014, "status": "FIT" },
-            { "id": "UTV-077", "model": "Utility Vehicle UTV-077", "division": "MYS", "depot": "MYS", "year": 2015, "status": "FIT" }
-        ],
-        "SRGM/RGM": [
-            { "id": "SRGM-IR20-04", "model": "Switch Rail Grinding Machine IR20-04", "division": "UBL", "depot": "UBL", "year": 2023, "status": "FIT" },
-            { "id": "RGM-96-07", "model": "Rail Grinding Machine 96-07", "division": "SBC", "depot": "SBC", "year": 2024, "status": "FIT" }
-        ],
-        "RBMV": [
-            { "id": "RBMV-006", "model": "Rail Borne Maintenance Vehicle RBMV-006", "division": "SBC", "depot": "SBC", "year": 2025, "status": "FIT" }
-        ],
-        "MDU": [
-            { "id": "MDU-57218", "model": "Muck Disposal Units 57218", "division": "UBL", "depot": "UBL", "year": 2023, "status": "FIT" },
-            { "id": "MDU-57220", "model": "Muck Disposal Units 57220", "division": "UBL", "depot": "UBL", "year": 2023, "status": "FIT" },
-            { "id": "MDU-57222", "model": "Muck Disposal Units 57222", "division": "UBL", "depot": "UBL", "year": 2023, "status": "FIT" },
-            { "id": "MDU-837", "model": "Muck Disposal Units 837", "division": "UBL", "depot": "UBL", "year": 2025, "status": "FIT" },
-            { "id": "MDU-845", "model": "Muck Disposal Units 845", "division": "UBL", "depot": "UBL", "year": 2025, "status": "FIT" },
-            { "id": "MDU-848", "model": "Muck Disposal Units 848", "division": "MYS", "depot": "MYS", "year": 2025, "status": "FIT" },
-            { "id": "MDU-849", "model": "Muck Disposal Units 849", "division": "SBC", "depot": "SBC", "year": 2025, "status": "FIT" },
-            { "id": "MDU-850", "model": "Muck Disposal Units 850", "division": "UBL", "depot": "UBL", "year": 2025, "status": "FIT" }
-        ]
-    },
+    "CSM":  [
+                {
+                    "id":  "CSM-939",
+                    "year":  2018,
+                    "division":  "SBC",
+                    "model":  "09-32 CSM Continuous Action Tamper",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "CSM-945",
+                    "year":  2016,
+                    "division":  "UBL",
+                    "model":  "09-32 CSM Continuous Action Tamper",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "CSM-984",
+                    "year":  2020,
+                    "division":  "SBC",
+                    "model":  "09-32 CSM Continuous Action Tamper",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                }
+            ],
+    "DTE":  [
+                {
+                    "id":  "DTE-56749",
+                    "year":  2020,
+                    "division":  "MYS",
+                    "model":  "09-3X Dynamic Tamping Express 56749",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "DTE-56850",
+                    "year":  2021,
+                    "division":  "UBL",
+                    "model":  "09-3X Dynamic Tamping Express 56850",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DTE-57083",
+                    "year":  2022,
+                    "division":  "SBC",
+                    "model":  "09-3X Dynamic Tamping Express 57083",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "DTE-9006",
+                    "year":  2019,
+                    "division":  "SBC",
+                    "model":  "09-3X Dynamic Tamping Express 9006",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                }
+            ],
+    "DUO":  [
+                {
+                    "id":  "DUO-3324",
+                    "year":  2014,
+                    "division":  "MYS",
+                    "model":  "08-32 Duomatic Track Tamper 3324",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "DUO-57434",
+                    "year":  2026,
+                    "division":  "UBL",
+                    "model":  "08-32 Duomatic Track Tamper 57434",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DUO-57497",
+                    "year":  2026,
+                    "division":  "MYS",
+                    "model":  "08-32 Duomatic Track Tamper 57497",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "DUO-8079",
+                    "year":  2013,
+                    "division":  "UBL",
+                    "model":  "08-32 Duomatic Track Tamper 8079",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DUO-8090",
+                    "year":  2014,
+                    "division":  "UBL",
+                    "model":  "08-32 Duomatic Track Tamper 8090",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DUO-8106",
+                    "year":  2015,
+                    "division":  "UBL",
+                    "model":  "08-32 Duomatic Track Tamper 8106",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DUO-8112",
+                    "year":  2015,
+                    "division":  "SBC",
+                    "model":  "08-32 Duomatic Track Tamper 8112",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "DUO-8128",
+                    "year":  2016,
+                    "division":  "MYS",
+                    "model":  "08-32 Duomatic Track Tamper 8128",
+                    "status":  "FIT",
+                    "depot":  "SKLR"
+                },
+                {
+                    "id":  "DUO-8154",
+                    "year":  2019,
+                    "division":  "UBL",
+                    "model":  "08-32 Duomatic Track Tamper 8154",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                }
+            ],
+    "UNI/PCTM":  [
+                     {
+                         "id":  "PCTM-26",
+                         "year":  2023,
+                         "division":  "SBC",
+                         "model":  "Points \u0026 Crossing Tamper 26",
+                         "status":  "FIT",
+                         "depot":  "SBC"
+                     },
+                     {
+                         "id":  "PCTM-27",
+                         "year":  2023,
+                         "division":  "UBL",
+                         "model":  "Points \u0026 Crossing Tamper 27",
+                         "status":  "FIT",
+                         "depot":  "UBL"
+                     },
+                     {
+                         "id":  "PCTM-9062",
+                         "year":  2019,
+                         "division":  "MYS",
+                         "model":  "Points \u0026 Crossing Tamper 9062",
+                         "status":  "FIT",
+                         "depot":  "MYS"
+                     },
+                     {
+                         "id":  "UNIMAT-8269",
+                         "year":  2017,
+                         "division":  "SBC",
+                         "model":  "Unimat 08-475 3S Points \u0026 Crossing Tamper",
+                         "status":  "FIT",
+                         "depot":  "YPR / BYPL"
+                     },
+                     {
+                         "id":  "UNIMAT-8277",
+                         "year":  2017,
+                         "division":  "MYS",
+                         "model":  "Unimat 08-475 3S Points \u0026 Crossing Tamper 8277",
+                         "status":  "FIT",
+                         "depot":  "MYS"
+                     },
+                     {
+                         "id":  "UNIMAT-8409",
+                         "year":  2016,
+                         "division":  "UBL",
+                         "model":  "Unimat 08-475 4S Points \u0026 Crossing Tamper 8409",
+                         "status":  "FIT",
+                         "depot":  "UBL"
+                     },
+                     {
+                         "id":  "UNIMAT-8427",
+                         "year":  2017,
+                         "division":  "MYS",
+                         "model":  "08-475 Unimat-4S Points \u0026 Crossing Tamper 8427",
+                         "status":  "FIT",
+                         "depot":  "MYS"
+                     }
+                 ],
+    "MPT":  [
+                {
+                    "id":  "MPT-12007",
+                    "year":  2019,
+                    "division":  "MYS",
+                    "model":  "Multi-Purpose Tamper 12007",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "MPT-12008",
+                    "year":  2020,
+                    "division":  "UBL",
+                    "model":  "Multi-Purpose Tamper 12008",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MPT-12015",
+                    "year":  2019,
+                    "division":  "SBC",
+                    "model":  "Multi-Purpose Tamper 12015",
+                    "status":  "FIT",
+                    "depot":  "KJM"
+                },
+                {
+                    "id":  "MPT-2011",
+                    "year":  2012,
+                    "division":  "SBC",
+                    "model":  "Multi-Purpose Tamper 2011",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "MPT-2014",
+                    "year":  2013,
+                    "division":  "MYS",
+                    "model":  "Multi-Purpose Tamper 2014",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "MPT-2016",
+                    "year":  2014,
+                    "division":  "UBL",
+                    "model":  "Multi-Purpose Tamper 2016",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MPT-56577",
+                    "year":  2021,
+                    "division":  "UBL",
+                    "model":  "Multi-Purpose Tamper 56577",
+                    "status":  "FIT",
+                    "depot":  "BAY"
+                },
+                {
+                    "id":  "MPT-56591",
+                    "year":  2021,
+                    "division":  "SBC",
+                    "model":  "Multi-Purpose Tamper 56591",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "MPT-56943",
+                    "year":  2022,
+                    "division":  "MYS",
+                    "model":  "Multi-Purpose Tamper 56943",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "MPT-56944",
+                    "year":  2022,
+                    "division":  "UBL",
+                    "model":  "Multi-Purpose Tamper 56944",
+                    "status":  "FIT",
+                    "depot":  "BJP"
+                },
+                {
+                    "id":  "MPT-56967",
+                    "year":  2022,
+                    "division":  "MYS",
+                    "model":  "Multi-Purpose Tamper 56967",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "MPT-56968",
+                    "year":  2022,
+                    "division":  "SBC",
+                    "model":  "Multi-Purpose Tamper 56968",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                }
+            ],
+    "BCM":  [
+                {
+                    "id":  "BCM-351",
+                    "year":  2015,
+                    "division":  "UBL",
+                    "model":  "RM-80 Ballast Cleaning Machine 351",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "BCM-384",
+                    "year":  2016,
+                    "division":  "MYS",
+                    "model":  "RM-80 Ballast Cleaning Machine 384",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "BCM-392",
+                    "year":  2017,
+                    "division":  "MYS",
+                    "model":  "RM-80 Ballast Cleaning Machine 392",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "BCM-400",
+                    "year":  2018,
+                    "division":  "UBL",
+                    "model":  "RM-80 High Output Ballast Cleaner 400",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "BCM-56824",
+                    "year":  2021,
+                    "division":  "SBC",
+                    "model":  "RM-80 Ballast Cleaning Machine 56824",
+                    "status":  "FIT",
+                    "depot":  "SBC / BYPL"
+                },
+                {
+                    "id":  "BCM-57098",
+                    "year":  2022,
+                    "division":  "MYS",
+                    "model":  "RM-80 Ballast Cleaning Machine 57098",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "BCM-712",
+                    "year":  2017,
+                    "division":  "SBC",
+                    "model":  "RM-80 Ballast Cleaning Machine 712",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                }
+            ],
+    "SBCM/FRM":  [
+                     {
+                         "id":  "FRM-1889",
+                         "year":  2016,
+                         "division":  "MYS",
+                         "model":  "Formation Rehabilitation Machine FRM-80 1889",
+                         "status":  "FIT",
+                         "depot":  "MYS"
+                     },
+                     {
+                         "id":  "FRM-1899",
+                         "year":  2017,
+                         "division":  "UBL",
+                         "model":  "Formation Rehabilitation Machine FRM-80 1899",
+                         "status":  "FIT",
+                         "depot":  "HPT"
+                     },
+                     {
+                         "id":  "FRM-56404",
+                         "year":  2020,
+                         "division":  "SBC",
+                         "model":  "Shoulder Ballast Cleaning Machine 56404",
+                         "status":  "FIT",
+                         "depot":  "SBC"
+                     },
+                     {
+                         "id":  "FRM-57160",
+                         "year":  2021,
+                         "division":  "UBL",
+                         "model":  "Shoulder Ballast Cleaning Machine 57160",
+                         "status":  "FIT",
+                         "depot":  "UBL"
+                     }
+                 ],
+    "BRM":  [
+                {
+                    "id":  "BRM-027",
+                    "year":  2017,
+                    "division":  "SBC",
+                    "model":  "Ballast Regulating Machine 027",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "BRM-033",
+                    "year":  2018,
+                    "division":  "MYS",
+                    "model":  "Ballast Regulating Machine 033",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "BRM-04",
+                    "year":  2009,
+                    "division":  "UBL",
+                    "model":  "Ballast Regulating Machine 04",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "BRM-56669",
+                    "year":  2021,
+                    "division":  "UBL",
+                    "model":  "Ballast Regulating Machine 56669",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "BRM-56680",
+                    "year":  2021,
+                    "division":  "UBL",
+                    "model":  "Ballast Regulating Machine 56680",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                }
+            ],
+    "SQRS":  [
+                 {
+                     "id":  "SQRS- 37 \u0026 38",
+                     "year":  2020,
+                     "division":  "UBL",
+                     "model":  "Simplex Quick Relaying System 37 \u0026 38",
+                     "status":  "FIT",
+                     "depot":  "UBL"
+                 },
+                 {
+                     "id":  "SQRS-19\u002620",
+                     "year":  2019,
+                     "division":  "SBC",
+                     "model":  "Simplex Quick Relaying System 19 \u0026 20",
+                     "status":  "FIT",
+                     "depot":  "SBC"
+                 },
+                 {
+                     "id":  "SQRS-51 \u0026 52",
+                     "year":  2021,
+                     "division":  "MYS",
+                     "model":  "Simplex Quick Relaying System 51 \u0026 52",
+                     "status":  "FIT",
+                     "depot":  "MYS"
+                 },
+                 {
+                     "id":  "SQRS-7\u00268",
+                     "year":  2018,
+                     "division":  "SBC",
+                     "model":  "Simplex Quick Relaying System 7\u00268",
+                     "status":  "FIT",
+                     "depot":  "BYPL"
+                 }
+             ],
+    "T28":  [
+                {
+                    "id":  "T28 403 \u0026 404",
+                    "year":  2004,
+                    "division":  "SBC",
+                    "model":  "T-28 Points \u0026 Crossing Change Machine (403 \u0026 404)",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "T28 908 A \u0026 B",
+                    "year":  2022,
+                    "division":  "UBL",
+                    "model":  "T-28 Points \u0026 Crossing Change Machine (908 A \u0026 B)",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                }
+            ],
+    "DGS":  [
+                {
+                    "id":  "DGS-339",
+                    "year":  2015,
+                    "division":  "SBC",
+                    "model":  "Dynamic Track Stabilizer 339",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "DGS-410",
+                    "year":  2018,
+                    "division":  "UBL",
+                    "model":  "Dynamic Track Stabilizer 410",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "DGS-417",
+                    "year":  2019,
+                    "division":  "MYS",
+                    "model":  "Dynamic Track Stabilizer 417",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "DGS-447",
+                    "year":  2021,
+                    "division":  "SBC",
+                    "model":  "Dynamic Track Stabilizer 447",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                }
+            ],
+    "UTV":  [
+                {
+                    "id":  "UTV-001",
+                    "year":  2018,
+                    "division":  "UBL",
+                    "model":  "Utility Vehicle UTV-001",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "UTV-002",
+                    "year":  2017,
+                    "division":  "SBC",
+                    "model":  "Utility Vehicle UTV-002",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "UTV-003",
+                    "year":  2018,
+                    "division":  "SBC",
+                    "model":  "Utility Vehicle UTV-003",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "UTV-004",
+                    "year":  2018,
+                    "division":  "MYS",
+                    "model":  "Utility Vehicle UTV-004",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "UTV-040",
+                    "year":  2012,
+                    "division":  "SBC",
+                    "model":  "Utility Vehicle UTV-040",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "UTV-057",
+                    "year":  2014,
+                    "division":  "UBL",
+                    "model":  "Utility Vehicle UTV-057",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "UTV-058",
+                    "year":  2014,
+                    "division":  "UBL",
+                    "model":  "Utility Vehicle UTV-058",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "UTV-077",
+                    "year":  2015,
+                    "division":  "SBC",
+                    "model":  "Utility Vehicle UTV-077",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "UTV-08",
+                    "year":  2009,
+                    "division":  "SBC",
+                    "model":  "Utility Vehicle UTV-08",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "UTV-103",
+                    "year":  2019,
+                    "division":  "UBL",
+                    "model":  "Utility Vehicle UTV-103",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "UTV-912",
+                    "year":  2016,
+                    "division":  "UBL",
+                    "model":  "Utility Vehicle UTV-912",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                }
+            ],
+    "SRGM/RGM":  [
+                     {
+                         "id":  "SRGM IR20-4",
+                         "year":  2023,
+                         "division":  "UBL",
+                         "model":  "Switch Rail Grinding Machine IR20-4",
+                         "status":  "FIT",
+                         "depot":  "UBL"
+                     },
+                     {
+                         "id":  "RGM-96-07",
+                         "year":  2024,
+                         "division":  "SBC",
+                         "model":  "Rail Grinding Machine 96-07",
+                         "status":  "FIT",
+                         "depot":  "SBC"
+                     }
+                 ],
+    "RBMV":  [
+                 {
+                     "id":  "RBMV-006",
+                     "year":  2025,
+                     "division":  "SBC",
+                     "model":  "Rail Borne Maintenance Vehicle RBMV-006",
+                     "status":  "FIT",
+                     "depot":  "SBC"
+                 },
+                 {
+                     "id":  "RBMV-007",
+                     "year":  2025,
+                     "division":  "UBL",
+                     "model":  "Rail Borne Maintenance Vehicle RBMV-007",
+                     "status":  "FIT",
+                     "depot":  "UBL"
+                 },
+                 {
+                     "id":  "RBMV-205",
+                     "year":  2024,
+                     "division":  "MYS",
+                     "model":  "Rail Borne Maintenance Vehicle RBMV-205",
+                     "status":  "FIT",
+                     "depot":  "MYS"
+                 }
+             ],
+    "MDU":  [
+                {
+                    "id":  "MDU-57218",
+                    "year":  2023,
+                    "division":  "UBL",
+                    "model":  "Muck Disposal Units 57218",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-57219",
+                    "year":  2023,
+                    "division":  "SBC",
+                    "model":  "Muck Disposal Units 57219",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "MDU-57220",
+                    "year":  2023,
+                    "division":  "UBL",
+                    "model":  "Muck Disposal Units 57220",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-57221",
+                    "year":  2023,
+                    "division":  "UBL",
+                    "model":  "Muck Disposal Units 57221",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-57222",
+                    "year":  2023,
+                    "division":  "UBL",
+                    "model":  "Muck Disposal Units 57222",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-837",
+                    "year":  2025,
+                    "division":  "SBC",
+                    "model":  "Muck Disposal Units 837",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-845",
+                    "year":  2025,
+                    "division":  "SBC",
+                    "model":  "Muck Disposal Units 845",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                },
+                {
+                    "id":  "MDU-848",
+                    "year":  2025,
+                    "division":  "MYS",
+                    "model":  "Muck Disposal Units 848",
+                    "status":  "FIT",
+                    "depot":  "MYS"
+                },
+                {
+                    "id":  "MDU-849",
+                    "year":  2025,
+                    "division":  "MYS",
+                    "model":  "Muck Disposal Units 849",
+                    "status":  "FIT",
+                    "depot":  "SBC"
+                },
+                {
+                    "id":  "MDU-850",
+                    "year":  2025,
+                    "division":  "MYS",
+                    "model":  "Muck Disposal Units 850",
+                    "status":  "FIT",
+                    "depot":  "UBL"
+                }
+            ]
+},
     "historyRegisters": {
     "FRM-57160":  {
                       "commissioningDate":  "2023-09-11",
@@ -39679,5 +40330,6 @@ window.REAL_SWR_FLEET_DATA = {
                      }
                  ]
 };
+
 
 

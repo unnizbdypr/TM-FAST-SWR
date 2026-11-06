@@ -273,11 +273,11 @@
               </h1>
               <div class="brand-subtitle">
                 <span>SOUTH WESTERN RAILWAY · FLEET RELIABILITY &amp; REPETITIVE DEFECT SURVEILLANCE</span>
-                <div class="live-indicator">
+                <div class="live-indicator" onclick="window.TM_APP.openCloudSyncModal()" title="Surveillance Active (Click to open Cloud Sync &amp; Diagnostics)" style="cursor: pointer;">
                   <span class="pulse-dot"></span>
                   <span>SURVEILLANCE ACTIVE</span>
                 </div>
-                <div class="cloud-sync-indicator" id="cloudSyncIndicator" title="Multi-User Cloud Sync Status">
+                <div class="cloud-sync-indicator" id="cloudSyncIndicator" onclick="window.TM_APP.openCloudSyncModal()" title="Click to view Multi-User Cloud Sync Status &amp; Diagnostics" style="cursor: pointer;">
                   <span class="cloud-dot" id="cloudDot"></span>
                   <span id="cloudStatusText">Cloud: Local Storage</span>
                 </div>
@@ -294,6 +294,9 @@
                 <span class="role-badge admin" id="loggedInRoleDisplay">ADMIN</span>
               </div>
               <div class="session-actions-divider"></div>
+              <button type="button" class="btn-user-tab btn-cloud-tab btn-user-action" onclick="window.TM_APP.openCloudSyncModal()" title="Open Cloud Sync Status &amp; Diagnostics">
+                <span>☁️ Cloud Sync</span>
+              </button>
               <button type="button" class="btn-user-tab btn-theme-tab btn-user-action" id="btnHeaderThemeToggle" onclick="window.TM_APP.toggleTheme()" title="Switch Display Theme (White Mode / Dark Mode)">
                 <span id="btnHeaderThemeIcon">☀️</span> <span id="btnHeaderThemeLabel">White Mode</span>
               </button>
@@ -307,6 +310,9 @@
 
             <!-- Operational Header Action Controls -->
             <div class="header-action-group">
+              <button type="button" class="btn btn-secondary-pista btn-cloud-sync" id="btnHeaderCloudSync" onclick="window.TM_APP.openCloudSyncModal()" title="Open Cloud Synchronization &amp; Diagnostics" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                <span>☁️ Cloud Sync</span>
+              </button>
               <button class="btn btn-secondary-pista" onclick="window.TM_APP.focusUniversalSearch()" title="Open Universal Fleet Search">
                 <span>🔍 Universal Search</span>
               </button>
@@ -348,6 +354,20 @@
             <button type="button" class="fy-toggle-btn" id="btnScopeAll" onclick="window.TM_APP.setKpiScope('ALL')" title="Show all-time cumulative metrics across all historical logs">
               📜 All-Time Logs
             </button>
+          </div>
+        </div>
+
+        <!-- Cloud Sync Database Rules Warning Banner (Shown when Firebase permissions are denied) -->
+        <div id="cloudRulesWarningBanner" class="cloud-rules-warning-banner" style="display: none;">
+          <div class="banner-content">
+            <span class="banner-icon">⚠️</span>
+            <div class="banner-text">
+              <strong>Multi-User Cloud Sync Blocked:</strong> Firebase Realtime Database rules are locked (Permission Denied). New entries are saved only on this machine's local storage and <em>are not syncing to other systems</em>.
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button type="button" class="btn btn-sm btn-secondary-gold" onclick="window.TM_APP.openCloudSyncModal()" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;">🛠️ Fix in 30 Seconds / Push Data</button>
+            <button type="button" class="banner-close" onclick="document.getElementById('cloudRulesWarningBanner').style.display='none'">&times;</button>
           </div>
         </div>
 
@@ -948,9 +968,15 @@
 
         <!-- Filter Bar -->
         <div class="table-filter-bar">
-          <div class="search-input-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="tableSearchInput" placeholder="Search across all machines, defects, parts or root causes...">
+          <div class="search-input-box" style="display: flex; align-items: center; gap: 8px; min-width: 320px; flex: 1;">
+            <div style="position: relative; flex: 1;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="tableSearchInput" placeholder="Search across all machines, defects, parts or root causes (Press Enter to Direct)..." style="padding-right: 32px;" autocomplete="off">
+              <button type="button" id="btnClearTableSearch" onclick="window.TM_APP.clearHistorySearch()" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #8da494; cursor: pointer; font-size: 13px;" title="Clear search">✕</button>
+            </div>
+            <button type="button" class="btn btn-secondary-pista btn-search-go" id="btnHistorySearchGo" onclick="window.TM_APP.applyHistorySearchAndDirect()" style="padding: 8px 14px; font-size: 12px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" title="Search and direct immediately to matching incident desk">
+              <span>🎯 Direct to Desk ↗️</span>
+            </button>
           </div>
 
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -1520,6 +1546,95 @@
             <button type="submit" class="btn btn-primary-gold">Save New Password</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       CLOUD SYNC & MULTI-USER DIAGNOSTICS MODAL
+       ==================================================================== -->
+  <div class="modal-overlay" id="cloudSyncModal">
+    <div class="modal-card" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>☁️</span>
+          <span>Multi-User Cloud Sync &amp; Database Diagnostics</span>
+        </div>
+        <button class="modal-close" onclick="window.TM_APP.closeModal('cloudSyncModal')">&times;</button>
+      </div>
+
+      <div class="modal-body" style="font-size: 13px; line-height: 1.5;">
+        <!-- Live Status Card (Dynamically populated) -->
+        <div id="cloudModalStatusCard" style="margin-bottom: 16px; padding: 14px; border-radius: 8px;"></div>
+
+        <!-- Diagnostic Table -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-dim); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-weight: 700; color: var(--gold-400); margin-bottom: 8px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">
+            Connection &amp; Project Diagnostics
+          </div>
+          <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <td style="padding: 6px 0; color: #a4bba9;">Firebase Project ID:</td>
+              <td style="padding: 6px 0; text-align: right; font-family: var(--font-mono); font-weight: 600;" id="cloudDiagProjectId">tm-fast-swr</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <td style="padding: 6px 0; color: #a4bba9;">Realtime Database URL:</td>
+              <td style="padding: 6px 0; text-align: right; font-family: var(--font-mono); font-size: 11px;" id="cloudDiagDbUrl">https://tm-fast-swr-default-rtdb.firebaseio.com</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <td style="padding: 6px 0; color: #a4bba9;">Websocket Connection:</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: 600;" id="cloudDiagSocket">Checking...</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <td style="padding: 6px 0; color: #a4bba9;">Database Read/Write Permission:</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: 600;" id="cloudDiagPermission">Checking...</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <td style="padding: 6px 0; color: #a4bba9;">Active Machine Failures in Local Memory:</td>
+              <td style="padding: 6px 0; text-align: right; font-family: var(--font-mono);" id="cloudDiagLocalCount">0 entries</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #a4bba9;">Last Successful Cloud Sync:</td>
+              <td style="padding: 6px 0; text-align: right; font-family: var(--font-mono);" id="cloudDiagLastSync">Never</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
+          <button type="button" class="btn btn-secondary-gold" onclick="window.TM_APP.testCloudConnection()" style="flex: 1; min-width: 200px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>🔄</span> <span>Re-Test Connection &amp; Sync</span>
+          </button>
+          <button type="button" class="btn btn-secondary-pista" id="btnModalPushSync" onclick="window.TM_APP.forceSyncLocalToCloud()" style="flex: 1; min-width: 180px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+            <span>☁️</span> <span>Push Local Entries to Cloud</span>
+          </button>
+          <button type="button" class="btn btn-dim" onclick="window.TM_APP.forcePullCloudData()" style="flex: 1; min-width: 180px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>📥</span> <span>Pull Latest Cloud Data</span>
+          </button>
+        </div>
+
+        <!-- Offline / Direct Snapshot Sync -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-dim); border-radius: 8px; padding: 12px;">
+          <div style="font-weight: 700; color: var(--gold-400); margin-bottom: 6px; font-size: 11px; text-transform: uppercase;">
+            📦 Direct Multi-System Transfer (Intranet / Air-Gapped Snapshot)
+          </div>
+          <div style="font-size: 12px; color: #a4bba9; margin-bottom: 10px;">
+            Need to instantly share your newly added entries with another computer without Firebase? Export a full snapshot file and load it on the other system:
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-dim" onclick="window.TM_APP.exportDatabaseSnapshot()" style="font-size: 12px;">
+              💾 Export Snapshot (.json)
+            </button>
+            <button type="button" class="btn btn-dim" onclick="document.getElementById('snapshotFileInput').click()" style="font-size: 12px;">
+              📂 Import &amp; Merge Snapshot
+            </button>
+            <input type="file" id="snapshotFileInput" accept=".json" style="display: none;" onchange="window.TM_APP.handleSnapshotImport(this.files[0])">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 12px 18px;">
+        <button type="button" class="btn btn-dim" onclick="window.TM_APP.closeModal('cloudSyncModal')">Close</button>
       </div>
     </div>
   </div>

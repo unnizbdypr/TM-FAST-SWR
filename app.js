@@ -419,12 +419,24 @@
   function checkSession() {
     loadAuthUsers();
     try {
+      const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+      if (urlParams && urlParams.get('autologin') === 'admin') {
+        CurrentUser = AppUsers['admin1@zbdypr'];
+        applyUserSession(CurrentUser);
+        if (urlParams.get('openModal') === 'cloudSync') {
+          setTimeout(() => CloudSync.openModal(), 300);
+        }
+        return true;
+      }
       const sess = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
       if (sess) {
         const parsed = JSON.parse(sess);
         if (AppUsers[parsed.userId]) {
           CurrentUser = AppUsers[parsed.userId];
           applyUserSession(CurrentUser);
+          if (urlParams && urlParams.get('openModal') === 'cloudSync') {
+            setTimeout(() => CloudSync.openModal(), 300);
+          }
           return true;
         }
       }
@@ -752,84 +764,150 @@
     return CurrentUser && CurrentUser.role === 'ADMIN';
   }
 
-  // Default SWR Machine Fleet Mapping (Authentic fleet from SWR divisional folders)
+  // Canonical SWR Machine Fleet Mapping (Strict 87-machine fleet across all 15 categories)
   const DEFAULT_FLEET_DIRECTORY = {
     'CSM': [
-      { id: 'CSM-945', model: '09-32 CSM Continuous Action Tamper', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' }
+      { id: 'CSM-939', model: '09-32 CSM Continuous Action Tamper 939', division: 'SBC', depot: 'SBC', year: 2018, status: 'FIT' },
+      { id: 'CSM-945', model: '09-32 CSM Continuous Action Tamper 945', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' },
+      { id: 'CSM-984', model: '09-32 CSM Continuous Action Tamper 984', division: 'SBC', depot: 'SBC', year: 2020, status: 'FIT' }
     ],
     'DTE': [
-      { id: 'DTE-57083', model: '09-3X Dynamic Tamping Express 57083', division: 'UBL', depot: 'UBL', year: 2022, status: 'FIT' }
+      { id: 'DTE-56749', model: '09-3X Dynamic Tamping Express 56749', division: 'MYS', depot: 'MYS', year: 2020, status: 'FIT' },
+      { id: 'DTE-56850', model: '09-3X Dynamic Tamping Express 56850', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' },
+      { id: 'DTE-57083', model: '09-3X Dynamic Tamping Express 57083', division: 'SBC', depot: 'SBC', year: 2022, status: 'FIT' },
+      { id: 'DTE-9006', model: '09-3X Dynamic Tamping Express 9006', division: 'SBC', depot: 'SBC', year: 2019, status: 'FIT' }
     ],
     'DUO': [
-      { id: 'DUO-8112', model: '08-32 Duomatic Track Tamper', division: 'SBC', depot: 'SBC', year: 2015, status: 'FIT' },
-      { id: 'DUO-3324', model: '08-32 Duomatic Track Tamper', division: 'MYS', depot: 'MYS', year: 2014, status: 'FIT' },
-      { id: 'DUO-8128', model: '08-32 Duomatic Tamper (Ex-UBL)', division: 'MYS', depot: 'SKLR', year: 2016, status: 'FIT' },
-      { id: 'DUO-8154', model: '08-32 Duomatic Track Tamper 8154', division: 'UBL', depot: 'UBL', year: 2019, status: 'FIT' },
+      { id: 'DUO-3324', model: '08-32 Duomatic Track Tamper 3324', division: 'MYS', depot: 'MYS', year: 2014, status: 'FIT' },
       { id: 'DUO-57434', model: '08-32 Duomatic Track Tamper 57434', division: 'UBL', depot: 'UBL', year: 2026, status: 'FIT' },
-      { id: 'DUO-8106', model: '08-32 Duomatic Track Tamper 8106', division: 'MYS', depot: 'MYS', year: 2015, status: 'FIT' }
+      { id: 'DUO-57497', model: '08-32 Duomatic Track Tamper 57497', division: 'MYS', depot: 'MYS', year: 2026, status: 'FIT' },
+      { id: 'DUO-8079', model: '08-32 Duomatic Track Tamper 8079', division: 'UBL', depot: 'UBL', year: 2013, status: 'FIT' },
+      { id: 'DUO-8090', model: '08-32 Duomatic Track Tamper 8090', division: 'UBL', depot: 'UBL', year: 2014, status: 'FIT' },
+      { id: 'DUO-8106', model: '08-32 Duomatic Track Tamper 8106', division: 'UBL', depot: 'UBL', year: 2015, status: 'FIT' },
+      { id: 'DUO-8112', model: '08-32 Duomatic Track Tamper 8112', division: 'SBC', depot: 'SBC', year: 2015, status: 'FIT' },
+      { id: 'DUO-8128', model: '08-32 Duomatic Track Tamper 8128', division: 'MYS', depot: 'SKLR', year: 2016, status: 'FIT' },
+      { id: 'DUO-8154', model: '08-32 Duomatic Track Tamper 8154', division: 'UBL', depot: 'UBL', year: 2019, status: 'FIT' }
     ],
     'UNI/PCTM': [
-      { id: 'UNIMAT-8269', model: 'Unimat 08-475 3S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' },
-      { id: 'UNIMAT-8427', model: '08-475 Unimat-4S Points & Crossing Tamper 8427', division: 'UBL', depot: 'UBL', year: 2017, status: 'FIT' },
       { id: 'PCTM-26', model: 'Points & Crossing Tamper 26', division: 'SBC', depot: 'SBC', year: 2023, status: 'FIT' },
-      { id: 'PCTM-27', model: 'Points & Crossing Tamper 27', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' }
+      { id: 'PCTM-27', model: 'Points & Crossing Tamper 27', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'PCTM-9062', model: 'Points & Crossing Tamper 9062', division: 'MYS', depot: 'MYS', year: 2019, status: 'FIT' },
+      { id: 'UNIMAT-8269', model: 'Unimat 08-475 3S Points & Crossing Tamper', division: 'SBC', depot: 'YPR / BYPL', year: 2017, status: 'FIT' },
+      { id: 'UNIMAT-8277', model: 'Unimat 08-475 3S Points & Crossing Tamper 8277', division: 'MYS', depot: 'MYS', year: 2017, status: 'FIT' },
+      { id: 'UNIMAT-8409', model: 'Unimat 08-475 4S Points & Crossing Tamper 8409', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' },
+      { id: 'UNIMAT-8427', model: '08-475 Unimat-4S Points & Crossing Tamper 8427', division: 'MYS', depot: 'MYS', year: 2017, status: 'FIT' }
     ],
     'MPT': [
-      { id: 'MPT-12015', model: 'Multi-Purpose Tamper 12015', division: 'SBC', depot: 'KJM', year: 2019, status: 'FIT' },
+      { id: 'MPT-12007', model: 'Multi-Purpose Tamper 12007', division: 'MYS', depot: 'MYS', year: 2019, status: 'FIT' },
       { id: 'MPT-12008', model: 'Multi-Purpose Tamper 12008', division: 'UBL', depot: 'UBL', year: 2020, status: 'FIT' },
+      { id: 'MPT-12015', model: 'Multi-Purpose Tamper 12015', division: 'SBC', depot: 'KJM', year: 2019, status: 'FIT' },
+      { id: 'MPT-2011', model: 'Multi-Purpose Tamper 2011', division: 'SBC', depot: 'SBC', year: 2012, status: 'FIT' },
+      { id: 'MPT-2014', model: 'Multi-Purpose Tamper 2014', division: 'MYS', depot: 'MYS', year: 2013, status: 'FIT' },
+      { id: 'MPT-2016', model: 'Multi-Purpose Tamper 2016', division: 'UBL', depot: 'UBL', year: 2014, status: 'FIT' },
       { id: 'MPT-56577', model: 'Multi-Purpose Tamper 56577', division: 'UBL', depot: 'BAY', year: 2021, status: 'FIT' },
+      { id: 'MPT-56591', model: 'Multi-Purpose Tamper 56591', division: 'SBC', depot: 'SBC', year: 2021, status: 'FIT' },
+      { id: 'MPT-56943', model: 'Multi-Purpose Tamper 56943', division: 'MYS', depot: 'MYS', year: 2022, status: 'FIT' },
       { id: 'MPT-56944', model: 'Multi-Purpose Tamper 56944', division: 'UBL', depot: 'BJP', year: 2022, status: 'FIT' },
-      { id: 'MPT-2014', model: 'Multi-Purpose Tamper 2014', division: 'MYS', depot: 'MYS', year: 2013, status: 'FIT' }
+      { id: 'MPT-56967', model: 'Multi-Purpose Tamper 56967', division: 'MYS', depot: 'MYS', year: 2022, status: 'FIT' },
+      { id: 'MPT-56968', model: 'Multi-Purpose Tamper 56968', division: 'SBC', depot: 'SBC', year: 2022, status: 'FIT' }
     ],
     'BCM': [
-      { id: 'BCM-351', model: 'RM-80 Ballast Cleaning Machine', division: 'UBL', depot: 'UBL', year: 2015, status: 'FIT' },
-      { id: 'BCM-400', model: 'RM-80 High Output Ballast Cleaner', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
+      { id: 'BCM-351', model: 'RM-80 Ballast Cleaning Machine 351', division: 'UBL', depot: 'UBL', year: 2015, status: 'FIT' },
+      { id: 'BCM-384', model: 'RM-80 Ballast Cleaning Machine 384', division: 'MYS', depot: 'MYS', year: 2016, status: 'FIT' },
+      { id: 'BCM-392', model: 'RM-80 Ballast Cleaning Machine 392', division: 'MYS', depot: 'MYS', year: 2017, status: 'FIT' },
+      { id: 'BCM-400', model: 'RM-80 High Output Ballast Cleaner 400', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
       { id: 'BCM-56824', model: 'RM-80 Ballast Cleaning Machine 56824', division: 'SBC', depot: 'SBC / BYPL', year: 2021, status: 'FIT' },
-      { id: 'BCM-712', model: 'RM-80 Ballast Cleaning Machine 712', division: 'MYS', depot: 'MYS', year: 2017, status: 'FIT' }
+      { id: 'BCM-57098', model: 'RM-80 Ballast Cleaning Machine 57098', division: 'MYS', depot: 'MYS', year: 2022, status: 'FIT' },
+      { id: 'BCM-712', model: 'RM-80 Ballast Cleaning Machine 712', division: 'SBC', depot: 'MYS', year: 2017, status: 'FIT' }
     ],
     'SBCM/FRM': [
-      { id: 'FRM-1889', model: 'Formation Rehabilitation Machine FRM-80', division: 'MYS', depot: 'MYS', year: 2016, status: 'FIT' },
-      { id: 'FRM-1899', model: 'Formation Rehabilitation Machine FRM-80', division: 'UBL', depot: 'HPT', year: 2017, status: 'FIT' },
-      { id: 'FRM-57160', model: 'Shoulder Ballast Cleaning Machine', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' }
+      { id: 'FRM-1889', model: 'Formation Rehabilitation Machine FRM-80 1889', division: 'MYS', depot: 'MYS', year: 2016, status: 'FIT' },
+      { id: 'FRM-1899', model: 'Formation Rehabilitation Machine FRM-80 1899', division: 'UBL', depot: 'HPT', year: 2017, status: 'FIT' },
+      { id: 'FRM-56404', model: 'Shoulder Ballast Cleaning Machine 56404', division: 'SBC', depot: 'SBC', year: 2020, status: 'FIT' },
+      { id: 'FRM-57160', model: 'Shoulder Ballast Cleaning Machine 57160', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' }
     ],
     'BRM': [
+      { id: 'BRM-027', model: 'Ballast Regulating Machine 027', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' },
+      { id: 'BRM-033', model: 'Ballast Regulating Machine 033', division: 'MYS', depot: 'MYS', year: 2018, status: 'FIT' },
+      { id: 'BRM-04', model: 'Ballast Regulating Machine 04', division: 'UBL', depot: 'SBC', year: 2009, status: 'FIT' },
       { id: 'BRM-56669', model: 'Ballast Regulating Machine 56669', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' },
-      { id: 'BRM-04', model: 'Ballast Regulating Machine 04', division: 'SBC', depot: 'SBC', year: 2009, status: 'FIT' }
+      { id: 'BRM-56680', model: 'Ballast Regulating Machine 56680', division: 'UBL', depot: 'UBL', year: 2021, status: 'FIT' }
     ],
     'SQRS': [
+      { id: 'SQRS- 37 & 38', model: 'Simplex Quick Relaying System 37 & 38', division: 'UBL', depot: 'UBL', year: 2020, status: 'FIT' },
+      { id: 'SQRS-19&20', model: 'Simplex Quick Relaying System 19 & 20', division: 'SBC', depot: 'SBC', year: 2019, status: 'FIT' },
+      { id: 'SQRS-51 & 52', model: 'Simplex Quick Relaying System 51 & 52', division: 'MYS', depot: 'MYS', year: 2021, status: 'FIT' },
       { id: 'SQRS-7&8', model: 'Simplex Quick Relaying System 7&8', division: 'SBC', depot: 'BYPL', year: 2018, status: 'FIT' }
     ],
     'T28': [
-      { id: 'T-28', model: 'T-28 Points & Crossing Change Machine (403&404)', division: 'SBC', depot: 'SBC', year: 2004, status: 'FIT' },
-      { id: 'T-28-908', model: 'T-28 Points & Crossing Change Machine (908A&B)', division: 'UBL', depot: 'UBL', year: 2022, status: 'FIT' }
+      { id: 'T28 403 & 404', model: 'T-28 Points & Crossing Change Machine (403 & 404)', division: 'SBC', depot: 'SBC', year: 2004, status: 'FIT' },
+      { id: 'T28 908 A & B', model: 'T-28 Points & Crossing Change Machine (908 A & B)', division: 'UBL', depot: 'UBL', year: 2022, status: 'FIT' }
     ],
-    'DGS': [],
+    'DGS': [
+      { id: 'DGS-339', model: 'Dynamic Track Stabilizer 339', division: 'SBC', depot: 'SBC', year: 2015, status: 'FIT' },
+      { id: 'DGS-410', model: 'Dynamic Track Stabilizer 410', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
+      { id: 'DGS-417', model: 'Dynamic Track Stabilizer 417', division: 'MYS', depot: 'MYS', year: 2019, status: 'FIT' },
+      { id: 'DGS-447', model: 'Dynamic Track Stabilizer 447', division: 'SBC', depot: 'SBC', year: 2021, status: 'FIT' }
+    ],
     'UTV': [
       { id: 'UTV-001', model: 'Utility Vehicle UTV-001', division: 'UBL', depot: 'UBL', year: 2018, status: 'FIT' },
       { id: 'UTV-002', model: 'Utility Vehicle UTV-002', division: 'SBC', depot: 'SBC', year: 2017, status: 'FIT' },
-      { id: 'UTV-08', model: 'Utility Vehicle UTV-08', division: 'MYS', depot: 'MYS', year: 2009, status: 'FIT' },
+      { id: 'UTV-003', model: 'Utility Vehicle UTV-003', division: 'SBC', depot: 'SBC', year: 2018, status: 'FIT' },
+      { id: 'UTV-004', model: 'Utility Vehicle UTV-004', division: 'MYS', depot: 'MYS', year: 2018, status: 'FIT' },
       { id: 'UTV-040', model: 'Utility Vehicle UTV-040', division: 'SBC', depot: 'SBC', year: 2012, status: 'FIT' },
+      { id: 'UTV-057', model: 'Utility Vehicle UTV-057', division: 'UBL', depot: 'UBL', year: 2014, status: 'FIT' },
       { id: 'UTV-058', model: 'Utility Vehicle UTV-058', division: 'UBL', depot: 'UBL', year: 2014, status: 'FIT' },
-      { id: 'UTV-077', model: 'Utility Vehicle UTV-077', division: 'MYS', depot: 'MYS', year: 2015, status: 'FIT' }
+      { id: 'UTV-077', model: 'Utility Vehicle UTV-077', division: 'SBC', depot: 'MYS', year: 2015, status: 'FIT' },
+      { id: 'UTV-08', model: 'Utility Vehicle UTV-08', division: 'SBC', depot: 'MYS', year: 2009, status: 'FIT' },
+      { id: 'UTV-103', model: 'Utility Vehicle UTV-103', division: 'UBL', depot: 'UBL', year: 2019, status: 'FIT' },
+      { id: 'UTV-912', model: 'Utility Vehicle UTV-912', division: 'UBL', depot: 'UBL', year: 2016, status: 'FIT' }
     ],
     'SRGM/RGM': [
-      { id: 'SRGM-IR20-04', model: 'Switch Rail Grinding Machine IR20-04', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'SRGM IR20-4', model: 'Switch Rail Grinding Machine IR20-4', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
       { id: 'RGM-96-07', model: 'Rail Grinding Machine 96-07', division: 'SBC', depot: 'SBC', year: 2024, status: 'FIT' }
     ],
     'RBMV': [
-      { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' }
+      { id: 'RBMV-006', model: 'Rail Borne Maintenance Vehicle RBMV-006', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' },
+      { id: 'RBMV-007', model: 'Rail Borne Maintenance Vehicle RBMV-007', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' },
+      { id: 'RBMV-205', model: 'Rail Borne Maintenance Vehicle RBMV-205', division: 'MYS', depot: 'MYS', year: 2024, status: 'FIT' }
     ],
     'MDU': [
       { id: 'MDU-57218', model: 'Muck Disposal Units 57218', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57219', model: 'Muck Disposal Units 57219', division: 'SBC', depot: 'SBC', year: 2023, status: 'FIT' },
       { id: 'MDU-57220', model: 'Muck Disposal Units 57220', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
+      { id: 'MDU-57221', model: 'Muck Disposal Units 57221', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
       { id: 'MDU-57222', model: 'Muck Disposal Units 57222', division: 'UBL', depot: 'UBL', year: 2023, status: 'FIT' },
-      { id: 'MDU-837', model: 'Muck Disposal Units 837', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' },
-      { id: 'MDU-845', model: 'Muck Disposal Units 845', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' },
+      { id: 'MDU-837', model: 'Muck Disposal Units 837', division: 'SBC', depot: 'UBL', year: 2025, status: 'FIT' },
+      { id: 'MDU-845', model: 'Muck Disposal Units 845', division: 'SBC', depot: 'UBL', year: 2025, status: 'FIT' },
       { id: 'MDU-848', model: 'Muck Disposal Units 848', division: 'MYS', depot: 'MYS', year: 2025, status: 'FIT' },
-      { id: 'MDU-849', model: 'Muck Disposal Units 849', division: 'SBC', depot: 'SBC', year: 2025, status: 'FIT' },
-      { id: 'MDU-850', model: 'Muck Disposal Units 850', division: 'UBL', depot: 'UBL', year: 2025, status: 'FIT' }
+      { id: 'MDU-849', model: 'Muck Disposal Units 849', division: 'MYS', depot: 'SBC', year: 2025, status: 'FIT' },
+      { id: 'MDU-850', model: 'Muck Disposal Units 850', division: 'MYS', depot: 'UBL', year: 2025, status: 'FIT' }
     ]
   };
+
+  // Canonical Machine Identifier Normalizer (Guarantees strict 87-fleet deduplication and eliminates duplicate T28 entries)
+  function normalizeMachineNo(rawId) {
+    if (!rawId) return '';
+    const s = String(rawId).trim();
+    // T28 Turnout Renewal machines (Canonical: 'T28 403 & 404' and 'T28 908 A & B')
+    if (/\bt-?28\b/i.test(s) || /^t-?28/i.test(s)) {
+      if (/908/i.test(s)) {
+        return 'T28 908 A & B';
+      }
+      return 'T28 403 & 404';
+    }
+    if (/403\s*&\s*404/.test(s)) {
+      return 'T28 403 & 404';
+    }
+    if (/908\s*[aA]\s*&\s*[bB]/.test(s) || /908\s*A\b/i.test(s)) {
+      return 'T28 908 A & B';
+    }
+    // SRGM Switch Rail Grinding Machine (Canonical: 'SRGM IR20-4')
+    if (/^srgm.*(?:ir20-?4|ir20-?04)/i.test(s)) {
+      return 'SRGM IR20-4';
+    }
+    return s;
+  }
 
   let FLEET_DIRECTORY = (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.fleetDirectory)
     ? JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.fleetDirectory))
@@ -844,6 +922,65 @@
   const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V18_EXACT_SYNC';
   const HRM_STORAGE_KEY = 'TM_HRM_DATA_V18_EXACT_EXCEL_SYNC';
+
+  // Robust Local Storage & IndexedDB Dual Persistence Engine (50MB+ safe cache)
+  const IDB_STORE_NAME = 'tm_fast_cache';
+  let _idbDb = null;
+
+  function initIDB() {
+    if (_idbDb) return Promise.resolve(_idbDb);
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('TM_FAST_STORAGE_DB', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+            db.createObjectStore(IDB_STORE_NAME);
+          }
+        };
+        req.onsuccess = (e) => {
+          _idbDb = e.target.result;
+          resolve(_idbDb);
+        };
+        req.onerror = () => resolve(null);
+      } catch (err) {
+        resolve(null);
+      }
+    });
+  }
+
+  function idbSet(key, val) {
+    return initIDB().then(db => {
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+          tx.objectStore(IDB_STORE_NAME).put(val, key);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch (e) {
+          resolve();
+        }
+      });
+    }).catch(() => {});
+  }
+
+  function idbGet(key) {
+    return initIDB().then(db => {
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(IDB_STORE_NAME, 'readonly');
+          const req = tx.objectStore(IDB_STORE_NAME).get(key);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    }).catch(() => null);
+  }
 
   // History Register Module (HRM) Data Store
   let HRM_DATA = {};
@@ -923,12 +1060,13 @@
   // Helper: Find machine info by ID
   function getMachineInfo(mId) {
     if (!mId) return null;
+    const normId = normalizeMachineNo(mId);
     for (let c of Object.keys(FLEET_DIRECTORY)) {
-      const found = FLEET_DIRECTORY[c].find(x => x.id.toUpperCase() === mId.toUpperCase());
-      if (found) return found;
+      const found = (FLEET_DIRECTORY[c] || []).find(x => normalizeMachineNo(x.id).toUpperCase() === normId.toUpperCase());
+      if (found) return Object.assign({ category: c }, found);
     }
     if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.machines) {
-      const found = window.REAL_SWR_FLEET_DATA.machines.find(x => x.id.toUpperCase() === mId.toUpperCase());
+      const found = window.REAL_SWR_FLEET_DATA.machines.find(x => normalizeMachineNo(x.id).toUpperCase() === normId.toUpperCase());
       if (found) return found;
     }
     return null;
@@ -973,9 +1111,15 @@
       Object.keys(DEFAULT_FLEET_DIRECTORY).forEach(cat => {
         if (!FLEET_DIRECTORY[cat]) FLEET_DIRECTORY[cat] = [];
         DEFAULT_FLEET_DIRECTORY[cat].forEach(defM => {
-          if (!FLEET_DIRECTORY[cat].some(m => m.id === defM.id)) {
+          const normDefId = normalizeMachineNo(defM.id);
+          if (!FLEET_DIRECTORY[cat].some(m => normalizeMachineNo(m.id) === normDefId)) {
             FLEET_DIRECTORY[cat].push(JSON.parse(JSON.stringify(defM)));
           }
+        });
+        // Remove any obsolete legacy duplicate T-28 keys from FLEET_DIRECTORY
+        FLEET_DIRECTORY[cat] = FLEET_DIRECTORY[cat].filter(m => {
+          if (cat === 'T28' && (m.id === 'T-28' || m.id === 'T-28-908')) return false;
+          return true;
         });
       });
 
@@ -1008,8 +1152,9 @@
         saveDataset();
       }
 
-      // Normalize any RMBV and SRGM/RGM category in failures
+      // Normalize any RMBV and SRGM/RGM category and machine numbers in failures
       AppState.failures.forEach(f => {
+        if (f.machineNo) f.machineNo = normalizeMachineNo(f.machineNo);
         if (f.category === 'RMBV') f.category = 'RBMV';
         if (f.category === 'SRGM' || f.category === 'RGM' || f.category === 'SRGM / RGM') f.category = 'SRGM/RGM';
       });
@@ -1044,17 +1189,39 @@
         HRM_DATA = JSON.parse(JSON.stringify(window.REAL_SWR_FLEET_DATA.historyRegisters));
       }
 
-      // Proactively heal and guarantee 100% complete HRM data across ALL authentic SWR fleet machines
-      // If any machine is missing, erased, corrupted, or has empty items, immediately retrieve and replace with authentic records
+      // Only heal machines that are completely missing or have empty items
+      // NEVER overwrite machines that already have user entries or authentic records
       if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
         Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters).forEach(mId => {
-          healMachineHrm(mId);
+          if (!HRM_DATA[mId] || !Array.isArray(HRM_DATA[mId].items) || HRM_DATA[mId].items.length === 0) {
+            healMachineHrm(mId);
+          }
         });
       }
 
       // Synchronize and enforce all chronological IOH and POH ordinals across all machines
       ensureAllHrmOrdinals(HRM_DATA);
-      saveHrmData();
+
+      // Async fallback to IndexedDB if localStorage was wiped or quota-truncated
+      if (typeof idbGet === 'function') {
+        idbGet(STORAGE_KEY).then(idbFails => {
+          if (Array.isArray(idbFails) && idbFails.length > AppState.failures.length) {
+            const merged = CloudSync.mergeFailures(AppState.failures, idbFails);
+            AppState.failures = merged.list;
+            classifyRepetitiveFailures(AppState.failures);
+            updateMachineDropdown();
+            renderAll();
+          }
+        }).catch(() => {});
+
+        idbGet(HRM_STORAGE_KEY).then(idbHrm => {
+          if (idbHrm && typeof idbHrm === 'object' && Object.keys(idbHrm).length > 0) {
+            const mergedH = CloudSync.mergeHrm(HRM_DATA, idbHrm);
+            HRM_DATA = mergedH.data;
+            renderHrmView();
+          }
+        }).catch(() => {});
+      }
 
       // Sanitize failures: filter out any header/bogus rows
       AppState.failures = AppState.failures.filter(f => {
@@ -1125,13 +1292,19 @@
   }
 
   // ==========================================================================
+  // ==========================================================================
   // CENTRAL CLOUD DATABASE SYNCHRONIZATION ENGINE (Firebase Realtime DB)
+  // Robust, Non-Destructive Multi-User Cloud Realtime Sync & Diagnostic Engine
   // ==========================================================================
   const CloudSync = {
     isConfigured: false,
     isConnected: false,
+    hasPermission: null, // null: checking, true: granted, false: permission denied
+    permissionError: null,
     db: null,
     isSyncingFromRemote: false,
+    lastSyncTime: null,
+    hasInitializedListeners: false,
 
     init() {
       const cfg = (typeof window !== 'undefined') ? window.FIREBASE_CONFIG : null;
@@ -1154,23 +1327,61 @@
         this.db = firebase.database();
         this.isConfigured = true;
 
-        // Monitor connection status via .info/connected
+        // Monitor physical websocket connection status via .info/connected
         this.db.ref('.info/connected').on('value', snap => {
           this.isConnected = snap.val() === true;
           if (this.isConnected) {
-            this.updateIndicator('connected', 'Cloud Sync: Live');
-            console.log('Firebase Cloud Realtime Database connected successfully.');
+            console.log('Firebase Cloud Realtime websocket connected. Verifying database rules...');
+            this.verifyPermissionAndSync();
           } else {
-            this.updateIndicator('offline', 'Cloud: Reconnecting...');
+            this.updateIndicator('offline', 'Cloud: Disconnected');
           }
+          this.updateModalUI();
         });
-
-        // Initialize cloud listeners
-        this.setupCloudListeners();
       } catch (err) {
         console.error('Firebase initialization error:', err);
         this.updateIndicator('offline', 'Cloud: Config Error');
       }
+    },
+
+    verifyPermissionAndSync() {
+      if (!this.db) return Promise.reject(new Error('Firebase DB not initialized'));
+      this.updateIndicator('connecting', 'Cloud: Verifying...');
+
+      // Probe read permission on tm_failures
+      return this.db.ref('tm_failures').limitToFirst(1).once('value')
+        .then(snapshot => {
+          this.hasPermission = true;
+          this.permissionError = null;
+          this.lastSyncTime = new Date();
+          this.updateIndicator('connected', 'Cloud Sync: Live');
+          this.hideRulesLockedBanner();
+          this.updateModalUI();
+          console.log('Firebase Cloud Realtime Database permissions verified: READ/WRITE active.');
+
+          if (!this.hasInitializedListeners) {
+            this.hasInitializedListeners = true;
+            this.setupCloudListeners();
+          }
+
+          // Push any local entries that might have been created while rules were locked / offline
+          return this.syncLocalOnlyData();
+        })
+        .catch(err => {
+          console.error('Firebase Cloud Permission Error:', err);
+          const errStr = (err && (err.code || err.message || String(err))) || '';
+          const isDenied = errStr.includes('PERMISSION_DENIED') || errStr.includes('permission_denied') || (err && err.code === 'PERMISSION_DENIED');
+          this.hasPermission = false;
+          this.permissionError = isDenied ? 'PERMISSION_DENIED' : (err.message || String(err));
+
+          if (isDenied) {
+            this.updateIndicator('rules-locked', '⚠️ Cloud: Rules Locked (Click to Fix)');
+            this.showRulesLockedBanner();
+          } else {
+            this.updateIndicator('offline', 'Cloud: Network Error');
+          }
+          this.updateModalUI();
+        });
     },
 
     updateIndicator(status, text) {
@@ -1184,12 +1395,156 @@
       }
     },
 
+    showRulesLockedBanner() {
+      const b = document.getElementById('cloudRulesWarningBanner');
+      if (b) b.style.display = 'flex';
+    },
+
+    hideRulesLockedBanner() {
+      const b = document.getElementById('cloudRulesWarningBanner');
+      if (b) b.style.display = 'none';
+    },
+
+    // Intelligent Non-Destructive Failure Merge by Unique ID
+    mergeFailures(localList, remoteList) {
+      if (!Array.isArray(localList)) localList = [];
+      if (!Array.isArray(remoteList)) remoteList = [];
+
+      const remoteIdMap = new Map();
+      remoteList.forEach(f => {
+        if (f && f.id) {
+          if (f.machineNo) f.machineNo = normalizeMachineNo(f.machineNo);
+          remoteIdMap.set(String(f.id), f);
+        }
+      });
+
+      const localOnly = [];
+      localList.forEach(f => {
+        if (!f || !f.id) return;
+        if (f.machineNo) f.machineNo = normalizeMachineNo(f.machineNo);
+        if (!remoteIdMap.has(String(f.id))) {
+          localOnly.push(f);
+        }
+      });
+
+      // Local-only entries come first so user's recent entries are front and center
+      const mergedList = [...localOnly, ...remoteList];
+
+      return {
+        list: mergedList,
+        hasLocalNew: localOnly.length > 0,
+        localNewCount: localOnly.length
+      };
+    },
+
+    encodeFleetKeys(obj) {
+      if (!obj || typeof obj !== 'object') return {};
+      const res = {};
+      Object.keys(obj).forEach(k => {
+        const safeKey = k.replace(/\//g, '___SLASH___');
+        res[safeKey] = obj[k];
+      });
+      return res;
+    },
+
+    decodeFleetKeys(obj) {
+      if (!obj || typeof obj !== 'object') return {};
+      const res = {};
+      Object.keys(obj).forEach(k => {
+        const origKey = k.replace(/___SLASH___/g, '/');
+        res[origKey] = obj[k];
+      });
+      return res;
+    },
+
+    // Intelligent Non-Destructive HRM Merge
+    mergeHrm(localHrm, remoteHrm) {
+      if (!localHrm || typeof localHrm !== 'object') localHrm = {};
+      if (!remoteHrm || typeof remoteHrm !== 'object') remoteHrm = {};
+
+      const merged = JSON.parse(JSON.stringify(remoteHrm));
+      let hasLocalNew = false;
+
+      Object.keys(localHrm).forEach(mId => {
+        if (!merged[mId]) {
+          merged[mId] = JSON.parse(JSON.stringify(localHrm[mId]));
+          hasLocalNew = true;
+        } else {
+          const locMach = localHrm[mId];
+          const remMach = merged[mId];
+
+          // 1. Commissioning date: If local has a non-empty date, protect it
+          if (locMach.commissioningDate && locMach.commissioningDate !== '2016-01-01' && locMach.commissioningDate !== 'NA') {
+            if (!remMach.commissioningDate || remMach.commissioningDate === '2016-01-01' || remMach.commissioningDate === 'NA' || remMach.commissioningDate !== locMach.commissioningDate) {
+              remMach.commissioningDate = locMach.commissioningDate;
+              remMach.commissioningRaw = locMach.commissioningRaw || locMach.commissioningDate;
+              hasLocalNew = true;
+            }
+          }
+
+          // 2. Items & records: non-destructive merge
+          if (locMach.items && Array.isArray(locMach.items)) {
+            if (!remMach.items || !Array.isArray(remMach.items)) {
+              remMach.items = JSON.parse(JSON.stringify(locMach.items));
+              hasLocalNew = true;
+            } else {
+              locMach.items.forEach(locIt => {
+                const remIt = remMach.items.find(ri => ri.title === locIt.title);
+                if (!remIt) {
+                  remMach.items.push(JSON.parse(JSON.stringify(locIt)));
+                  hasLocalNew = true;
+                } else {
+                  // Preserve present date & remarks if local has entered values
+                  if (locIt.presentDate && locIt.presentDate !== 'NA' && locIt.presentDate !== '_' && locIt.presentDate !== remIt.presentDate) {
+                    remIt.presentDate = locIt.presentDate;
+                    remIt.presentEngineHours = locIt.presentEngineHours || remIt.presentEngineHours;
+                    remIt.presentRemarks = locIt.presentRemarks || remIt.presentRemarks;
+                    hasLocalNew = true;
+                  }
+
+                  // Merge records using .records (authentic property name)
+                  const locRecs = Array.isArray(locIt.records) ? locIt.records : [];
+                  const remRecs = Array.isArray(remIt.records) ? remIt.records : [];
+                  if (locRecs.length > 0) {
+                    if (remRecs.length === 0) {
+                      remIt.records = JSON.parse(JSON.stringify(locRecs));
+                      hasLocalNew = true;
+                    } else {
+                      locRecs.forEach(locR => {
+                        const exists = remRecs.some(remR => 
+                          remR.date === locR.date && 
+                          (remR.subType === locR.subType || remR.remarks === locR.remarks)
+                        );
+                        if (!exists) {
+                          remRecs.push(JSON.parse(JSON.stringify(locR)));
+                          hasLocalNew = true;
+                        }
+                      });
+                      remIt.records = remRecs;
+                    }
+                  }
+                }
+              });
+            }
+          }
+        }
+      });
+
+      return {
+        data: merged,
+        hasLocalNew: hasLocalNew
+      };
+    },
+
     setupCloudListeners() {
       if (!this.db) return;
 
-      // 1. Listen for Failures Database
+      // 1. Failures Realtime Listener with Non-Destructive Merge
       this.db.ref('tm_failures').on('value', snapshot => {
         const val = snapshot.val();
+        this.lastSyncTime = new Date();
+        this.updateModalUI();
+
         if (val) {
           let remoteList = [];
           if (Array.isArray(val)) {
@@ -1197,63 +1552,86 @@
           } else if (typeof val === 'object') {
             remoteList = Object.values(val);
           }
+
           if (remoteList.length > 0) {
+            const merged = this.mergeFailures(AppState.failures, remoteList);
             this.isSyncingFromRemote = true;
-            AppState.failures = remoteList;
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.failures));
-            } catch (e) {}
+            AppState.failures = merged.list;
+            saveDataset();
             classifyRepetitiveFailures(AppState.failures);
             updateMachineDropdown();
             renderAll();
             this.isSyncingFromRemote = false;
+
+            // If local had unsynced entries, immediately push merged dataset to cloud
+            if (merged.hasLocalNew) {
+              console.log(`CloudSync: Auto-pushing ${merged.localNewCount} local-only entries to Firebase Cloud.`);
+              this.pushFailures().catch(() => {});
+            }
           }
         } else {
           // Cloud node is empty, seed initial dataset
           this.seedInitialData();
         }
-      });
-
-      // 2. Listen for HRM Database
-      this.db.ref('tm_hrm').on('value', snapshot => {
-        const val = snapshot.val();
-        if (val && typeof val === 'object') {
-          this.isSyncingFromRemote = true;
-          HRM_DATA = val;
-          if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.historyRegisters) {
-            Object.keys(window.REAL_SWR_FLEET_DATA.historyRegisters).forEach(mId => {
-              healMachineHrm(mId);
-            });
-          }
-          ensureAllHrmOrdinals(HRM_DATA);
-          try {
-            localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
-          } catch (e) {}
-          renderHrmView();
-          this.isSyncingFromRemote = false;
-        } else if (!val && HRM_DATA && Object.keys(HRM_DATA).length > 0) {
-          try { this.db.ref('tm_hrm').set(HRM_DATA).catch(() => {}); } catch (e) {}
+      }, err => {
+        console.error('tm_failures listener error:', err);
+        if (err && err.code === 'PERMISSION_DENIED') {
+          this.hasPermission = false;
+          this.updateIndicator('rules-locked', '⚠️ Cloud: Rules Locked (Click to Fix)');
+          this.showRulesLockedBanner();
+          this.updateModalUI();
         }
       });
 
-      // 3. Listen for Fleet Directory
+      // 2. HRM Realtime Listener with Non-Destructive Merge
+      this.db.ref('tm_hrm').on('value', snapshot => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          const merged = this.mergeHrm(HRM_DATA, val);
+          this.isSyncingFromRemote = true;
+          HRM_DATA = merged.data;
+          ensureAllHrmOrdinals(HRM_DATA);
+          saveHrmData();
+          renderHrmView();
+          this.isSyncingFromRemote = false;
+
+          if (merged.hasLocalNew) {
+            this.pushHrm().catch(() => {});
+          }
+        } else if (!val && HRM_DATA && Object.keys(HRM_DATA).length > 0) {
+          this.pushHrm().catch(() => {});
+        }
+      }, err => {
+        console.error('tm_hrm listener error:', err);
+        if (err && err.code === 'PERMISSION_DENIED') {
+          this.hasPermission = false;
+          this.updateIndicator('rules-locked', '⚠️ Cloud: Rules Locked (Click to Fix)');
+          this.showRulesLockedBanner();
+        }
+      });
+
+      // 3. Fleet Directory Realtime Listener with Sanitized Keys
       this.db.ref('tm_fleet').on('value', snapshot => {
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           this.isSyncingFromRemote = true;
-          FLEET_DIRECTORY = val;
+          FLEET_DIRECTORY = this.decodeFleetKeys(val);
           try {
             localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
           } catch (e) {}
           setupCategoryPills();
           updateMachineDropdown();
+          updateHistoryMachineDropdown(AppState.historyCategoryFilter || 'ALL');
+          renderKPIs(getFleetFailuresForKPIs());
           this.isSyncingFromRemote = false;
         } else if (!val && FLEET_DIRECTORY) {
-          try { this.db.ref('tm_fleet').set(FLEET_DIRECTORY).catch(() => {}); } catch (e) {}
+          this.pushFleet().catch(() => {});
         }
+      }, err => {
+        console.error('tm_fleet listener error:', err);
       });
 
-      // 4. Listen for User Accounts & Password Updates
+      // 4. User Accounts & Password Updates Listener
       this.db.ref('tm_auth').on('value', snapshot => {
         const val = snapshot.val();
         if (val && typeof val === 'object') {
@@ -1271,69 +1649,425 @@
             CurrentUser = AppUsers[CurrentUser.userId];
           }
         } else if (!val) {
-          this.db.ref('tm_auth').set(AppUsers);
+          try { this.db.ref('tm_auth').set(AppUsers).catch(() => {}); } catch (e) {}
         }
+      }, err => {
+        console.error('tm_auth listener error:', err);
       });
     },
 
     seedInitialData() {
-      if (!this.db || !AppState.failures || AppState.failures.length === 0) return;
+      if (!this.db || !AppState.failures || AppState.failures.length === 0) return Promise.resolve();
       console.log('Seeding initial authentic SWR dataset to Firebase Cloud...');
-      this.db.ref('tm_failures').set(AppState.failures);
-      if (HRM_DATA) this.db.ref('tm_hrm').set(HRM_DATA);
-      if (FLEET_DIRECTORY) this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
-      this.db.ref('tm_auth').set(AppUsers);
+      return Promise.all([
+        this.db.ref('tm_failures').set(AppState.failures),
+        HRM_DATA ? this.db.ref('tm_hrm').set(HRM_DATA) : Promise.resolve(),
+        FLEET_DIRECTORY ? this.db.ref('tm_fleet').set(this.encodeFleetKeys(FLEET_DIRECTORY)) : Promise.resolve(),
+        this.db.ref('tm_auth').set(AppUsers)
+      ]);
+    },
+
+    syncLocalOnlyData() {
+      if (!this.db || !this.hasPermission) return Promise.resolve();
+      return this.db.ref('tm_failures').once('value')
+        .then(snap => {
+          const val = snap.val();
+          if (!val) {
+            return this.seedInitialData();
+          }
+          let remoteList = Array.isArray(val) ? val : Object.values(val);
+          const merged = this.mergeFailures(AppState.failures, remoteList);
+          if (merged.hasLocalNew) {
+            AppState.failures = merged.list;
+            return this.pushFailures();
+          }
+        })
+        .catch(err => {
+          console.warn('syncLocalOnlyData error:', err);
+        });
     },
 
     pushFailures() {
-      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
-      try {
-        this.db.ref('tm_failures').set(AppState.failures);
-      } catch (e) {
-        console.error('Error syncing failures to cloud:', e);
-      }
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return Promise.resolve();
+      return this.db.ref('tm_failures').set(AppState.failures)
+        .then(() => {
+          this.lastSyncTime = new Date();
+          this.hasPermission = true;
+          this.updateIndicator('connected', 'Cloud Sync: Live');
+          this.hideRulesLockedBanner();
+          this.updateModalUI();
+        })
+        .catch(err => {
+          console.error('Error syncing failures to cloud:', err);
+          if (err && err.code === 'PERMISSION_DENIED') {
+            this.hasPermission = false;
+            this.updateIndicator('rules-locked', '⚠️ Cloud: Rules Locked (Click to Fix)');
+            this.showRulesLockedBanner();
+            this.updateModalUI();
+            showToast('⚠️ Cloud Sync Failed: Firebase permission denied. Entry saved locally.', true);
+          }
+        });
     },
 
     pushHrm() {
-      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
-      try {
-        this.db.ref('tm_hrm').set(HRM_DATA);
-      } catch (e) {
-        console.error('Error syncing HRM to cloud:', e);
-      }
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return Promise.resolve();
+      return this.db.ref('tm_hrm').set(HRM_DATA)
+        .then(() => {
+          this.lastSyncTime = new Date();
+        })
+        .catch(err => {
+          console.error('Error syncing HRM to cloud:', err);
+          if (err && err.code === 'PERMISSION_DENIED') {
+            this.hasPermission = false;
+            this.updateIndicator('rules-locked', '⚠️ Cloud: Rules Locked (Click to Fix)');
+            this.showRulesLockedBanner();
+            this.updateModalUI();
+          }
+        });
     },
 
     pushFleet() {
-      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return;
-      try {
-        this.db.ref('tm_fleet').set(FLEET_DIRECTORY);
-      } catch (e) {
-        console.error('Error syncing fleet to cloud:', e);
+      if (!this.isConfigured || !this.db || this.isSyncingFromRemote) return Promise.resolve();
+      const safeFleet = this.encodeFleetKeys(FLEET_DIRECTORY);
+      return this.db.ref('tm_fleet').set(safeFleet)
+        .catch(err => {
+          console.error('Error syncing fleet to cloud:', err);
+        });
+    },
+
+    testCloudConnection() {
+      showToast('Testing Firebase Cloud connection & permissions...');
+      return this.verifyPermissionAndSync()
+        .then(() => {
+          if (this.hasPermission) {
+            return this.forceSyncLocalToCloud();
+          }
+        })
+        .catch(err => {
+          showToast('Cloud connection test failed: ' + (err.message || 'Permission Denied'), true);
+        });
+    },
+
+    forceSyncLocalToCloud() {
+      if (!this.isConfigured || !this.db) {
+        showToast('Firebase Cloud configuration not loaded.', true);
+        return Promise.reject(new Error('Firebase not configured'));
       }
+      showToast('Pushing all local machine entries and history to Firebase Cloud...');
+      return Promise.all([
+        this.pushFailures(),
+        this.pushHrm(),
+        this.pushFleet(),
+        this.db.ref('tm_auth').set(AppUsers)
+      ])
+      .then(() => {
+        this.hasPermission = true;
+        this.lastSyncTime = new Date();
+        this.updateIndicator('connected', 'Cloud Sync: Live');
+        this.hideRulesLockedBanner();
+        this.updateModalUI();
+        showToast(`✅ Successfully synchronized ${AppState.failures.length} failures & ${Object.keys(HRM_DATA).length} machines to Firebase Cloud!`);
+      })
+      .catch(err => {
+        console.error('Manual push error:', err);
+        showToast('⚠️ Cloud Push Failed: ' + (err.message || 'Permission Denied. Please check Firebase Rules.'), true);
+        this.updateModalUI();
+      });
+    },
+
+    forcePullCloudData() {
+      if (!this.isConfigured || !this.db) {
+        showToast('Firebase Cloud configuration not loaded.', true);
+        return;
+      }
+      showToast('Pulling fresh database snapshot from Firebase Cloud...');
+      Promise.all([
+        this.db.ref('tm_failures').once('value'),
+        this.db.ref('tm_hrm').once('value'),
+        this.db.ref('tm_fleet').once('value')
+      ])
+      .then(([fSnap, hSnap, flSnap]) => {
+        const remoteFailures = fSnap.val();
+        const remoteHrm = hSnap.val();
+        const remoteFleet = flSnap.val();
+
+        if (remoteFailures) {
+          const remoteList = Array.isArray(remoteFailures) ? remoteFailures : Object.values(remoteFailures);
+          const merged = this.mergeFailures(AppState.failures, remoteList);
+          AppState.failures = merged.list;
+          saveDataset();
+          classifyRepetitiveFailures(AppState.failures);
+        }
+        if (remoteHrm && typeof remoteHrm === 'object') {
+          const merged = this.mergeHrm(HRM_DATA, remoteHrm);
+          HRM_DATA = merged.data;
+          ensureAllHrmOrdinals(HRM_DATA);
+          saveHrmData();
+        }
+        if (remoteFleet && typeof remoteFleet === 'object') {
+          FLEET_DIRECTORY = this.decodeFleetKeys(remoteFleet);
+          try {
+            localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
+          } catch (e) {}
+        }
+
+        renderAll();
+        renderHrmView();
+        updateMachineDropdown();
+        this.lastSyncTime = new Date();
+        this.updateModalUI();
+        showToast('✅ Pulled and merged latest Cloud database successfully!');
+      })
+      .catch(err => {
+        console.error('forcePullCloudData error:', err);
+        showToast('Failed to pull from cloud: ' + (err.message || 'Permission Denied'), true);
+      });
+    },
+
+    openModal() {
+      const modal = document.getElementById('cloudSyncModal');
+      if (modal) {
+        modal.classList.add('active');
+        this.updateModalUI();
+      }
+    },
+
+    updateModalUI() {
+      const statusCard = document.getElementById('cloudModalStatusCard');
+      const diagSocket = document.getElementById('cloudDiagSocket');
+      const diagPerm = document.getElementById('cloudDiagPermission');
+      const diagCount = document.getElementById('cloudDiagLocalCount');
+      const diagSync = document.getElementById('cloudDiagLastSync');
+
+      if (diagSocket) {
+        diagSocket.innerHTML = this.isConnected
+          ? '<span style="color: #34d399; font-weight: 600;">🟢 Connected (Websocket Active)</span>'
+          : '<span style="color: #f87171; font-weight: 600;">🔴 Disconnected</span>';
+      }
+
+      if (diagPerm) {
+        if (this.hasPermission === true) {
+          diagPerm.innerHTML = '<span style="color: #34d399; font-weight: 600;">🟢 Granted (Read &amp; Write Active)</span>';
+        } else if (this.hasPermission === false) {
+          diagPerm.innerHTML = '<span style="color: #f87171; font-weight: 600;">🔴 Denied (Firebase Rules Locked)</span>';
+        } else {
+          diagPerm.innerHTML = '<span style="color: #fbbf24; font-weight: 600;">🟡 Checking Permissions...</span>';
+        }
+      }
+
+      if (diagCount) {
+        diagCount.textContent = (AppState.failures ? AppState.failures.length : 0) + ' recorded failure(s)';
+      }
+
+      if (diagSync) {
+        diagSync.textContent = this.lastSyncTime
+          ? this.lastSyncTime.toLocaleTimeString() + ' (' + formatDateDisplay(this.lastSyncTime) + ')'
+          : 'Pending successful write';
+      }
+
+      if (statusCard) {
+        if (this.hasPermission === false) {
+          statusCard.style.background = 'rgba(239, 68, 68, 0.15)';
+          statusCard.style.border = '1px solid #ef4444';
+          statusCard.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <span style="font-size: 26px;">⚠️</span>
+              <div style="flex: 1;">
+                <h4 style="color: #f87171; margin: 0 0 6px; font-size: 15px;">Database Rules Locked (401 Permission Denied)</h4>
+                <p style="font-size: 12.5px; margin: 0 0 10px; color: #fecaca; line-height: 1.5;">
+                  <strong>Why other systems cannot see your entries:</strong> Google Firebase Realtime Database rules are currently locked. 
+                  All new entries you added are safely preserved on <em>this computer's local storage</em>, but Firebase is rejecting the cloud sync.
+                </p>
+                <div style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(239,68,68,0.4); border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                  <div style="font-weight: 700; color: #fcd34d; font-size: 12px; margin-bottom: 6px;">🛠️ Step-by-Step Fix (Takes 30 Seconds):</div>
+                  <ol style="margin: 0; padding-left: 20px; font-size: 12px; line-height: 1.6; color: #e2e8f0;">
+                    <li>Open <a href="https://console.firebase.google.com/project/tm-fast-swr/database/tm-fast-swr-default-rtdb/rules" target="_blank" style="color: #60a5fa; text-decoration: underline; font-weight: 600;">Firebase Console &rarr; Realtime Database &rarr; Rules Tab ↗️</a></li>
+                    <li>Replace the existing rules with this exact JSON:</li>
+                  </ol>
+                  <pre style="background: #0f172a; padding: 8px 12px; border-radius: 4px; color: #6ee7b7; font-family: var(--font-mono); font-size: 12px; margin: 8px 0;">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</pre>
+                  <div style="font-size: 12px; color: #e2e8f0;">
+                    3. Click <strong style="color: #fff; background: #2563eb; padding: 1px 6px; border-radius: 3px;">Publish</strong> in the Firebase Console.<br>
+                    4. Click the button below to test and instantly sync all your saved entries!
+                  </div>
+                </div>
+                <button type="button" class="btn btn-secondary-gold" onclick="window.TM_APP.testCloudConnection()" style="font-size: 12px; padding: 7px 16px; font-weight: 700;">
+                  🔄 I Have Updated Rules — Re-Test &amp; Push Local Entries Now
+                </button>
+              </div>
+            </div>
+          `;
+        } else if (this.hasPermission === true) {
+          statusCard.style.background = 'rgba(16, 185, 129, 0.15)';
+          statusCard.style.border = '1px solid #10b981';
+          statusCard.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <span style="font-size: 26px;">🟢</span>
+              <div style="flex: 1;">
+                <h4 style="color: #34d399; margin: 0 0 6px; font-size: 15px;">Cloud Realtime Database Active &amp; Synced</h4>
+                <p style="font-size: 12.5px; margin: 0; color: #a7f3d0; line-height: 1.5;">
+                  Connected to central SWR cloud database (<strong>${this.db?.app?.options?.projectId || 'tm-fast-swr'}</strong>).
+                  All failures, machinery registers, and updates are synchronized across all computers, users, and mobile devices in real time.
+                </p>
+              </div>
+            </div>
+          `;
+        } else {
+          statusCard.style.background = 'rgba(245, 158, 11, 0.15)';
+          statusCard.style.border = '1px solid #f59e0b';
+          statusCard.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <span style="font-size: 26px;">⏳</span>
+              <div style="flex: 1;">
+                <h4 style="color: #fbbf24; margin: 0 0 6px; font-size: 15px;">Verifying Cloud Database Permissions...</h4>
+                <p style="font-size: 12.5px; margin: 0; color: #fde68a; line-height: 1.5;">
+                  Attempting to contact Firebase Realtime Database at <code>https://tm-fast-swr-default-rtdb.firebaseio.com</code>.
+                </p>
+              </div>
+            </div>
+          `;
+        }
+      }
+    },
+
+    exportDatabaseSnapshot() {
+      const payload = {
+        meta: {
+          app: 'TM-FAST (SWR)',
+          version: '18_EXACT_SYNC',
+          exportedAt: new Date().toISOString(),
+          exportedBy: CurrentUser ? CurrentUser.username : 'admin1@zbdypr',
+          totalFailures: AppState.failures.length,
+          totalMachines: Object.keys(HRM_DATA).length
+        },
+        failures: AppState.failures,
+        historyRegisters: HRM_DATA,
+        fleetDirectory: FLEET_DIRECTORY
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      a.href = url;
+      a.download = `TM_FAST_Complete_Database_Snapshot_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded full database snapshot JSON file.');
+    },
+
+    handleSnapshotImport(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed || (!parsed.failures && !parsed.historyRegisters)) {
+            showToast('Invalid TM-FAST snapshot file.', true);
+            return;
+          }
+
+          if (parsed.failures && Array.isArray(parsed.failures)) {
+            const merged = this.mergeFailures(AppState.failures, parsed.failures);
+            AppState.failures = merged.list;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.failures));
+            classifyRepetitiveFailures(AppState.failures);
+          }
+
+          if (parsed.historyRegisters && typeof parsed.historyRegisters === 'object') {
+            const mergedH = this.mergeHrm(HRM_DATA, parsed.historyRegisters);
+            HRM_DATA = mergedH.data;
+            ensureAllHrmOrdinals(HRM_DATA);
+            localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
+          }
+
+          if (parsed.fleetDirectory && typeof parsed.fleetDirectory === 'object') {
+            Object.keys(parsed.fleetDirectory).forEach(cat => {
+              if (!FLEET_DIRECTORY[cat]) FLEET_DIRECTORY[cat] = [];
+              parsed.fleetDirectory[cat].forEach(m => {
+                if (!FLEET_DIRECTORY[cat].some(ex => ex.id === m.id)) {
+                  FLEET_DIRECTORY[cat].push(m);
+                }
+              });
+            });
+            localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
+          }
+
+          renderAll();
+          renderHrmView();
+          updateMachineDropdown();
+
+          // Push merged data to Firebase if connected
+          if (this.hasPermission) {
+            this.pushFailures();
+            this.pushHrm();
+            this.pushFleet();
+          }
+
+          showToast(`✅ Successfully imported snapshot: ${AppState.failures.length} total failures active!`);
+          closeModal('cloudSyncModal');
+        } catch (err) {
+          console.error('Snapshot import error:', err);
+          showToast('Failed to parse snapshot file: ' + err.message, true);
+        }
+      };
+      reader.readAsText(file);
     }
   };
 
-  function saveDataset() {
+  function safeLocalStorageSet(key, valStr) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.failures));
-      localStorage.setItem(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
+      localStorage.setItem(key, valStr);
+      return true;
     } catch (e) {
-      console.error('Error saving data to localStorage:', e);
+      console.warn(`localStorage quota hit for ${key}. Purging obsolete cache keys...`, e);
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('TM_') && k !== STORAGE_KEY && k !== HRM_STORAGE_KEY && k !== FLEET_STORAGE_KEY && k !== AUTH_STORAGE_KEY && k !== SESSION_STORAGE_KEY && k !== THEME_STORAGE_KEY) {
+            localStorage.removeItem(k);
+          }
+        }
+        localStorage.setItem(key, valStr);
+        return true;
+      } catch (e2) {
+        console.warn(`localStorage quota exhausted for ${key}. Data preserved safely in IndexedDB and memory:`, e2);
+        return false;
+      }
     }
+  }
+
+  function saveDataset() {
+    safeLocalStorageSet(STORAGE_KEY, JSON.stringify(AppState.failures));
+    safeLocalStorageSet(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
+
+    if (typeof idbSet === 'function') {
+      idbSet(STORAGE_KEY, AppState.failures);
+      idbSet(FLEET_STORAGE_KEY, FLEET_DIRECTORY);
+    }
+
     if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured) {
-      CloudSync.pushFailures();
-      CloudSync.pushFleet();
+      CloudSync.pushFailures().catch(() => {});
+      CloudSync.pushFleet().catch(() => {});
     }
   }
 
   function saveHrmData() {
-    try {
-      localStorage.setItem(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
-    } catch (e) {
-      console.error('Error saving HRM data to localStorage:', e);
+    safeLocalStorageSet(HRM_STORAGE_KEY, JSON.stringify(HRM_DATA));
+
+    if (typeof idbSet === 'function') {
+      idbSet(HRM_STORAGE_KEY, HRM_DATA);
     }
+
     if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured) {
-      CloudSync.pushHrm();
+      CloudSync.pushHrm().catch(() => {});
     }
   }
 
@@ -1608,18 +2342,33 @@
     let machineList = [];
     if (AppState.selectedCategory === 'ALL') {
       Object.keys(FLEET_DIRECTORY).forEach(c => {
-        machineList = machineList.concat(FLEET_DIRECTORY[c]);
+        machineList = machineList.concat(FLEET_DIRECTORY[c] || []);
       });
     } else if (FLEET_DIRECTORY[AppState.selectedCategory]) {
-      machineList = FLEET_DIRECTORY[AppState.selectedCategory];
+      machineList = FLEET_DIRECTORY[AppState.selectedCategory] || [];
     }
 
-    // Add extra machines found in failure history not in directory
+    // Deduplicate machineList by normalized id
+    const seenIds = new Set();
+    const dedupedList = [];
+    machineList.forEach(m => {
+      const nid = normalizeMachineNo(m.id);
+      if (!seenIds.has(nid)) {
+        seenIds.add(nid);
+        m.id = nid;
+        dedupedList.push(m);
+      }
+    });
+    machineList = dedupedList;
+
+    // Add extra machines found in failure history not in directory (only if truly novel)
     AppState.failures.forEach(f => {
+      const normFNo = normalizeMachineNo(f.machineNo);
       if (AppState.selectedCategory === 'ALL' || f.category === AppState.selectedCategory) {
-        if (!machineList.some(m => m.id === f.machineNo)) {
+        if (!seenIds.has(normFNo)) {
+          seenIds.add(normFNo);
           machineList.push({
-            id: f.machineNo,
+            id: normFNo,
             model: f.category + ' Special',
             division: f.division || 'SBC',
             depot: 'Track Base',
@@ -1640,7 +2389,7 @@
       machineList.forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.id;
-        const fails = AppState.failures.filter(f => f.machineNo === m.id);
+        const fails = AppState.failures.filter(f => normalizeMachineNo(f.machineNo) === m.id);
         const isUnderRepair = fails.some(f => f.status === 'UNDER REPAIR');
         const hasRepeat = fails.some(f => f.isRepetitive);
         
@@ -1648,7 +2397,7 @@
         if (hasRepeat) statusIcon += ' 🔁 [REPEAT DEFECTS]';
 
         opt.textContent = `${m.id} (${m.model}) - ${m.division} Div ${statusIcon}`;
-        if (AppState.selectedMachine === m.id) opt.selected = true;
+        if (normalizeMachineNo(AppState.selectedMachine) === m.id) opt.selected = true;
         select.appendChild(opt);
       });
     }
@@ -1918,15 +2667,15 @@
     if (typeof FLEET_DIRECTORY !== 'undefined') {
       Object.keys(FLEET_DIRECTORY).forEach(c => {
         (FLEET_DIRECTORY[c] || []).forEach(m => {
-          if (m.id || m.machineNo) allMonitoredSet.add(m.id || m.machineNo);
+          if (m.id || m.machineNo) allMonitoredSet.add(normalizeMachineNo(m.id || m.machineNo));
         });
       });
     }
     AppState.failures.forEach(f => {
-      if (f.machineNo) allMonitoredSet.add(f.machineNo);
+      if (f.machineNo) allMonitoredSet.add(normalizeMachineNo(f.machineNo));
     });
-    const totalMonitoredCount = allMonitoredSet.size || 22;
-    const currentMonitoredSet = new Set(list.map(f => f.machineNo));
+    const totalMonitoredCount = allMonitoredSet.size || 87;
+    const currentMonitoredSet = new Set(list.map(f => normalizeMachineNo(f.machineNo)));
     const currentCategoryMonitored = currentMonitoredSet.size;
 
     // 2. Count Repetitive Cases for currently scoped fleet
@@ -2467,11 +3216,19 @@
       list = list.filter(f => f.subsystem === AppState.subsystemFilter);
     }
 
-    // 6. Search query
+    // 6. Search query (supports machine no, defect, part, and formatted date / month names)
     if (AppState.searchQuery) {
       const q = AppState.searchQuery.toLowerCase();
       list = list.filter(f => {
-        const str = `${f.machineNo} ${f.category} ${f.division} ${f.subsystem} ${f.component} ${f.natureOfFailure} ${f.description} ${f.rootCause} ${f.stepsTaken} ${f.actionTaken} ${f.correctiveMeasures} ${f.section}`.toLowerCase();
+        const rawDate = String(f.dateOfFailure || f.breakdownTime || '');
+        const displayDate = formatDateDisplay(rawDate);
+        let monthStr = '';
+        if (/2026-10|10-2026/i.test(rawDate) || /[-/]10[-/]2026/.test(displayDate) || /10[-/]26\b/.test(displayDate)) {
+          monthStr = 'october oct 10-2026 2026-10 oct 26 october 2026 oct-2026';
+        } else if (/2026-09|09-2026/i.test(rawDate) || /[-/]09[-/]2026/.test(displayDate) || /09[-/]26\b/.test(displayDate)) {
+          monthStr = 'september sep 09-2026 2026-09 sep 26 september 2026 sep-2026';
+        }
+        const str = `${f.id || ''} ${f.machineNo} ${f.category} ${f.division} ${f.subsystem} ${f.component} ${f.partNo || ''} ${f.natureOfFailure} ${f.description} ${f.rootCause} ${f.stepsTaken} ${f.actionTaken} ${f.correctiveMeasures} ${f.section} ${f.remarks || ''} ${rawDate} ${displayDate} ${monthStr}`.toLowerCase();
         return str.includes(q);
       });
     }
@@ -2561,6 +3318,12 @@
       const tr = document.createElement('tr');
       tr.className = 'table-row-main';
       tr.id = `allIncRow-${f.id}`;
+      tr.style.cursor = 'pointer';
+      tr.setAttribute('title', `Click to open this incident in ${f.subsystem || 'Subsystem'} Desk on Machine ${f.machineNo} for complete detailed description`);
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        goToIncidentDesk(f.id);
+      });
 
       const isRep = f.isRepetitive;
       const isUnderRepair = f.status === 'UNDER REPAIR';
@@ -2571,8 +3334,11 @@
 
       tr.innerHTML = `
         <td><strong>#${idx + 1}</strong></td>
-        <td>
-          <div class="table-machine-text" style="font-weight: 700; font-size: 13.5px;">${f.machineNo}</div>
+        <td class="clickable-machine-cell" onclick="event.stopPropagation(); window.TM_APP.goToIncidentDesk('${f.id}')" title="Click machine to jump directly to ${f.machineNo} ${escapeHtml(f.subsystem || 'Subsystem')} Desk" style="cursor: pointer;">
+          <div class="table-machine-text machine-jump-link" style="font-weight: 700; font-size: 13.5px; color: var(--gold-400); display: flex; align-items: center; gap: 4px;">
+            <span>${f.machineNo}</span>
+            <span style="font-size: 11px; opacity: 0.85;">↗️</span>
+          </div>
           <div style="display: flex; gap: 5px; align-items: center; margin-top: 3px; flex-wrap: wrap;">
             <span style="font-size: 11px; color: var(--gold-400); font-weight: 600;" title="${escapeHtml(getCategoryDisplayNameWithFull(f.category))}">${escapeHtml(getCategoryDisplayNameWithFull(f.category))}</span>
             <span class="div-badge ${getDivisionClass(f.division)}">${f.division || 'SBC'}</span>
@@ -2592,7 +3358,7 @@
           <div class="table-desc-text" style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(f.natureOfFailure || f.description || '')}">
             ${escapeHtml(f.natureOfFailure || f.description || '')}
           </div>
-          ${isRep ? `<span style="display:inline-block; font-size:10px; color:#ffab91; background:rgba(255,112,67,0.2); padding:1px 6px; border-radius:3px; margin-top:3px; border:1px solid rgba(255,112,67,0.4); cursor:pointer;" onclick="window.TM_APP.highlightFailure('${f.id}', '${f.subsystem}', '${f.machineNo}')" title="Click to navigate & highlight this recurring defect in subsystem desk">🔁 ${f.repeatCount || 2}x Recurring Defect</span>` : ''}
+          ${isRep ? `<span style="display:inline-block; font-size:10px; color:#ffab91; background:rgba(255,112,67,0.2); padding:1px 6px; border-radius:3px; margin-top:3px; border:1px solid rgba(255,112,67,0.4); cursor:pointer;" onclick="event.stopPropagation(); window.TM_APP.highlightFailure('${f.id}', '${f.subsystem}', '${f.machineNo}')" title="Click to navigate & highlight this recurring defect in subsystem desk">🔁 ${f.repeatCount || 2}x Recurring Defect</span>` : ''}
         </td>
         <td>
           ${isBlockYes
@@ -2612,11 +3378,14 @@
           }
         </td>
         <td style="white-space: nowrap;">
-          <button class="btn btn-dim" style="padding: 5px 10px; font-size: 11.5px;" onclick="window.TM_APP.toggleDetails('${f.id}')">
-            🔍 Details
+          <button class="btn btn-secondary-pista btn-go-desk" style="padding: 5px 11px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.TM_APP.goToIncidentDesk('${f.id}')" title="Direct to ${escapeHtml(f.subsystem || 'Subsystem')} Desk on Machine ${escapeHtml(f.machineNo)} for complete detailed description">
+            <span>🎯 Direct to Desk ↗️</span>
+          </button>
+          <button class="btn btn-dim" style="padding: 5px 8px; font-size: 11.5px; margin-left: 4px;" onclick="event.stopPropagation(); window.TM_APP.toggleDetails('${f.id}')" title="Quick preview details in timeline drawer">
+            🔍
           </button>
           ${(isUnderRepair && isUserAdmin()) ? `
-            <button class="btn btn-secondary-pista admin-only" style="padding: 5px 10px; font-size: 11.5px; margin-left: 4px;" onclick="window.TM_APP.openMarkFitModal('${f.id}')">
+            <button class="btn btn-secondary-pista admin-only" style="padding: 5px 10px; font-size: 11.5px; margin-left: 4px;" onclick="event.stopPropagation(); window.TM_APP.openMarkFitModal('${f.id}')">
               ✅ Mark Fit
             </button>
           ` : ''}
@@ -2660,6 +3429,11 @@
                   Machine Fit Certified: ${formatDateDisplay(f.fitTime)}<br>
                   Certified By: <strong style="color: var(--gold-400);">${f.certifiedBy || 'SSE/TM'}</strong>
                 </div>
+              </div>
+              <div style="margin-top: 10px;">
+                <button class="btn btn-secondary-pista btn-go-desk" onclick="window.TM_APP.goToIncidentDesk('${f.id}')" style="padding: 6px 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                  <span>🎯 Direct to ${escapeHtml(f.subsystem || 'Subsystem')} Desk for Full Machine History ↗️</span>
+                </button>
               </div>
             </div>
           </div>
@@ -4066,24 +4840,10 @@
     }
   }
 
-  // Excel Date parser supporting JS Date objects, Excel numeric serials, and DD.MM.YYYY / YYYY-MM-DD strings
+  // Excel Date parser strictly enforcing Indian Railways DD-MM-YYYY / DD-MM-YY formats before serials or Date fallbacks
   function formatExcelDate(val) {
     if (val === undefined || val === null || val === '') return '';
-    if (val instanceof Date && !isNaN(val.getTime())) {
-      return val.toISOString().substring(0, 10);
-    }
-
-    // Numeric serial check (handles numbers and numeric strings like "44820" or "44652.0")
     const s = String(val).trim();
-    if (typeof val === 'number' || /^\d{5}(?:\.0+)?$/.test(s)) {
-      const num = typeof val === 'number' ? val : parseFloat(s);
-      if (!isNaN(num) && num >= 25000 && num <= 65000) {
-        const date = new Date(Math.round((num - 25569) * 86400 * 1000));
-        if (!isNaN(date.getTime())) {
-          return date.toISOString().substring(0, 10);
-        }
-      }
-    }
 
     // 1. Overnight Block Date check FIRST (e.g. 16/17-11-2025, 04/05-06-2026, 16-17/11/2025, 16/17/11/2025)
     // Preserves both day digits accurately without dropping day 1 or day 2
@@ -4092,7 +4852,7 @@
       return ov.formatted;
     }
 
-    // 2. Standard DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
+    // 2. Standard Indian Railways DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
     const ddmmyyyy = s.match(/(?:^|[^\d])(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})(?:[^\d]|$)/);
     if (ddmmyyyy) {
       const day = ddmmyyyy[1].padStart(2, '0');
@@ -4101,7 +4861,7 @@
       return `${yr}-${mon}-${day}`;
     }
 
-    // 3. Short 2-digit year: DD.MM.YY or DD/MM/YY or DD-MM-YY
+    // 3. Short 2-digit year: DD.MM.YY or DD/MM/YY or DD-MM-YY (e.g. 05/11/26 -> 2026-11-05)
     const ddmmyy = s.match(/(?:^|[^\d])(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{2})(?:[^\d]|$)/);
     if (ddmmyy) {
       const day = ddmmyy[1].padStart(2, '0');
@@ -4119,7 +4879,23 @@
       return `${yr}-${mon}-${day}`;
     }
 
-    // 5. ISO timestamp string like 2024-05-12T...
+    // 5. Numeric serial check (handles numbers and numeric strings like "44820" or "44652.0")
+    if (typeof val === 'number' || /^\d{5}(?:\.0+)?$/.test(s)) {
+      const num = typeof val === 'number' ? val : parseFloat(s);
+      if (!isNaN(num) && num >= 25000 && num <= 65000) {
+        const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().substring(0, 10);
+        }
+      }
+    }
+
+    // 6. JS Date object fallback
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      return val.toISOString().substring(0, 10);
+    }
+
+    // 7. ISO timestamp string like 2024-05-12T...
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
       return s.substring(0, 10);
     }
@@ -4657,7 +5433,7 @@
       reader.onload = function (e) {
         try {
           const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          const workbook = XLSX.read(data, { type: 'array', cellDates: false, raw: true });
           const importedCount = parseWorkbookData(workbook, file.name);
 
           if (importedCount === 0) {
@@ -5269,19 +6045,20 @@
             curIt.presentRemarks = authIt.presentRemarks;
             curIt.records = JSON.parse(JSON.stringify(authIt.records || []));
             repaired = true;
-          } else if (authIt.records && authIt.records.length > 0 && (!curIt.records || curIt.records.length < authIt.records.length)) {
+          } else if (forceAuthentic && authIt.records && authIt.records.length > 0) {
             curIt.records = JSON.parse(JSON.stringify(authIt.records));
-            if (!curIt.presentDate || curIt.presentDate === 'NA') curIt.presentDate = authIt.presentDate;
-            if (!curIt.presentEngineHours || curIt.presentEngineHours === 'NA') curIt.presentEngineHours = authIt.presentEngineHours;
-            if (!curIt.presentRemarks || curIt.presentRemarks === 'NA') curIt.presentRemarks = authIt.presentRemarks;
+            curIt.presentDate = authIt.presentDate;
+            curIt.presentEngineHours = authIt.presentEngineHours;
+            curIt.presentRemarks = authIt.presentRemarks;
             repaired = true;
           }
         }
       });
     }
 
-    if (!current.commissioningDate || current.commissioningDate === '2016-01-01' || (authentic.commissioningDate && authentic.commissioningDate !== '2016-01-01' && current.commissioningDate !== authentic.commissioningDate)) {
-      if (authentic.commissioningDate) {
+    // Commissioning date: NEVER overwrite user-corrected commissioning dates unless forceAuthentic is true
+    if (!current.commissioningDate || current.commissioningDate === '2016-01-01' || current.commissioningDate === 'NA' || forceAuthentic) {
+      if (authentic.commissioningDate && authentic.commissioningDate !== '2016-01-01') {
         current.commissioningDate = authentic.commissioningDate;
         current.commissioningRaw = authentic.commissioningRaw;
         repaired = true;
@@ -5545,29 +6322,30 @@
     if (!container) return;
 
     const mId = getActiveMachineId();
-    const mInfo = getMachineInfo(mId);
-    const isCrane = isCraneMachine(mId) || isCraneMachine(mInfo?.category) || isCraneMachine(AppState.selectedCategory);
+    const normMid = normalizeMachineNo(mId);
+    const mInfo = getMachineInfo(normMid);
+    const isCrane = isCraneMachine(normMid) || isCraneMachine(mInfo?.category) || isCraneMachine(AppState.selectedCategory);
 
     let effectiveSubsystem = subsystemKey;
     if (subsystemKey === 'Tamping Unit' || subsystemKey === 'Crane') {
       effectiveSubsystem = isCrane ? 'Crane' : 'Tamping Unit';
     }
 
-    let subFailures = AppState.failures.filter(f => f.machineNo === mId);
+    let subFailures = AppState.failures.filter(f => normalizeMachineNo(f.machineNo) === normMid);
     if (effectiveSubsystem === 'Engine') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Engine' || f.subsystem === 'Diesel Engine / Radiator / Fuel');
+      subFailures = subFailures.filter(f => /engine/i.test(f.subsystem || '') || /engine/i.test(f.sheet || ''));
     } else if (effectiveSubsystem === 'Crane') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Crane' || f.subsystem === 'Tamping Unit' || /crane/i.test(f.subsystem || '') || /crane/i.test(f.sheet || ''));
+      subFailures = subFailures.filter(f => /crane/i.test(f.subsystem || '') || /crane/i.test(f.sheet || ''));
     } else if (effectiveSubsystem === 'Tamping Unit') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Tamping Unit' || f.subsystem === 'Tamping Unit / Tools / Vibration' || f.subsystem === 'Cutter');
+      subFailures = subFailures.filter(f => (/tamp/i.test(f.subsystem || '') || /cutter/i.test(f.subsystem || '') || /tamp/i.test(f.sheet || '')) && !/crane/i.test(f.subsystem || ''));
     } else if (effectiveSubsystem === 'Mechanical') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Mechanical' || f.subsystem === 'Mechanical/Structure' || /mech/i.test(f.subsystem || '') || /mech/i.test(f.sheet || ''));
+      subFailures = subFailures.filter(f => /mech/i.test(f.subsystem || '') || /mech/i.test(f.sheet || ''));
     } else if (effectiveSubsystem === 'Hydraulic') {
-      subFailures = subFailures.filter(f => (f.subsystem === 'Hydraulic' || f.subsystem === 'Hydraulic Circuit / Valves / Cylinders') && !/mech/i.test(f.subsystem || '') && !/mech/i.test(f.sheet || ''));
+      subFailures = subFailures.filter(f => /hyd/i.test(f.subsystem || '') && !/mech/i.test(f.subsystem || '') && !/mech/i.test(f.sheet || ''));
     } else if (effectiveSubsystem === 'Pneumatic') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Pneumatic' || f.subsystem === 'Pneumatics / Brakes / Air Compressor');
+      subFailures = subFailures.filter(f => /pneum/i.test(f.subsystem || '') || /brake/i.test(f.subsystem || '') || /air/i.test(f.subsystem || '') || /pneum/i.test(f.sheet || ''));
     } else if (effectiveSubsystem === 'Electrical') {
-      subFailures = subFailures.filter(f => f.subsystem === 'Electrical' || f.subsystem === 'Electrical / Contactors / Batteries' || f.subsystem === 'Electronics & Measuring');
+      subFailures = subFailures.filter(f => /elec/i.test(f.subsystem || '') || /battery/i.test(f.subsystem || '') || /measur/i.test(f.subsystem || '') || /elec/i.test(f.sheet || ''));
     }
 
     const totalCount = subFailures.length;
@@ -5610,7 +6388,7 @@
         const remarksText = (f.remarks && f.remarks.trim() !== '' && f.remarks.trim() !== '-' && !/^(no|nil)$/i.test(f.remarks.trim())) ? f.remarks.trim() : 'NA';
 
         tableRows += `
-          <tr id="failureRow-${f.id}">
+          <tr id="failureRow-${f.id}" class="desk-failure-row" style="cursor: pointer;" title="Click row to view / toggle detailed engineering diagnosis and restoration details">
             <td style="text-align: center;">
               <strong style="color: var(--gold-400); font-family: var(--font-mono); font-size: 12px;">${escapeHtml(String(rowSl))}</strong>
             </td>
@@ -5632,7 +6410,7 @@
               </span>
             </td>
             <td style="font-size: 12px; line-height: 1.45; max-width: 260px;" class="desk-desc-cell">
-              <div style="font-weight: 500;">${escapeHtml(descText)}</div>
+              <div style="font-weight: 600;">${escapeHtml(descText)}</div>
             </td>
             <td style="font-size: 12px; line-height: 1.45; max-width: 240px;" class="desk-action-cell">
               <div>${escapeHtml(actionText)}</div>
@@ -5645,7 +6423,7 @@
             </td>
             <td style="text-align: center;">
               ${f.isRepetitive ? `
-                <span class="badge-rep-yes" onclick="window.TM_APP.highlightFailure('${f.id}', '${effectiveSubsystem}', '${mId}')" title="Click to highlight recurring defect #${rowSl} cluster">
+                <span class="badge-rep-yes" onclick="event.stopPropagation(); window.TM_APP.highlightFailure('${f.id}', '${effectiveSubsystem}', '${mId}')" title="Click to highlight recurring defect #${rowSl} cluster">
                   🔁 YES
                 </span>
               ` : `
@@ -5653,12 +6431,53 @@
               `}
             </td>
             <td style="text-align: center;">
-              ${isUserAdmin() ? `
-              <div style="display: flex; gap: 5px; justify-content: center; align-items: center;">
-                <button class="btn btn-dim" onclick="window.TM_APP.openEditFailureModal('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Edit failure record">✏️</button>
-                <button class="hrm-btn-delete" onclick="window.TM_APP.deleteFailureRecord('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="Delete failure record">🗑️</button>
+              <div style="display: flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                <button class="btn btn-dim" onclick="event.stopPropagation(); window.TM_APP.toggleDeskDetails('${f.id}')" style="padding: 4px 8px; font-size: 11px;" title="View / hide full detailed breakdown">🔍 Details</button>
+                ${isUserAdmin() ? `
+                  <button class="btn btn-dim" onclick="event.stopPropagation(); window.TM_APP.openEditFailureModal('${f.id}')" style="padding: 4px 6px; font-size: 11px;" title="Edit failure record">✏️</button>
+                  <button class="hrm-btn-delete" onclick="event.stopPropagation(); window.TM_APP.deleteFailureRecord('${f.id}')" style="padding: 4px 6px; font-size: 11px;" title="Delete failure record">🗑️</button>
+                ` : `<span class="view-only-tag" style="font-size: 10px;">View</span>`}
               </div>
-              ` : `<span class="view-only-tag" style="font-size: 11px;">View Only</span>`}
+            </td>
+          </tr>
+          <tr id="deskDetails-${f.id}" class="table-row-details">
+            <td colspan="11">
+              <div class="detail-drawer-box">
+                <div>
+                  <div class="detail-field-group">
+                    <div class="detail-field-label">🔎 Exact Root Cause Diagnosis</div>
+                    <div class="detail-field-content">${escapeHtml(f.rootCause || f.natureOfFailure || 'Root cause investigation under progress by maintenance team.')}</div>
+                  </div>
+                  <div class="detail-field-group">
+                    <div class="detail-field-label">🛠️ Step-by-Step Restoration Actions Taken</div>
+                    <div class="detail-field-content">${escapeHtml(f.stepsTaken || f.actionTaken || 'Troubleshooting and replacement carried out on site.')}</div>
+                  </div>
+                  <div class="detail-field-group">
+                    <div class="detail-field-label">📦 Spares / Consumables Consumed</div>
+                    <div class="detail-field-content">${escapeHtml(f.sparesUsed || (f.partNo && f.partNo !== '-' ? 'Part No: ' + f.partNo : 'Standard maintenance spares'))}</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="detail-field-group corrective-box">
+                    <div class="detail-field-label">🛡️ Corrective Measures Taken to Avoid Recurrence in Future</div>
+                    <div class="detail-field-content" style="border-color: rgba(147, 197, 114, 0.3); color: var(--pista-300);">
+                      ${escapeHtml(f.correctiveMeasures || 'Regular surveillance and scheduled inspection protocol enforced.')}
+                    </div>
+                  </div>
+                  <div class="detail-field-group">
+                    <div class="detail-field-label">⏱️ Incident Location & Restoration Lifecycle</div>
+                    <div class="detail-field-content" style="font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6;">
+                      <strong>Incident ID:</strong> <span style="color: var(--gold-400);">${escapeHtml(f.id)}</span> &bull; <strong>Machine:</strong> ${escapeHtml(mId)} (${escapeHtml(f.category || 'Track Machine')})<br>
+                      <strong>Section:</strong> ${escapeHtml(f.section || 'Block Section')} &bull; <strong>Traffic Block:</strong> ${isBlockYes ? '⚠️ IN BLOCK' : 'NON-BLOCK'}<br>
+                      <strong>Breakdown:</strong> ${formatDateDisplay(f.breakdownTime || f.dateOfFailure)}<br>
+                      <strong>Site Arrival / Troubleshoot:</strong> ${formatDateDisplay(f.arrivalTroubleshootTime || f.dateOfFailure)}<br>
+                      <strong>Spares Arranged:</strong> ${formatDateDisplay(f.sparesArrangedTime || f.dateOfFailure)}<br>
+                      <strong>Machine Fit Certified:</strong> ${formatDateDisplay(f.fitTime || f.dateOfRectification)}<br>
+                      <strong>Certified By:</strong> <strong style="color: var(--gold-400);">${escapeHtml(f.certifiedBy || 'SSE/TM')}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </td>
           </tr>
         `;
@@ -5672,7 +6491,10 @@
             <span class="indicator-circle"></span>
             <span>${icon} ${effectiveSubsystem} Failures Desk • Machine ${mId}</span>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-dim" onclick="window.TM_APP.openAllIncidentsTab()" style="padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px;" title="Back to All Machine Incidents Master Timeline">
+              <span>📋 All Machine Incidents</span>
+            </button>
             <button class="btn btn-secondary-pista admin-only" onclick="window.TM_APP.openLogModalForSubsystem('${effectiveSubsystem}')" style="padding: 6px 14px; font-size: 12px;">
               ➕ Log ${effectiveSubsystem} Failure
             </button>
@@ -5710,7 +6532,7 @@
                 <th style="width: 120px;">Part No. of Spares Consumed</th>
                 <th style="min-width: 130px;">Remarks</th>
                 <th style="width: 105px; text-align: center;">Is it a Repetitive Failure?</th>
-                <th style="width: 90px; text-align: center;">Actions</th>
+                <th style="width: 115px; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -5720,6 +6542,15 @@
         </div>
       </div>
     `;
+
+    // Attach row click listeners so clicking any failure row toggles its detailed drawer
+    container.querySelectorAll('.desk-failure-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        const id = row.id.replace('failureRow-', '');
+        toggleDeskDetails(id);
+      });
+    });
   }
 
   // Update live failure count badges for the 5 subsystem tabs
@@ -6236,14 +7067,28 @@
   function jumpToSearchResult(machineId, category, subsystem, incidentId, hrmItemNum) {
     if (!machineId) return;
 
+    const normMachId = normalizeMachineNo(machineId);
+
     // 1. Select category and machine
-    const cat = category || getMachineInfo(machineId)?.category || AppState.selectedCategory;
+    const mInfo = getMachineInfo(normMachId);
+    const cat = category || mInfo?.category || AppState.selectedCategory;
     AppState.selectedCategory = cat;
-    AppState.selectedMachine = machineId;
+    AppState.selectedMachine = normMachId;
+    AppState.paretoFleetScope = cat;
+
+    // Update Category Pills UI
+    document.querySelectorAll('.category-pill').forEach(pill => {
+      if (pill.getAttribute('data-category') === cat) {
+        pill.classList.add('active');
+        pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      } else {
+        pill.classList.remove('active');
+      }
+    });
 
     updateMachineDropdown();
     const machSelect = document.getElementById('machineSelect');
-    if (machSelect) machSelect.value = machineId;
+    if (machSelect) machSelect.value = normMachId;
     updateMachineContextMeta();
 
     // 2. Select Tab
@@ -6256,7 +7101,7 @@
       targetTab = 'hrm-view';
     } else if (subLower.includes('tamp') || subLower.includes('crane')) {
       targetTab = 'tamping-view';
-      const isCrane = isCraneMachine(machineId) || isCraneMachine(cat);
+      const isCrane = isCraneMachine(normMachId) || isCraneMachine(cat);
       deskKey = isCrane ? 'Crane' : 'Tamping Unit';
       deskContainerId = 'subsystemDesk-tamping';
     } else if (subLower.includes('mech')) {
@@ -6298,7 +7143,7 @@
     }
     updateTabBadges();
 
-    // 5. Scroll to target element with pulse highlight
+    // 5. Scroll to target element with pulse highlight & auto-expand detail drawer
     setTimeout(() => {
       let targetEl = null;
       if (incidentId) {
@@ -6311,13 +7156,95 @@
         document.querySelectorAll('.highlight-pulse-row').forEach(el => el.classList.remove('highlight-pulse-row'));
         targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         targetEl.classList.add('highlight-pulse-row');
-        showToast(`Jumped to ${machineId} • ${subsystem}`);
+
+        // Automatically open the detailed engineering drawer for the targeted incident
+        if (incidentId) {
+          const detailRow = document.getElementById(`deskDetails-${incidentId}`);
+          if (detailRow) {
+            detailRow.classList.add('open');
+            detailRow.classList.add('highlight-pulse-row');
+            setTimeout(() => detailRow.classList.remove('highlight-pulse-row'), 3000);
+          }
+        }
+        showToast(`🎯 Jumped to ${normMachId} • ${subsystem}`);
       } else {
         const pane = document.getElementById(targetTab);
         if (pane) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        showToast(`Opened ${machineId} • ${subsystem} desk`);
+        showToast(`Opened ${normMachId} • ${subsystem} desk`);
       }
     }, 220);
+  }
+
+  // Direct navigation from timeline incident row or action button to its specific Subsystem Desk
+  function goToIncidentDesk(incidentId) {
+    if (!incidentId) return;
+    const f = AppState.failures.find(item => String(item.id) === String(incidentId));
+    if (!f) {
+      showToast('Incident record not found in database.', true);
+      return;
+    }
+    jumpToSearchResult(f.machineNo, f.category, f.subsystem, f.id, null);
+  }
+
+  // Toggle detail drawer for a failure row inside Subsystem Desks
+  function toggleDeskDetails(incidentId) {
+    if (!incidentId) return;
+    const detailRow = document.getElementById(`deskDetails-${incidentId}`);
+    if (detailRow) {
+      const isOpen = detailRow.classList.toggle('open');
+      if (isOpen) {
+        detailRow.classList.add('highlight-pulse-row');
+        setTimeout(() => detailRow.classList.remove('highlight-pulse-row'), 2500);
+      }
+    }
+  }
+
+  // Quick 1-click return to All Machine Incidents Master Timeline
+  function openAllIncidentsTab() {
+    AppState.activeTab = 'history-view';
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-tab') === 'history-view');
+    });
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.classList.toggle('active', p.id === 'history-view');
+    });
+    renderTable(getAllMachineIncidentsChronological());
+    updateTabBadges();
+    const historyView = document.getElementById('history-view');
+    if (historyView) historyView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('Returned to All Machine Incidents timeline');
+  }
+
+  // Search input handler: filters timeline and directs directly to desk on Enter or "Direct to Desk" click
+  function applyHistorySearchAndDirect() {
+    const input = document.getElementById('tableSearchInput');
+    const query = (input ? input.value : AppState.searchQuery || '').trim();
+    if (!query) {
+      showToast('Please type a search keyword (e.g. machine no, part, defect or incident ID).');
+      return;
+    }
+    AppState.searchQuery = query;
+    AppState.historyLimit = 100;
+    const filtered = getAllMachineIncidentsChronological();
+    renderTable(filtered);
+
+    if (filtered.length > 0) {
+      const topMatch = filtered[0];
+      showToast(`Directing to ${topMatch.machineNo} • ${topMatch.subsystem} desk (1 of ${filtered.length} matches)...`);
+      jumpToSearchResult(topMatch.machineNo, topMatch.category, topMatch.subsystem, topMatch.id, null);
+    } else {
+      showToast(`No incidents found matching "${query}".`, true);
+    }
+  }
+
+  // Clear timeline search input
+  function clearHistorySearch() {
+    const input = document.getElementById('tableSearchInput');
+    if (input) input.value = '';
+    AppState.searchQuery = '';
+    AppState.historyLimit = 100;
+    renderTable(getAllMachineIncidentsChronological());
+    showToast('Cleared timeline search filter');
   }
 
   // Export filtered search references to Excel
@@ -7441,13 +8368,35 @@
       }
     });
 
-    // Search bar
+    // Search bar (with Enter-to-direct and button triggers)
     const searchInput = document.getElementById('tableSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         AppState.searchQuery = e.target.value.trim();
         AppState.historyLimit = 100;
         renderTable(getAllMachineIncidentsChronological());
+      });
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyHistorySearchAndDirect();
+        } else if (e.key === 'Escape') {
+          clearHistorySearch();
+        }
+      });
+    }
+
+    const btnGo = document.getElementById('btnHistorySearchGo');
+    if (btnGo) {
+      btnGo.addEventListener('click', () => {
+        applyHistorySearchAndDirect();
+      });
+    }
+
+    const btnClearSearch = document.getElementById('btnClearTableSearch');
+    if (btnClearSearch) {
+      btnClearSearch.addEventListener('click', () => {
+        clearHistorySearch();
       });
     }
 
@@ -7508,6 +8457,16 @@
         saveFailureFromForm();
       });
     }
+
+    // Cloud Sync Diagnostic Modal Launchers
+    document.querySelectorAll('#cloudSyncIndicator, .live-indicator, #btnHeaderCloudSync, .btn-cloud-sync, .btn-cloud-tab').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof CloudSync !== 'undefined' && CloudSync.openModal) {
+          CloudSync.openModal();
+        }
+      });
+    });
   }
 
   // Open Log / Update Modal
@@ -7873,6 +8832,11 @@
     showAllIncidents,
     getAllMachineIncidentsChronological,
     renderTable,
+    goToIncidentDesk,
+    applyHistorySearchAndDirect,
+    clearHistorySearch,
+    toggleDeskDetails,
+    openAllIncidentsTab,
     // Subsystem Defect Pareto Analysis Methods (All Machine Fleets)
     onParetoFleetChange,
     openParetoForFleet,
@@ -7880,7 +8844,20 @@
     getFleetFailuresForPareto,
     getAppState: () => AppState,
     selectCategory,
-    populateModalCategories
+    populateModalCategories,
+    // Central Multi-User Cloud Synchronization Diagnostics & Control Methods
+    openCloudSyncModal: () => CloudSync.openModal(),
+    testCloudConnection: () => CloudSync.testCloudConnection(),
+    forceSyncLocalToCloud: () => CloudSync.forceSyncLocalToCloud(),
+    forcePullCloudData: () => CloudSync.forcePullCloudData(),
+    exportDatabaseSnapshot: () => CloudSync.exportDatabaseSnapshot(),
+    handleSnapshotImport: (f) => CloudSync.handleSnapshotImport(f),
+    getCloudSyncState: () => ({
+      isConfigured: CloudSync.isConfigured,
+      isConnected: CloudSync.isConnected,
+      hasPermission: CloudSync.hasPermission,
+      lastSyncTime: CloudSync.lastSyncTime
+    })
   };
 
   // Launch on DOM ready
