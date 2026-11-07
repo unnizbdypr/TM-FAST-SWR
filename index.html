@@ -816,6 +816,99 @@
         </div>
       </div>
 
+      <!-- ====================================================================
+           MONTH-WISE FAILURE GRAPHICAL VIEW & COMPARISON FEATURE
+           Multi-Dataset Radar & Month-to-Month Comparative Subsystem Analytics
+           ==================================================================== -->
+      <div class="panel-card gold-focus month-analytics-panel-card" id="monthAnalyticsCard" style="margin-bottom: 22px;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+          <div class="panel-title gold-accent" style="display: flex; align-items: center; gap: 8px;">
+            <span class="indicator-circle" style="background: var(--gold-400); box-shadow: 0 0 8px var(--gold-400);"></span>
+            <span>Month-Wise Graphical View &amp; Subsystem Radar Comparison</span>
+            <span class="badge" id="monthComparisonBadge" style="font-size: 11px; font-weight: 700; background: rgba(245, 158, 11, 0.2); border: 1px solid var(--border-gold); color: var(--gold-400);">MoM Comparative View</span>
+          </div>
+          
+          <!-- Month Selection & Comparison Controls -->
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <!-- View Mode Switcher -->
+            <div class="month-view-mode-group" style="display: inline-flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border-dim); border-radius: 8px; padding: 2px;">
+              <button type="button" class="btn-month-mode active" id="btnModeCompare" onclick="window.TM_APP.setMonthComparisonMode('compare')" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: none; cursor: pointer;">
+                📊 Compare 2 Months
+              </button>
+              <button type="button" class="btn-month-mode" id="btnModeTrend" onclick="window.TM_APP.setMonthComparisonMode('trend')" style="padding: 5px 12px; font-size: 11.5px; font-weight: 600; border-radius: 6px; border: none; cursor: pointer;">
+                📈 Monthly Trend
+              </button>
+              <button type="button" class="btn-month-mode" id="btnModeSingle" onclick="window.TM_APP.setMonthComparisonMode('single')" style="padding: 5px 12px; font-size: 11.5px; font-weight: 600; border-radius: 6px; border: none; cursor: pointer;">
+                🔍 Single Month
+              </button>
+            </div>
+
+            <!-- Scope Select -->
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <label for="monthScopeSelect" style="font-size: 11.5px; font-weight: 700; color: var(--pista-300); margin: 0;">🎯 Scope:</label>
+              <select id="monthScopeSelect" class="form-control" style="font-size: 11.5px; padding: 5px 10px; width: auto; background: var(--bg-surface); color: var(--text-primary); border: 1.5px solid var(--border-gold); font-weight: 700; border-radius: 6px;" onchange="window.TM_APP.onMonthComparisonScopeChange(this.value)">
+                <option value="ALL">🌐 Entire SWR Fleet (87 Machines)</option>
+              </select>
+            </div>
+
+            <!-- Month A Select -->
+            <div id="monthAContainer" style="display: flex; align-items: center; gap: 5px;">
+              <label for="monthASelect" style="font-size: 11.5px; font-weight: 700; color: #10b981; margin: 0;">📅 Month A:</label>
+              <select id="monthASelect" class="form-control" style="font-size: 11.5px; padding: 5px 10px; width: auto; background: var(--bg-surface); color: #10b981; font-weight: 700; border: 1.5px solid #10b981; border-radius: 6px;" onchange="window.TM_APP.onMonthAChange(this.value)">
+              </select>
+            </div>
+
+            <!-- Month B Select -->
+            <div id="monthBContainer" style="display: flex; align-items: center; gap: 5px;">
+              <label for="monthBSelect" style="font-size: 11.5px; font-weight: 700; color: var(--gold-400); margin: 0;">📅 Month B:</label>
+              <select id="monthBSelect" class="form-control" style="font-size: 11.5px; padding: 5px 10px; width: auto; background: var(--bg-surface); color: var(--gold-400); font-weight: 700; border: 1.5px solid var(--gold-400); border-radius: 6px;" onchange="window.TM_APP.onMonthBChange(this.value)">
+              </select>
+            </div>
+
+            <!-- Swap Months Button -->
+            <button type="button" class="btn btn-secondary-pista btn-sm" id="btnSwapMonths" onclick="window.TM_APP.swapComparisonMonths()" title="Swap Month A and Month B" style="padding: 5px 10px; font-size: 11px; font-weight: 700;">
+              ⇄ Swap
+            </button>
+          </div>
+        </div>
+
+        <!-- Month Comparison KPI Delta Metric Cards Strip -->
+        <div class="month-comparison-metrics-bar" id="monthComparisonMetricsBar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0;">
+          <!-- Dynamically populated comparison delta cards -->
+        </div>
+
+        <!-- 2-Column Grid: Month Comparison Radar + Comparative Bar / Trend Chart -->
+        <div class="grid-2col" style="margin-top: 14px;">
+          <!-- Multi-Dataset Comparative Radar Chart -->
+          <div class="panel-card" style="background: rgba(0,0,0,0.22); border: 1px solid var(--border-dim); border-radius: 10px; padding: 14px;">
+            <div class="panel-header" style="margin-bottom: 8px;">
+              <div class="panel-title gold-accent" style="font-size: 12.5px;">
+                <span class="indicator-circle"></span>
+                <span id="titleMonthCompareRadar">Subsystem Defect Radar Comparison</span>
+              </div>
+              <span style="font-size: 10.5px; color: var(--gold-400); font-family: var(--font-mono);">Multi-Axis Spider Comparison</span>
+            </div>
+            <div class="chart-container-box" style="height: 330px;">
+              <canvas id="chartMonthCompareRadar"></canvas>
+            </div>
+          </div>
+
+          <!-- Comparative Subsystem Bar Chart / Chronological Monthly Trend -->
+          <div class="panel-card" style="background: rgba(0,0,0,0.22); border: 1px solid var(--border-dim); border-radius: 10px; padding: 14px;">
+            <div class="panel-header" style="margin-bottom: 8px;">
+              <div class="panel-title" style="font-size: 12.5px;">
+                <span class="indicator-circle"></span>
+                <span id="titleMonthCompareBar">Subsystem Defect Breakdown Comparison</span>
+              </div>
+              <span style="font-size: 10.5px; color: var(--pista-300);" id="subTitleMonthCompareBar">Side-by-Side Defect Distribution</span>
+            </div>
+            <div class="chart-container-box" style="height: 330px;">
+              <canvas id="chartMonthCompareBar"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Fleet Overview Grid: Category Incidents & Division Breakdown -->
       <div class="grid-2col" style="margin-bottom: 22px;">
         <div class="panel-card gold-focus">
@@ -1073,7 +1166,7 @@
                 <th>Subsystem / Component</th>
                 <th>Nature of Failure</th>
                 <th>Block Impact</th>
-                <th>Down Time</th>
+                <th>Down Time (Days)</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>

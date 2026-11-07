@@ -4419,3 +4419,105 @@ body[data-theme="light"],
 .clickable-machine-cell:hover .machine-jump-link {
   transform: translateX(2px);
 }
+
+/* ====================================================================
+   MONTH-WISE FAILURE GRAPHICAL VIEW & RADAR COMPARISON STYLING
+   ==================================================================== */
+.btn-month-mode {
+  transition: all 0.18s ease;
+  color: var(--text-secondary);
+}
+.btn-month-mode.active {
+  background: var(--gold-400) !important;
+  color: #0b1510 !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+}
+[data-theme="light"] .btn-month-mode.active {
+  background: #d97706 !important;
+  color: #ffffff !important;
+}
+
+.month-delta-card {
+  background: rgba(18, 28, 22, 0.85);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.month-delta-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-400);
+}
+[data-theme="light"] .month-delta-card {
+  background: #f8fafc;
+  border-color: rgba(217, 119, 6, 0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.month-delta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--pista-300);
+}
+[data-theme="light"] .month-delta-label {
+  color: #1e3a24;
+}
+.month-delta-values {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 800;
+}
+.month-delta-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.month-delta-badge.better {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+.month-delta-badge.worse {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+.month-delta-badge.neutral {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.btn-edit-incident {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35)) !important;
+  border: 1.2px solid var(--gold-400) !important;
+  color: #fef08a !important;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.btn-edit-incident:hover {
+  background: var(--gold-400) !important;
+  color: #000000 !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+[data-theme="light"] .btn-edit-incident {
+  background: #fef3c7 !important;
+  border-color: #d97706 !important;
+  color: #92400e !important;
+}
+[data-theme="light"] .btn-edit-incident:hover {
+  background: #d97706 !important;
+  color: #ffffff !important;
+}
+

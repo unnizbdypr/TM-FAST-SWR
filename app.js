@@ -224,6 +224,77 @@
     return s;
   }
 
+  // Full Month Names for Month-Wise Analytics & Comparison
+  const MONTH_NAMES_FULL = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Helper: Extract normalized year and month ({ ym: 'YYYY-MM', label: 'Month YYYY', year, month }) from any failure record
+  function getFailureYearMonth(f) {
+    if (!f) return { ym: 'UNKNOWN', label: 'Unknown Month', year: 0, month: 0 };
+    const raw = String(f.dateOfFailure || f.breakdownTime || '').trim();
+    if (!raw || raw === 'NA' || raw === 'Not Set' || raw === '-' || raw === '--') {
+      return { ym: 'UNKNOWN', label: 'Unknown Month', year: 0, month: 0 };
+    }
+
+    // 1. Overnight date check (e.g. 24/25-10-2026, 16/17-11-2025)
+    const ov = parseOvernightDate(raw);
+    if (ov && ov.yyyy && ov.mm) {
+      const padM = String(ov.mm).padStart(2, '0');
+      const ym = `${ov.yyyy}-${padM}`;
+      const label = `${MONTH_NAMES_FULL[ov.mm - 1] || 'Month'} ${ov.yyyy}`;
+      return { ym, label, year: ov.yyyy, month: ov.mm };
+    }
+
+    // 2. ISO format YYYY-MM-DD
+    const isoM = raw.match(/^(\d{4})[-/.](\d{1,2})/);
+    if (isoM) {
+      const yr = parseInt(isoM[1], 10);
+      const mo = parseInt(isoM[2], 10);
+      if (mo >= 1 && mo <= 12 && yr >= 2000 && yr <= 2099) {
+        const padM = String(mo).padStart(2, '0');
+        return { ym: `${yr}-${padM}`, label: `${MONTH_NAMES_FULL[mo - 1]} ${yr}`, year: yr, month: mo };
+      }
+    }
+
+    // 3. Indian format DD-MM-YYYY or DD/MM/YYYY or DD-MM-YY
+    const dmyM = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+    if (dmyM) {
+      const mo = parseInt(dmyM[2], 10);
+      let yr = parseInt(dmyM[3], 10);
+      if (yr < 100) yr += 2000;
+      if (mo >= 1 && mo <= 12 && yr >= 2000 && yr <= 2099) {
+        const padM = String(mo).padStart(2, '0');
+        return { ym: `${yr}-${padM}`, label: `${MONTH_NAMES_FULL[mo - 1]} ${yr}`, year: yr, month: mo };
+      }
+    }
+
+    // 4. DD-MMM-YYYY format (e.g. 15-Oct-2026 or 15/Oct/2026)
+    const dMmmM = raw.match(/^(\d{1,2})[-/. ]([A-Za-z]+)[-/. ](\d{2,4})/);
+    if (dMmmM) {
+      const mStr = dMmmM[2].toLowerCase();
+      const mo = OVERNIGHT_MONTH_MAP[mStr] || NaN;
+      let yr = parseInt(dMmmM[3], 10);
+      if (yr < 100) yr += 2000;
+      if (!isNaN(mo) && mo >= 1 && mo <= 12 && yr >= 2000 && yr <= 2099) {
+        const padM = String(mo).padStart(2, '0');
+        return { ym: `${yr}-${padM}`, label: `${MONTH_NAMES_FULL[mo - 1]} ${yr}`, year: yr, month: mo };
+      }
+    }
+
+    // 5. General Date parsing fallback
+    const dObj = new Date(raw);
+    if (!isNaN(dObj.getTime()) && dObj.getFullYear() >= 2000 && dObj.getFullYear() <= 2099) {
+      const yr = dObj.getFullYear();
+      const mo = dObj.getMonth() + 1;
+      const padM = String(mo).padStart(2, '0');
+      return { ym: `${yr}-${padM}`, label: `${MONTH_NAMES_FULL[mo - 1]} ${yr}`, year: yr, month: mo };
+    }
+
+    return { ym: 'UNKNOWN', label: 'Unknown Month', year: 0, month: 0 };
+  }
+
   // ==========================================================================
   // THEME MANAGEMENT: WHITE MODE (LIGHT) / INDUSTRIAL NIGHT DARK MODE
   // ==========================================================================
@@ -918,8 +989,8 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v18 TM-FAST authentic fleet with exact Excel commissioning & HRM synchronization)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY';
+  // Local Storage Keys (v19 TM-FAST authentic fleet with purged July-Aug 2026 & intact Sept-Oct 2026 data)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V19_PURGED_JULY_AUG';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V18_EXACT_SYNC';
   const HRM_STORAGE_KEY = 'TM_HRM_DATA_V18_EXACT_EXCEL_SYNC';
 
@@ -1033,6 +1104,10 @@
     historyLimit: 100,
     kpiScope: 'FY_2026_27', // Default Surveillance Highlights Scope: Current Financial Year 2026-27 (01.04.2026 to Present)
     paretoFleetScope: 'ALL', // Subsystem Defect Pareto Scope: 'ALL' or specific category
+    monthComparisonMode: 'compare', // Month Comparison Mode: 'compare', 'trend', or 'single'
+    monthComparisonScope: 'ALL',    // Scope: 'ALL' or specific category
+    monthA: '',                     // Primary Comparison Month (e.g. '2026-10')
+    monthB: '',                     // Secondary Comparison Month (e.g. '2026-09')
     charts: {}
   };
 
@@ -1045,6 +1120,7 @@
     updateMachineDropdown();
     updateHistoryMachineDropdown('ALL');
     setupEventListeners();
+    initMonthComparisonControls();
     renderAll();
     // Initialize Central Cloud Database Synchronization (Firebase)
     if (typeof CloudSync !== 'undefined') {
@@ -1087,7 +1163,8 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V10_RBMV_UTV2', 'TM_FAILURE_FLEET_DIRECTORY_V10_RBMV_UTV2',
         'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
         'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST', 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST', 'TM_HRM_DATA_V14_FAST',
-        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY', 'TM_HRM_DATA_V16_ORDINAL_IOH_POH'
+        'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY', 'TM_HRM_DATA_V16_ORDINAL_IOH_POH',
+        'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -1229,6 +1306,13 @@
         if (f.id === 'INC-DUO-8128-1062' || f.id === 'INC-FRM-57160-1541' || f.id === 'INC-MPT-12008-1659' || f.id === 'INC-MDU-57222-1557') return false;
         if (f.dateOfFailure === 'DESCRIPTION OF FAILURE' || f.natureOfFailure === 'REMARKS') return false;
         if (f.dateOfFailure === 'NA' && f.natureOfFailure === 'NA' && f.description === 'NA') return false;
+        return true;
+      });
+
+      // Requirement 1: Strictly exclude any July-August 2026 failures across all machines (01/07/2026 - 31/08/2026)
+      AppState.failures = AppState.failures.filter(f => {
+        const ymInfo = getFailureYearMonth(f);
+        if (ymInfo.ym === '2026-07' || ymInfo.ym === '2026-08') return false;
         return true;
       });
 
@@ -3367,8 +3451,25 @@
           }
         </td>
         <td>
-          <span style="font-family: var(--font-mono); font-weight: 700; color: ${f.downHours > 6 ? '#ff8a65' : 'var(--pista-300)'};">
-            ${f.downHours ? f.downHours + ' hrs' : (f.totalDownDays !== undefined && f.totalDownDays !== null ? f.totalDownDays + ' days' : '0 hrs')}
+          <span style="font-family: var(--font-mono); font-weight: 700; color: ${(() => {
+            let days = 0;
+            if (f.totalDownDays !== undefined && f.totalDownDays !== null && f.totalDownDays !== '' && !isNaN(Number(f.totalDownDays))) {
+              days = Number(f.totalDownDays);
+            } else if (f.downHours !== undefined && f.downHours !== null && f.downHours !== '' && !isNaN(Number(f.downHours))) {
+              days = Number(f.downHours) / 24;
+            }
+            return days > 0 ? '#ff8a65' : 'var(--pista-300)';
+          })()};">
+            ${(() => {
+              let days = 0;
+              if (f.totalDownDays !== undefined && f.totalDownDays !== null && f.totalDownDays !== '' && !isNaN(Number(f.totalDownDays))) {
+                days = Number(f.totalDownDays);
+              } else if (f.downHours !== undefined && f.downHours !== null && f.downHours !== '' && !isNaN(Number(f.downHours))) {
+                days = Number(f.downHours) / 24;
+              }
+              days = Math.round(days * 10) / 10;
+              return (days === 1) ? '1 day' : `${days} days`;
+            })()}
           </span>
         </td>
         <td>
@@ -3380,6 +3481,9 @@
         <td style="white-space: nowrap;">
           <button class="btn btn-secondary-pista btn-go-desk" style="padding: 5px 11px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.TM_APP.goToIncidentDesk('${f.id}')" title="Direct to ${escapeHtml(f.subsystem || 'Subsystem')} Desk on Machine ${escapeHtml(f.machineNo)} for complete detailed description">
             <span>🎯 Direct to Desk ↗️</span>
+          </button>
+          <button class="btn btn-primary-gold btn-edit-incident" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; margin-left: 4px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.TM_APP.openEditFailureModal('${f.id}')" title="Edit this incident record">
+            <span>✏️ Edit</span>
           </button>
           <button class="btn btn-dim" style="padding: 5px 8px; font-size: 11.5px; margin-left: 4px;" onclick="event.stopPropagation(); window.TM_APP.toggleDetails('${f.id}')" title="Quick preview details in timeline drawer">
             🔍
@@ -3430,9 +3534,12 @@
                   Certified By: <strong style="color: var(--gold-400);">${f.certifiedBy || 'SSE/TM'}</strong>
                 </div>
               </div>
-              <div style="margin-top: 10px;">
+              <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
                 <button class="btn btn-secondary-pista btn-go-desk" onclick="window.TM_APP.goToIncidentDesk('${f.id}')" style="padding: 6px 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
                   <span>🎯 Direct to ${escapeHtml(f.subsystem || 'Subsystem')} Desk for Full Machine History ↗️</span>
+                </button>
+                <button class="btn btn-primary-gold btn-edit-incident" onclick="window.TM_APP.openEditFailureModal('${f.id}')" style="padding: 6px 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                  <span>✏️ Edit Failure Record</span>
                 </button>
               </div>
             </div>
@@ -3672,6 +3779,7 @@
       : getActiveMachineId();
     renderMachineRadarChart(activeM);
     renderMachinePercentDonutChart(activeM);
+    renderMonthComparisonCharts();
   }
 
   // Chart 1: Category / Fleet Breakdown Comparison (Total Incidents)
@@ -4552,6 +4660,708 @@
     if (!mId) return;
     renderMachineRadarChart(mId);
     renderMachinePercentDonutChart(mId);
+  }
+
+  // ==========================================================================
+  // MONTH-WISE GRAPHICAL VIEW & SUBSYSTEM RADAR COMPARISON ANALYTICS
+  // ==========================================================================
+
+  // Helper: Retrieve all unique months present in failures dataset (sorted reverse chronological)
+  function getAvailableFailureMonths() {
+    const monthMap = {};
+    (AppState.failures || []).forEach(f => {
+      const info = getFailureYearMonth(f);
+      if (info.ym !== 'UNKNOWN') {
+        if (!monthMap[info.ym]) {
+          monthMap[info.ym] = {
+            ym: info.ym,
+            label: info.label,
+            year: info.year,
+            month: info.month,
+            count: 0
+          };
+        }
+        monthMap[info.ym].count++;
+      }
+    });
+
+    const arr = Object.values(monthMap);
+    arr.sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+    return arr;
+  }
+
+  // Initialize or Refresh Month Comparison Controls (Scope, Month A, Month B, Mode Toggles)
+  function initMonthComparisonControls() {
+    const scopeSelect = document.getElementById('monthScopeSelect');
+    const monthASelect = document.getElementById('monthASelect');
+    const monthBSelect = document.getElementById('monthBSelect');
+    const monthAContainer = document.getElementById('monthAContainer');
+    const monthBContainer = document.getElementById('monthBContainer');
+    const btnSwap = document.getElementById('btnSwapMonths');
+    const badge = document.getElementById('monthComparisonBadge');
+
+    const availableMonths = getAvailableFailureMonths();
+
+    // 1. Populate Scope Select if needed
+    if (scopeSelect && scopeSelect.options.length <= 1) {
+      scopeSelect.innerHTML = `
+        <option value="ALL">🌐 Entire SWR Fleet (87 Machines)</option>
+        ${MACHINE_CATEGORIES.map(c => `<option value="${c}">${getCategoryDisplayNameWithFull(c)}</option>`).join('')}
+      `;
+      scopeSelect.value = AppState.monthComparisonScope || 'ALL';
+    }
+
+    // 2. Set default Month A and Month B if empty
+    if (availableMonths.length > 0) {
+      if (!AppState.monthA || !availableMonths.some(m => m.ym === AppState.monthA)) {
+        const hasOct26 = availableMonths.some(m => m.ym === '2026-10');
+        AppState.monthA = hasOct26 ? '2026-10' : availableMonths[0].ym;
+      }
+      if (!AppState.monthB || !availableMonths.some(m => m.ym === AppState.monthB)) {
+        const hasSep26 = availableMonths.some(m => m.ym === '2026-09');
+        if (hasSep26 && AppState.monthA !== '2026-09') {
+          AppState.monthB = '2026-09';
+        } else {
+          AppState.monthB = availableMonths.length > 1 ? availableMonths[1].ym : availableMonths[0].ym;
+        }
+      }
+    }
+
+    // 3. Populate Month A Select
+    if (monthASelect) {
+      monthASelect.innerHTML = availableMonths.map(m => 
+        `<option value="${m.ym}" ${m.ym === AppState.monthA ? 'selected' : ''}>${m.label} (${m.count} records)</option>`
+      ).join('');
+      if (AppState.monthA) monthASelect.value = AppState.monthA;
+    }
+
+    // 4. Populate Month B Select
+    if (monthBSelect) {
+      monthBSelect.innerHTML = availableMonths.map(m => 
+        `<option value="${m.ym}" ${m.ym === AppState.monthB ? 'selected' : ''}>${m.label} (${m.count} records)</option>`
+      ).join('');
+      if (AppState.monthB) monthBSelect.value = AppState.monthB;
+    }
+
+    // 5. Update mode buttons active class
+    const currentMode = AppState.monthComparisonMode || 'compare';
+    const btnCompare = document.getElementById('btnModeCompare');
+    const btnTrend = document.getElementById('btnModeTrend');
+    const btnSingle = document.getElementById('btnModeSingle');
+
+    if (btnCompare) btnCompare.classList.toggle('active', currentMode === 'compare');
+    if (btnTrend) btnTrend.classList.toggle('active', currentMode === 'trend');
+    if (btnSingle) btnSingle.classList.toggle('active', currentMode === 'single');
+
+    // 6. Adjust visibility of Month B and Swap button based on mode
+    if (monthBContainer) {
+      monthBContainer.style.display = (currentMode === 'compare') ? 'flex' : 'none';
+    }
+    if (btnSwap) {
+      btnSwap.style.display = (currentMode === 'compare') ? 'inline-flex' : 'none';
+    }
+    if (monthAContainer) {
+      const lbl = monthAContainer.querySelector('label');
+      if (lbl) {
+        lbl.textContent = (currentMode === 'compare') ? '📅 Month A:' : (currentMode === 'trend' ? '📅 Focus Month:' : '📅 Selected Month:');
+      }
+    }
+
+    // 7. Update header badge
+    const monthALabel = (availableMonths.find(m => m.ym === AppState.monthA)?.label) || AppState.monthA || 'Month A';
+    const monthBLabel = (availableMonths.find(m => m.ym === AppState.monthB)?.label) || AppState.monthB || 'Month B';
+
+    if (badge) {
+      if (currentMode === 'compare') {
+        badge.textContent = `MoM Comparative View: ${monthALabel} vs ${monthBLabel}`;
+      } else if (currentMode === 'trend') {
+        badge.textContent = `Multi-Month Chronological Trend`;
+      } else {
+        badge.textContent = `Single Month Diagnostic: ${monthALabel}`;
+      }
+    }
+  }
+
+  // Compute subsystem failure distribution, down days, block percentage for a given month and fleet scope
+  function getMonthSubsystemStats(ym, scope) {
+    const targetScope = scope || AppState.monthComparisonScope || 'ALL';
+    const subLabels = ['Engine', 'Tamping / Crane', 'Mechanical', 'Hydraulic', 'Pneumatic', 'Electrical'];
+    const counts = {
+      'Engine': 0,
+      'Tamping / Crane': 0,
+      'Mechanical': 0,
+      'Hydraulic': 0,
+      'Pneumatic': 0,
+      'Electrical': 0
+    };
+
+    let totalDownDays = 0;
+    let blockCount = 0;
+    let nonBlockCount = 0;
+    let pool = AppState.failures || [];
+
+    // Filter by fleet scope
+    if (targetScope !== 'ALL') {
+      pool = pool.filter(f => {
+        if (targetScope === 'SRGM/RGM') {
+          return f.category === 'SRGM/RGM' || f.category === 'SRGM / RGM' || f.category === 'SRGM' || f.category === 'RGM';
+        }
+        if (targetScope === 'RBMV') {
+          return f.category === 'RBMV' || f.category === 'RMBV';
+        }
+        return f.category === targetScope;
+      });
+    }
+
+    // Filter by target month
+    const monthFailures = pool.filter(f => {
+      const info = getFailureYearMonth(f);
+      return info.ym === ym;
+    });
+
+    monthFailures.forEach(f => {
+      const s = (f.subsystem || '').toLowerCase();
+      const sheet = (f.sheet || '').toLowerCase();
+      const desc = ((f.natureOfFailure || '') + ' ' + (f.component || '') + ' ' + (f.description || '')).toLowerCase();
+
+      if (s.includes('engine') || s.includes('diesel') || s.includes('fuel') || desc.includes('engine') || desc.includes('diesel')) {
+        counts['Engine']++;
+      } else if (s.includes('tamp') || s.includes('crane') || s.includes('cutter') || sheet.includes('crane') || desc.includes('tamp') || desc.includes('crane') || desc.includes('squeeze')) {
+        counts['Tamping / Crane']++;
+      } else if (s.includes('hyd') || desc.includes('hyd') || desc.includes('valve')) {
+        counts['Hydraulic']++;
+      } else if (s.includes('pneu') || s.includes('air') || s.includes('brake') || desc.includes('pneu') || desc.includes('air') || desc.includes('brake')) {
+        counts['Pneumatic']++;
+      } else if (s.includes('elec') || desc.includes('elec') || desc.includes('alternator')) {
+        counts['Electrical']++;
+      } else {
+        counts['Mechanical']++;
+      }
+
+      // Total down days
+      if (f.totalDownDays !== undefined && f.totalDownDays !== null && f.totalDownDays !== '') {
+        totalDownDays += parseFloat(f.totalDownDays) || 0;
+      } else if (f.downHours !== undefined && f.downHours !== null) {
+        totalDownDays += (parseFloat(f.downHours) || 0) / 24;
+      }
+
+      // Block vs Non-Block
+      const b = String(f.whetherInBlock || '').toUpperCase().trim();
+      if (b === 'YES' || b.includes('BLOCK') || b === 'Y') {
+        blockCount++;
+      } else {
+        nonBlockCount++;
+      }
+    });
+
+    const total = monthFailures.length;
+    const percentages = subLabels.map(l => total > 0 ? parseFloat(((counts[l] / total) * 100).toFixed(1)) : 0);
+    const countsList = subLabels.map(l => counts[l]);
+
+    // Determine leading defect subsystem
+    let topName = 'None';
+    let topCount = 0;
+    subLabels.forEach(l => {
+      if (counts[l] > topCount) {
+        topCount = counts[l];
+        topName = l;
+      }
+    });
+    const topPct = total > 0 ? ((topCount / total) * 100).toFixed(1) : 0;
+    const inBlockPct = total > 0 ? ((blockCount / total) * 100).toFixed(1) : 0;
+
+    return {
+      ym,
+      total,
+      totalDownDays: parseFloat(totalDownDays.toFixed(1)),
+      blockCount,
+      nonBlockCount,
+      inBlockPct,
+      subLabels,
+      counts,
+      countsList,
+      percentages,
+      topSubsystem: { name: topName, count: topCount, pct: topPct }
+    };
+  }
+
+  // Render Month Comparison KPI Delta Cards
+  function renderMonthComparisonDeltaCards(statsA, statsB, labelA, labelB, mode) {
+    const container = document.getElementById('monthComparisonMetricsBar');
+    if (!container) return;
+
+    if (mode === 'compare') {
+      const failDelta = statsA.total - statsB.total;
+      const failPct = statsB.total > 0 ? ((failDelta / statsB.total) * 100).toFixed(1) : 0;
+      let failBadgeClass = 'neutral';
+      let failBadgeText = '0 Cases (Equal)';
+      if (failDelta < 0) {
+        failBadgeClass = 'better';
+        failBadgeText = `▼ ${Math.abs(failDelta)} cases (${Math.abs(failPct)}% lower)`;
+      } else if (failDelta > 0) {
+        failBadgeClass = 'worse';
+        failBadgeText = `▲ +${failDelta} cases (+${failPct}% higher)`;
+      }
+
+      const daysDelta = parseFloat((statsA.totalDownDays - statsB.totalDownDays).toFixed(1));
+      let daysBadgeClass = 'neutral';
+      let daysBadgeText = 'Equal Down Days';
+      if (daysDelta < 0) {
+        daysBadgeClass = 'better';
+        daysBadgeText = `▼ ${Math.abs(daysDelta)} days saved`;
+      } else if (daysDelta > 0) {
+        daysBadgeClass = 'worse';
+        daysBadgeText = `▲ +${daysDelta} days added`;
+      }
+
+      container.innerHTML = `
+        <div class="month-delta-card">
+          <div class="month-delta-label">Total Failures (${labelA} vs ${labelB})</div>
+          <div class="month-delta-values">
+            <span style="color:#10b981;">${statsA.total}</span>
+            <span style="color:var(--text-secondary); font-size:13px; font-weight:normal;">vs</span>
+            <span style="color:#f59e0b;">${statsB.total}</span>
+          </div>
+          <div><span class="month-delta-badge ${failBadgeClass}">${failBadgeText}</span></div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">Down Time in Days (${labelA} vs ${labelB})</div>
+          <div class="month-delta-values">
+            <span style="color:#10b981;">${statsA.totalDownDays}d</span>
+            <span style="color:var(--text-secondary); font-size:13px; font-weight:normal;">vs</span>
+            <span style="color:#f59e0b;">${statsB.totalDownDays}d</span>
+          </div>
+          <div><span class="month-delta-badge ${daysBadgeClass}">${daysBadgeText}</span></div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">In-Block Traffic Disruption %</div>
+          <div class="month-delta-values">
+            <span style="color:#10b981;">${statsA.inBlockPct}%</span>
+            <span style="color:var(--text-secondary); font-size:13px; font-weight:normal;">vs</span>
+            <span style="color:#f59e0b;">${statsB.inBlockPct}%</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">${statsA.blockCount} vs ${statsB.blockCount} In-Block cases</div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">Leading Defect Subsystem</div>
+          <div class="month-delta-values" style="font-size:13.5px;">
+            <span style="color:#10b981;">${statsA.topSubsystem.name} (${statsA.topSubsystem.count})</span>
+            <span style="color:var(--text-secondary); font-size:12px; font-weight:normal;">vs</span>
+            <span style="color:#f59e0b;">${statsB.topSubsystem.name} (${statsB.topSubsystem.count})</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">Highest failure volume contributor</div>
+        </div>
+      `;
+    } else {
+      // Single Month or Trend Mode
+      container.innerHTML = `
+        <div class="month-delta-card">
+          <div class="month-delta-label">Total Recorded Incidents</div>
+          <div class="month-delta-values">
+            <span style="color:#10b981;">${statsA.total} Cases</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">Logged for ${labelA}</div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">Total Down Time (Days Only)</div>
+          <div class="month-delta-values">
+            <span style="color:var(--gold-400);">${statsA.totalDownDays} Days</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">Strict calendar days format</div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">In-Block Failure Ratio</div>
+          <div class="month-delta-values">
+            <span style="color:#10b981;">${statsA.inBlockPct}%</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">${statsA.blockCount} In-Block / ${statsA.nonBlockCount} Non-Block</div>
+        </div>
+
+        <div class="month-delta-card">
+          <div class="month-delta-label">#1 Leading Defect Driver</div>
+          <div class="month-delta-values" style="font-size:14px;">
+            <span style="color:#ef4444;">${statsA.topSubsystem.name}</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-secondary);">${statsA.topSubsystem.count} cases (${statsA.topSubsystem.pct}% of month defects)</div>
+        </div>
+      `;
+    }
+  }
+
+  // Render Month Comparison Charts (Multi-Dataset Radar & Grouped Bar / Trend)
+  function renderMonthComparisonCharts() {
+    const radarCtx = document.getElementById('chartMonthCompareRadar');
+    const barCtx = document.getElementById('chartMonthCompareBar');
+    if (!radarCtx && !barCtx) return;
+
+    if (AppState.charts.monthCompareRadar) {
+      AppState.charts.monthCompareRadar.destroy();
+      AppState.charts.monthCompareRadar = null;
+    }
+    if (AppState.charts.monthCompareBar) {
+      AppState.charts.monthCompareBar.destroy();
+      AppState.charts.monthCompareBar = null;
+    }
+
+    if (!AppState.monthA || !AppState.monthB) {
+      initMonthComparisonControls();
+    }
+
+    const themeColors = getChartThemeColors();
+    const availableMonths = getAvailableFailureMonths();
+    const mode = AppState.monthComparisonMode || 'compare';
+    const scope = AppState.monthComparisonScope || 'ALL';
+
+    const infoA = availableMonths.find(m => m.ym === AppState.monthA) || { label: AppState.monthA || 'Month A' };
+    const infoB = availableMonths.find(m => m.ym === AppState.monthB) || { label: AppState.monthB || 'Month B' };
+    const labelA = infoA.label;
+    const labelB = infoB.label;
+
+    const statsA = getMonthSubsystemStats(AppState.monthA, scope);
+    const statsB = getMonthSubsystemStats(AppState.monthB, scope);
+
+    // Update section card titles
+    const titleRadar = document.getElementById('titleMonthCompareRadar');
+    const titleBar = document.getElementById('titleMonthCompareBar');
+    const subTitleBar = document.getElementById('subTitleMonthCompareBar');
+
+    if (mode === 'compare') {
+      if (titleRadar) titleRadar.textContent = `Subsystem Defect Radar Comparison (${labelA} vs ${labelB})`;
+      if (titleBar) titleBar.textContent = `Subsystem Defect Breakdown (${labelA} vs ${labelB})`;
+      if (subTitleBar) subTitleBar.textContent = 'Side-by-Side Defect Distribution';
+    } else if (mode === 'trend') {
+      if (titleRadar) titleRadar.textContent = `Subsystem Defect Radar (${labelA} Focus)`;
+      if (titleBar) titleBar.textContent = 'Month-over-Month Incident & Down Days Trend';
+      if (subTitleBar) subTitleBar.textContent = 'Fleet Historical Chronological Trend';
+    } else {
+      if (titleRadar) titleRadar.textContent = `${labelA} Subsystem Failure Radar`;
+      if (titleBar) titleBar.textContent = `${labelA} Subsystem Defect Breakdown`;
+      if (subTitleBar) subTitleBar.textContent = 'Isolated Monthly Subsystem Profile';
+    }
+
+    // Render Metric Cards
+    renderMonthComparisonDeltaCards(statsA, statsB, labelA, labelB, mode);
+
+    // 1. Radar Chart Datasets
+    const radarLabels = ['Engine', 'Tamping / Crane', 'Mechanical', 'Hydraulic', 'Pneumatic', 'Electrical'];
+    const radarDatasets = [];
+
+    if (mode === 'compare') {
+      radarDatasets.push({
+        label: `${labelA} (${statsA.total} cases)`,
+        data: statsA.countsList,
+        backgroundColor: themeColors.isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.35)',
+        borderColor: '#10b981',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: themeColors.doughnutBorder,
+        pointRadius: 4.5,
+        pointHoverRadius: 7
+      });
+      radarDatasets.push({
+        label: `${labelB} (${statsB.total} cases)`,
+        data: statsB.countsList,
+        backgroundColor: themeColors.isLight ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.35)',
+        borderColor: '#f59e0b',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#f59e0b',
+        pointBorderColor: themeColors.doughnutBorder,
+        pointRadius: 4.5,
+        pointHoverRadius: 7
+      });
+    } else {
+      radarDatasets.push({
+        label: `${labelA} (${statsA.total} cases)`,
+        data: statsA.countsList,
+        backgroundColor: themeColors.isLight ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.4)',
+        borderColor: '#10b981',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: themeColors.doughnutBorder,
+        pointRadius: 5,
+        pointHoverRadius: 8
+      });
+    }
+
+    const maxRadarVal = Math.max(...statsA.countsList, ...(mode === 'compare' ? statsB.countsList : [0]), 3);
+
+    if (radarCtx) {
+      AppState.charts.monthCompareRadar = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: radarLabels,
+          datasets: radarDatasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: themeColors.textColor, font: { size: 11, family: 'Segoe UI', weight: '700' } }
+            },
+            tooltip: {
+              backgroundColor: themeColors.tooltipBg,
+              titleColor: themeColors.tooltipTitle,
+              bodyColor: themeColors.tooltipBody,
+              borderColor: themeColors.tooltipBorder,
+              borderWidth: 1,
+              callbacks: {
+                label: function (ctx) {
+                  return ` ${ctx.dataset.label}: ${ctx.raw} defects`;
+                }
+              }
+            }
+          },
+          scales: {
+            r: {
+              angleLines: { color: themeColors.angleLineColor, lineWidth: 1.5 },
+              grid: { color: themeColors.gridColor, lineWidth: 1.2 },
+              pointLabels: {
+                color: themeColors.textColor,
+                font: { size: 11.5, weight: '700', family: 'Segoe UI' }
+              },
+              ticks: {
+                color: themeColors.textColor,
+                backdropColor: 'transparent',
+                stepSize: Math.ceil(maxRadarVal / 4) || 1,
+                font: { weight: '600' }
+              },
+              suggestedMin: 0,
+              suggestedMax: maxRadarVal + 1
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Bar / Trend Chart
+    if (barCtx) {
+      if (mode === 'compare') {
+        AppState.charts.monthCompareBar = new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels: radarLabels,
+            datasets: [
+              {
+                label: `${labelA} (${statsA.total} cases)`,
+                data: statsA.countsList,
+                backgroundColor: themeColors.isLight ? 'rgba(16, 185, 129, 0.85)' : 'rgba(16, 185, 129, 0.75)',
+                borderColor: '#059669',
+                borderWidth: 1.5,
+                borderRadius: 5
+              },
+              {
+                label: `${labelB} (${statsB.total} cases)`,
+                data: statsB.countsList,
+                backgroundColor: themeColors.isLight ? 'rgba(245, 158, 11, 0.85)' : 'rgba(245, 158, 11, 0.75)',
+                borderColor: '#d97706',
+                borderWidth: 1.5,
+                borderRadius: 5
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: themeColors.textColor, font: { size: 11, weight: '700' } }
+              },
+              tooltip: {
+                backgroundColor: themeColors.tooltipBg,
+                titleColor: themeColors.tooltipTitle,
+                bodyColor: themeColors.tooltipBody,
+                borderColor: themeColors.tooltipBorder,
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: themeColors.textColor, font: { size: 10.5, weight: '700' } },
+                grid: { color: themeColors.gridColor }
+              },
+              y: {
+                ticks: { color: themeColors.axisColor, stepSize: 1, font: { weight: '600' } },
+                title: { display: true, text: 'Defect Incidents', color: themeColors.axisColor, font: { weight: 'bold' } },
+                grid: { color: themeColors.gridColor },
+                suggestedMin: 0
+              }
+            }
+          }
+        });
+      } else if (mode === 'trend') {
+        // Chronological trend of all available months (oldest to newest)
+        const trendMonths = [...availableMonths].reverse();
+        const trendLabels = trendMonths.map(m => m.label);
+        const trendCounts = trendMonths.map(m => getMonthSubsystemStats(m.ym, scope).total);
+        const trendDays = trendMonths.map(m => getMonthSubsystemStats(m.ym, scope).totalDownDays);
+
+        AppState.charts.monthCompareBar = new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels: trendLabels,
+            datasets: [
+              {
+                type: 'bar',
+                label: 'Failure Incidents',
+                data: trendCounts,
+                backgroundColor: themeColors.isLight ? 'rgba(16, 185, 129, 0.85)' : 'rgba(16, 185, 129, 0.75)',
+                borderColor: '#059669',
+                borderWidth: 1.5,
+                borderRadius: 5,
+                yAxisID: 'yCount',
+                order: 2
+              },
+              {
+                type: 'line',
+                label: 'Total Down Days',
+                data: trendDays,
+                borderColor: '#f59e0b',
+                backgroundColor: '#f59e0b',
+                borderWidth: 2.5,
+                pointRadius: 4.5,
+                pointHoverRadius: 7,
+                fill: false,
+                tension: 0.25,
+                yAxisID: 'yDays',
+                order: 1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: themeColors.textColor, font: { size: 11, weight: '700' } }
+              },
+              tooltip: {
+                backgroundColor: themeColors.tooltipBg,
+                titleColor: themeColors.tooltipTitle,
+                bodyColor: themeColors.tooltipBody,
+                borderColor: themeColors.tooltipBorder,
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: themeColors.textColor, font: { size: 10.5, weight: '700' } },
+                grid: { color: themeColors.gridColor }
+              },
+              yCount: {
+                type: 'linear',
+                position: 'left',
+                ticks: { color: themeColors.axisColor, stepSize: 1, font: { weight: '600' } },
+                title: { display: true, text: 'Defect Incidents', color: themeColors.axisColor, font: { weight: 'bold' } },
+                grid: { color: themeColors.gridColor },
+                suggestedMin: 0
+              },
+              yDays: {
+                type: 'linear',
+                position: 'right',
+                ticks: { color: '#f59e0b', font: { weight: '600' } },
+                title: { display: true, text: 'Down Time (Days)', color: '#f59e0b', font: { weight: 'bold' } },
+                grid: { drawOnChartArea: false },
+                suggestedMin: 0
+              }
+            }
+          }
+        });
+      } else {
+        // Single Month
+        const singleColors = radarLabels.map(l => SUBSYSTEM_COLORS[l]?.bg || 'rgba(16, 185, 129, 0.75)');
+        const singleBorders = radarLabels.map(l => SUBSYSTEM_COLORS[l]?.border || '#10b981');
+
+        AppState.charts.monthCompareBar = new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels: radarLabels,
+            datasets: [
+              {
+                label: `${labelA} Subsystem Defect Breakdown`,
+                data: statsA.countsList,
+                backgroundColor: singleColors,
+                borderColor: singleBorders,
+                borderWidth: 1.5,
+                borderRadius: 5
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: themeColors.tooltipBg,
+                titleColor: themeColors.tooltipTitle,
+                bodyColor: themeColors.tooltipBody,
+                borderColor: themeColors.tooltipBorder,
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: themeColors.textColor, font: { size: 10.5, weight: '700' } },
+                grid: { color: themeColors.gridColor }
+              },
+              y: {
+                ticks: { color: themeColors.axisColor, stepSize: 1, font: { weight: '600' } },
+                title: { display: true, text: 'Defect Incidents', color: themeColors.axisColor, font: { weight: 'bold' } },
+                grid: { color: themeColors.gridColor },
+                suggestedMin: 0
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+
+  // Handlers for Month-Wise Comparison Mode, Scope, and Month Changes
+  function setMonthComparisonMode(mode) {
+    AppState.monthComparisonMode = mode;
+    initMonthComparisonControls();
+    renderMonthComparisonCharts();
+  }
+
+  function onMonthComparisonScopeChange(scope) {
+    AppState.monthComparisonScope = scope;
+    initMonthComparisonControls();
+    renderMonthComparisonCharts();
+  }
+
+  function onMonthAChange(ym) {
+    AppState.monthA = ym;
+    initMonthComparisonControls();
+    renderMonthComparisonCharts();
+  }
+
+  function onMonthBChange(ym) {
+    AppState.monthB = ym;
+    initMonthComparisonControls();
+    renderMonthComparisonCharts();
+  }
+
+  function swapComparisonMonths() {
+    const temp = AppState.monthA;
+    AppState.monthA = AppState.monthB;
+    AppState.monthB = temp;
+    initMonthComparisonControls();
+    renderMonthComparisonCharts();
   }
 
   // Chart 4: Fleet Operational Surveillance: In Block vs Non-Block & Repetitive Defect Breakdown
@@ -8208,87 +9018,6 @@
     }
   }
 
-  function openEditFailureModal(id) {
-    if (!isUserAdmin()) {
-      showToast('View-Only Access: Editing failure records requires Admin privileges.', true);
-      return;
-    }
-    const f = AppState.failures.find(x => x.id === id);
-    if (!f) return;
-    openLogModal();
-    document.getElementById('formIncidentId').value = f.id;
-    document.getElementById('formCategory').value = f.category;
-    populateFormMachines();
-    document.getElementById('formMachineNo').value = f.machineNo;
-
-    adjustSubsystemOptionsForMachine(f.machineNo || f.category);
-    const subSelect = document.getElementById('formSubsystem');
-    if (subSelect) {
-      if (f.subsystem === 'Crane') {
-        subSelect.value = 'Crane';
-      } else {
-        for (let opt of subSelect.options) {
-          if (opt.value.toLowerCase().includes((f.subsystem || '').toLowerCase())) {
-            opt.selected = true;
-            break;
-          }
-        }
-      }
-    }
-
-    const slInput = document.getElementById('formSlNo');
-    if (slInput) slInput.value = f.slNo || '';
-
-    // Handle Date of Failure (Calendar & Overnight Block Detection)
-    const bDate = document.getElementById('formBreakdownDate');
-    const chkOvernight = document.getElementById('formIsOvernightBlock');
-    const sDate = document.getElementById('formOvernightStartDate');
-    const eDate = document.getElementById('formOvernightEndDate');
-
-    const failDateVal = f.dateOfFailure || f.breakdownTime || '';
-    const ov = parseOvernightDate(failDateVal);
-
-    if (ov) {
-      if (chkOvernight) chkOvernight.checked = true;
-      if (sDate) sDate.value = ov.startDateIso;
-      if (eDate) eDate.value = ov.endDateIso;
-      onOvernightToggleChanged();
-    } else {
-      if (chkOvernight) chkOvernight.checked = false;
-      onOvernightToggleChanged();
-      if (bDate) bDate.value = failDateVal ? (toIsoDate(failDateVal) || failDateVal.substring(0, 10)) : '';
-    }
-
-    const fDate = document.getElementById('formFitDate');
-    if (fDate) {
-      const fitVal = f.dateOfRectification || f.fitTime || '';
-      fDate.value = fitVal ? (toIsoDate(fitVal) || fitVal.substring(0, 10)) : '';
-    }
-
-    const downInput = document.getElementById('formTotalDownDays');
-    if (downInput) downInput.value = (f.totalDownDays !== undefined && f.totalDownDays !== null) ? f.totalDownDays : ((parseFloat(f.downHours) || 0) / 24).toFixed(1);
-
-    const blockSelect = document.getElementById('formWhetherInBlock');
-    if (blockSelect) blockSelect.value = f.whetherInBlock || 'NO';
-
-    const descInput = document.getElementById('formNature');
-    if (descInput) descInput.value = f.description || f.natureOfFailure || '';
-
-    const actionInput = document.getElementById('formStepsTaken');
-    if (actionInput) actionInput.value = f.actionTaken || f.stepsTaken || '';
-
-    const partInput = document.getElementById('formPartNo');
-    if (partInput) partInput.value = (f.partNo && f.partNo !== '-') ? f.partNo : '';
-
-    const remarksInput = document.getElementById('formRemarks');
-    if (remarksInput) remarksInput.value = f.remarks || '';
-
-    const repSelect = document.getElementById('formIsRepetitive');
-    if (repSelect) repSelect.value = f.isRepetitive ? 'YES' : 'NO';
-
-    const statusSelect = document.getElementById('formStatus');
-    if (statusSelect) statusSelect.value = f.status || 'FIT';
-  }
 
   // ==========================================================================
   // EVENT LISTENERS & MODAL WORKFLOWS
@@ -8482,6 +9211,11 @@
     document.getElementById('failureEntryForm').reset();
     document.getElementById('formIncidentId').value = '';
 
+    const modalTitle = document.querySelector('#failureEntryModal .modal-title span');
+    if (modalTitle) {
+      modalTitle.textContent = '🛠️ Log New Breakdown or Update Machine Status';
+    }
+
     // Populate category dropdown
     const catSelect = document.getElementById('formCategory');
     catSelect.innerHTML = '';
@@ -8569,6 +9303,149 @@
     document.getElementById('formSpares').value = incident.sparesUsed || '';
     document.getElementById('formStatus').value = 'FIT';
     document.getElementById('formCertifiedBy').value = incident.certifiedBy || 'SSE/TM';
+  }
+
+  // Open Edit Failure Incident Modal (Pre-fills all incident details for editing)
+  function openEditFailureModal(id) {
+    if (!isUserAdmin()) {
+      showToast('View-Only Access: Editing failures requires Admin privileges.', true);
+      return;
+    }
+    const incident = AppState.failures.find(f => String(f.id) === String(id));
+    if (!incident) {
+      showToast('Incident record not found.', true);
+      return;
+    }
+
+    openLogModal();
+
+    // Update modal title
+    const modalTitle = document.querySelector('#failureEntryModal .modal-title span');
+    if (modalTitle) {
+      modalTitle.innerHTML = `✏️ Edit Failure Incident — <strong style="color:var(--gold-400);">${escapeHtml(incident.machineNo)}</strong> (${escapeHtml(incident.subsystem || 'Defect')})`;
+    }
+
+    // Set hidden ID
+    const idInput = document.getElementById('formIncidentId');
+    if (idInput) idInput.value = incident.id;
+
+    // Set Category & populate machines
+    const catSelect = document.getElementById('formCategory');
+    if (catSelect) {
+      catSelect.value = incident.category || 'CSM';
+      populateFormMachines();
+    }
+
+    // Set Machine Number
+    const machSelect = document.getElementById('formMachineNo');
+    if (machSelect) {
+      machSelect.value = incident.machineNo;
+    }
+
+    // Set Subsystem
+    const subSelect = document.getElementById('formSubsystem');
+    if (subSelect && incident.subsystem) {
+      subSelect.value = incident.subsystem;
+    }
+
+    // Set Sl No
+    const slNoInput = document.getElementById('formSlNo');
+    if (slNoInput) slNoInput.value = incident.slNo || '';
+
+    // Check if failure date is Overnight (e.g. 16/17-11-2025 or similar)
+    const rawFailDate = String(incident.dateOfFailure || incident.breakdownTime || '').trim();
+    const chkOvernight = document.getElementById('formIsOvernightBlock');
+    const overnightParsed = (typeof parseOvernightDateString === 'function') ? parseOvernightDateString(rawFailDate) : null;
+
+    if (overnightParsed && overnightParsed.isOvernight) {
+      if (chkOvernight) chkOvernight.checked = true;
+      onOvernightToggleChanged();
+      const sInput = document.getElementById('formOvernightStartDate');
+      const eInput = document.getElementById('formOvernightEndDate');
+      if (sInput) sInput.value = overnightParsed.startDateIso;
+      if (eInput) eInput.value = overnightParsed.endDateIso;
+      const prevEl = document.getElementById('formOvernightPreview');
+      if (prevEl) prevEl.textContent = overnightParsed.formatted;
+    } else {
+      if (chkOvernight) chkOvernight.checked = false;
+      onOvernightToggleChanged();
+      const bInput = document.getElementById('formBreakdownDate');
+      if (bInput) {
+        let isoDate = rawFailDate;
+        const dParts = rawFailDate.split(/[-/]/);
+        if (dParts.length === 3 && dParts[0].length <= 2 && dParts[2].length === 4) {
+          isoDate = `${dParts[2]}-${dParts[1].padStart(2, '0')}-${dParts[0].padStart(2, '0')}`;
+        }
+        bInput.value = isoDate.substring(0, 10);
+      }
+    }
+
+    // Set Fit Date
+    const rawFitDate = String(incident.dateOfRectification || incident.fitTime || '').trim();
+    const fitInput = document.getElementById('formFitDate');
+    if (fitInput) {
+      if (rawFitDate && rawFitDate !== '-' && rawFitDate !== 'Not Set') {
+        let isoFit = rawFitDate;
+        const fParts = rawFitDate.split(/[-/]/);
+        if (fParts.length === 3 && fParts[0].length <= 2 && fParts[2].length === 4) {
+          isoFit = `${fParts[2]}-${fParts[1].padStart(2, '0')}-${fParts[0].padStart(2, '0')}`;
+        }
+        fitInput.value = isoFit.substring(0, 10);
+      } else {
+        fitInput.value = '';
+      }
+    }
+
+    // Total Down Days
+    const downDaysInput = document.getElementById('formTotalDownDays');
+    if (downDaysInput) {
+      let days = 0;
+      if (incident.totalDownDays !== undefined && incident.totalDownDays !== null && incident.totalDownDays !== '') {
+        days = parseFloat(incident.totalDownDays) || 0;
+      } else if (incident.downHours !== undefined && incident.downHours !== null) {
+        days = parseFloat(((incident.downHours || 0) / 24).toFixed(1));
+      }
+      downDaysInput.value = days;
+    }
+
+    // Whether Occurred During Block
+    const blockSelect = document.getElementById('formWhetherInBlock');
+    if (blockSelect) {
+      const bStr = String(incident.whetherInBlock || '').toUpperCase();
+      if (bStr === 'YES' || bStr.includes('BLOCK') || bStr === 'Y') {
+        blockSelect.value = 'YES';
+      } else if (bStr.includes('MOVEMENT')) {
+        blockSelect.value = 'Machine Movement';
+      } else if (bStr.includes('PRE') || bStr.includes('POST')) {
+        blockSelect.value = 'Pre-Block / Post-Block';
+      } else {
+        blockSelect.value = 'NO';
+      }
+    }
+
+    // Description / Nature
+    const natureInput = document.getElementById('formNature');
+    if (natureInput) natureInput.value = incident.natureOfFailure || incident.description || '';
+
+    // Action Taken / Steps
+    const stepsInput = document.getElementById('formStepsTaken');
+    if (stepsInput) stepsInput.value = incident.actionTaken || incident.stepsTaken || '';
+
+    // Part No
+    const partInput = document.getElementById('formPartNo');
+    if (partInput) partInput.value = incident.partNo || '';
+
+    // Repetitive
+    const repSelect = document.getElementById('formIsRepetitive');
+    if (repSelect) repSelect.value = incident.isRepetitive ? 'YES' : 'NO';
+
+    // Remarks
+    const remInput = document.getElementById('formRemarks');
+    if (remInput) remInput.value = incident.remarks || '';
+
+    // Status
+    const statusSelect = document.getElementById('formStatus');
+    if (statusSelect) statusSelect.value = incident.status || 'FIT';
   }
 
   // Save Failure from Modal Form
@@ -8790,6 +9667,16 @@
     onRadarMachineChange,
     renderMachineRadarChart,
     renderMachinePercentDonutChart,
+    // Month-Wise Graphical View & Subsystem Comparison Methods
+    setMonthComparisonMode,
+    onMonthComparisonScopeChange,
+    onMonthAChange,
+    onMonthBChange,
+    swapComparisonMonths,
+    renderMonthComparisonCharts,
+    initMonthComparisonControls,
+    getAvailableFailureMonths,
+    getMonthSubsystemStats,
     // Overnight Block (D1/D2-MM-YYYY) Methods & Helpers
     isOvernightDate,
     parseOvernightDate,
