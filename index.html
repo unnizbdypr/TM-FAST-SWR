@@ -481,6 +481,9 @@
           </select>
           <span class="select-arrow">▼</span>
         </div>
+        <button class="btn btn-secondary-pista" id="btnExportMachineCompleteExcel" onclick="window.TM_APP.exportCompleteMachineReport()" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #86efac; border-radius: 8px; font-weight: 600;" title="Export complete details of selected machine (History Registers, failure incidents, subsystem logs, repeat cases, and overhaul schedules) as a comprehensive multi-sheet Excel report">
+          <span>📥 Export Machine Excel Report</span>
+        </button>
         <button class="btn btn-dim" id="btnQuickFleetPareto" onclick="window.TM_APP.openParetoForFleet(window.TM_APP.getAppState().selectedCategory)" style="padding: 8px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;" title="Open Subsystem Pareto analysis for active fleet">
           <span>📊 Subsystem Pareto</span>
         </button>
@@ -524,20 +527,68 @@
     </div>
 
     <!-- ====================================================================
-         SURVEILLANCE & REPETITIVE FAILURE ALERT CARD
+         REPETITIVE FAILURES SLOW-MOVING TICKER (Replaces static radar flag)
          ==================================================================== -->
-    <div class="surveillance-alert-card" id="surveillanceAlertCard">
-      <div class="alert-header-row">
-        <div class="alert-title-group">
-          <div class="alert-icon-box">🔁</div>
-          <div>
-            <div class="alert-title">REPETITIVE DEFECT SURVEILLANCE RADAR DETECTED</div>
-            <div class="alert-subtitle">The following machines have shown 2 or more recurring subsystem/component failures within 60 days</div>
+    <div class="repeat-failures-ticker-bar" id="repeatFailuresTicker" onclick="window.TM_APP.openRepeatViewFromTicker()" onkeydown="if(event.key==='Enter'||event.key===' ')window.TM_APP.openRepeatViewFromTicker()" role="button" tabindex="0" title="Click here to analyze repetitive failures across all machines">
+      <div class="ticker-prefix-badge">
+        <span class="ticker-pulse-circle"></span>
+        <span class="ticker-label">🔁 REPEAT DEFECTS</span>
+      </div>
+      <div class="ticker-viewport">
+        <div class="ticker-track" id="repeatTickerTrack">
+          <div class="ticker-content">
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
+          </div>
+          <div class="ticker-content" aria-hidden="true">
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
+            <span class="ticker-text">Click here to analyze repetitive failures across all machines</span>
+            <span class="ticker-star">★</span>
           </div>
         </div>
       </div>
-      <div class="repeat-pills-container" id="repeatPillsContainer">
-        <!-- Repeat incident pills injected by app.js -->
+      <div class="ticker-suffix-action">
+        <span class="ticker-action-btn">Analyze ↗</span>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         IOH POH UPDATES SLOW-MOVING TICKER (Directs user to IOH POH tab)
+         ==================================================================== -->
+    <div class="ioh-poh-ticker-bar" id="iohPohTicker" onclick="window.TM_APP.openIohPohViewFromTicker()" onkeydown="if(event.key==='Enter'||event.key===' ')window.TM_APP.openIohPohViewFromTicker()" role="button" tabindex="0" title="Click here for IOH POH Updates">
+      <div class="ticker-prefix-badge ioh-poh-badge">
+        <span class="ticker-pulse-circle cyan-pulse"></span>
+        <span class="ticker-label">🛠️ IOH / POH UPDATES</span>
+      </div>
+      <div class="ticker-viewport">
+        <div class="ticker-track ioh-poh-track" id="iohPohTickerTrack">
+          <div class="ticker-content">
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+          </div>
+          <div class="ticker-content" aria-hidden="true">
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+            <span class="ticker-text cyan-text">Click here for IOH POH Updates</span>
+            <span class="ticker-star cyan-star">★</span>
+          </div>
+        </div>
+      </div>
+      <div class="ticker-suffix-action">
+        <span class="ticker-action-btn cyan-btn">Open Updates ↗</span>
       </div>
     </div>
 
@@ -631,6 +682,14 @@
       <button class="tab-btn tab-btn-dim" data-tab="fleet-view" id="tabBtnFleet" style="margin-left: auto;">
         <span>📊 Fleet Analytics &amp; Radar</span>
       </button>
+      <button class="tab-btn" data-tab="repeat-view" id="tabBtnRepeat">
+        <span>🔁 Repeat Failures</span>
+        <span class="tab-count-badge" id="badgeRepeatFailures">0</span>
+      </button>
+      <button class="tab-btn" data-tab="ioh-poh-view" id="tabBtnIohPoh">
+        <span>🛠️ IOH POH Updates</span>
+        <span class="tab-count-badge" id="badgeIohPohUpdates">8</span>
+      </button>
       <button class="tab-btn tab-btn-dim" data-tab="history-view" id="tabBtnAllFailures">
         <span>📋 All Machine Incidents</span>
         <span class="tab-count-badge" id="badgeAllFailures">0</span>
@@ -688,8 +747,11 @@
             <button class="btn btn-secondary-pista admin-only" onclick="window.TM_APP.openAddHrmEntryModal()" style="font-size: 12px; padding: 6px 14px;">
               ➕ Add / Update Entry
             </button>
-            <button class="btn btn-dim" onclick="window.TM_APP.exportCurrentHrm()" style="font-size: 12px; padding: 6px 12px;">
-              📥 Export HRM
+            <button class="btn btn-secondary-pista" id="btnHrmExportCompleteReport" onclick="window.TM_APP.exportCompleteMachineReport()" style="font-size: 12px; padding: 6px 14px; font-weight: 600;" title="Export entire machine details (History Register, all failure incidents, subsystem breakdown, repeat defects, overhaul schedules) as a comprehensive multi-sheet Excel report">
+              📥 Export Machine Excel Report
+            </button>
+            <button class="btn btn-dim" onclick="window.TM_APP.exportCurrentHrm()" style="font-size: 12px; padding: 6px 12px;" title="Export HRM 16 items table only">
+              📄 Export HRM Only
             </button>
             <button class="btn btn-dim" onclick="window.TM_APP.resetMachineHrm()" style="font-size: 12px; padding: 6px 12px;" title="Reset this machine to authentic Excel values">
               🔄 Reset to Workbook
@@ -1023,6 +1085,264 @@
         </div>
         <div class="chart-container-box" style="height: 280px;">
           <canvas id="chartBlockVsNonBlock"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ====================================================================
+         TAB: REPEAT FAILURES & COMPONENT RECURRENCE SURVEILLANCE
+         ==================================================================== -->
+    <div class="tab-pane" id="repeat-view">
+      
+      <!-- Top Control Header: Machine Selector, Duration Filter, Live Search & Stats -->
+      <div class="panel-card" style="margin-bottom: 20px;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+          <div class="panel-title gold-accent">
+            <span class="indicator-circle"></span>
+            <span>Fleet Repeat Failure Surveillance &amp; Recurring Component Registry</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);" id="badgeRepeatClustersCount">
+              🔁 Component-Level Recurrence Active
+            </span>
+            <button type="button" class="btn btn-secondary-gold" onclick="window.TM_APP.exportRepeatFailures('excel')" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;">
+              📥 Export Repeat Cases
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Controls Toolbar -->
+        <div class="repeat-controls-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; padding: 14px; background: rgba(10, 20, 14, 0.6); border-radius: 8px; border: 1px solid var(--border-pista);">
+          
+          <!-- Machine Selector -->
+          <div>
+            <label for="repeatMachineSelect" style="display: block; font-size: 11.5px; font-weight: 700; color: var(--gold-300); margin-bottom: 6px;">
+              🚂 Select Machine (Fleet of 87 Machines):
+            </label>
+            <select id="repeatMachineSelect" class="filter-select" style="width: 100%; font-weight: 700; color: #fff; background: rgba(18, 38, 26, 0.95); padding: 7px 10px; cursor: pointer; border: 1px solid var(--border-gold);" onchange="window.TM_APP.onRepeatMachineChange(this.value)">
+              <option value="ALL">🌐 All Machines with Repeat Cases</option>
+            </select>
+          </div>
+
+          <!-- Duration Filter -->
+          <div>
+            <label for="repeatDurationSelect" style="display: block; font-size: 11.5px; font-weight: 700; color: var(--gold-300); margin-bottom: 6px;">
+              🗓️ Failure Duration Period:
+            </label>
+            <select id="repeatDurationSelect" class="filter-select" style="width: 100%; font-weight: 600; color: #fff; background: rgba(18, 38, 26, 0.95); padding: 7px 10px; cursor: pointer; border: 1px solid var(--border-pista);" onchange="window.TM_APP.onRepeatDurationChange(this.value)">
+              <option value="ALL">🗓️ All Time (Complete Fleet History)</option>
+              <option value="30D">⏱️ Last 30 Days</option>
+              <option value="90D">⏱️ Last 90 Days</option>
+              <option value="180D">⏱️ Last 6 Months (180 Days)</option>
+              <option value="FY2627">📊 Financial Year 2026-27 (Current FY)</option>
+              <option value="FY2526">📊 Financial Year 2025-26</option>
+              <option value="2026">📅 Calendar Year 2026</option>
+              <option value="CUSTOM">⚙️ Custom Date Range...</option>
+            </select>
+          </div>
+
+          <!-- Custom Date Range (Hidden by default, shown when CUSTOM selected) -->
+          <div id="repeatCustomDateBox" style="display: none;">
+            <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--gold-300); margin-bottom: 6px;">
+              📅 Custom Range (From / To):
+            </label>
+            <div style="display: flex; gap: 6px;">
+              <input type="date" id="repeatCustomFrom" class="form-control" style="padding: 5px; font-size: 11.5px; background: rgba(18, 38, 26, 0.95); color: #fff; border: 1px solid var(--border-pista);" onchange="window.TM_APP.onRepeatCustomDateChange()">
+              <input type="date" id="repeatCustomTo" class="form-control" style="padding: 5px; font-size: 11.5px; background: rgba(18, 38, 26, 0.95); color: #fff; border: 1px solid var(--border-pista);" onchange="window.TM_APP.onRepeatCustomDateChange()">
+            </div>
+          </div>
+
+          <!-- Search Filter -->
+          <div>
+            <label for="repeatSearchInput" style="display: block; font-size: 11.5px; font-weight: 700; color: var(--gold-300); margin-bottom: 6px;">
+              🔍 Search Component / Nature / Spares:
+            </label>
+            <input type="text" id="repeatSearchInput" class="form-control" placeholder="Filter by part, code (e.g. HZS-DS, 09D090), defect..." style="width: 100%; padding: 7px 10px; font-size: 12px; background: rgba(18, 38, 26, 0.95); color: #fff; border: 1px solid var(--border-pista);" oninput="window.TM_APP.onRepeatSearch(this.value)">
+          </div>
+
+        </div>
+
+        <!-- Executive KPI Metric Ribbon -->
+        <div class="repeat-kpi-ribbon" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px;">
+          
+          <div class="kpi-card" style="border-left: 4px solid #ef4444; padding: 12px 14px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #a4bba9; font-weight: 700;">Repeat Defect Clusters</div>
+            <div style="font-size: 26px; font-weight: 800; color: #f87171; font-family: var(--font-mono); margin-top: 4px;" id="kpiRepeatClusters">0</div>
+            <div style="font-size: 11px; color: #a4bba9; margin-top: 2px;">Matching identical parts</div>
+          </div>
+
+          <div class="kpi-card" style="border-left: 4px solid #f59e0b; padding: 12px 14px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #a4bba9; font-weight: 700;">Total Repeated Incidents</div>
+            <div style="font-size: 26px; font-weight: 800; color: #fbbf24; font-family: var(--font-mono); margin-top: 4px;" id="kpiRepeatIncidents">0</div>
+            <div style="font-size: 11px; color: #a4bba9; margin-top: 2px;">Across monitored fleet</div>
+          </div>
+
+          <div class="kpi-card" style="border-left: 4px solid #ec4899; padding: 12px 14px;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #a4bba9; font-weight: 700;">Traffic Block Incidents</div>
+            <div style="font-size: 26px; font-weight: 800; color: #f472b6; font-family: var(--font-mono); margin-top: 4px;" id="kpiRepeatBlockCases">0</div>
+            <div style="font-size: 11px; color: #a4bba9; margin-top: 2px;">Critical in-block failures</div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Machine Specific Header Banner (Shown when a particular machine is selected) -->
+      <div id="repeatMachineHeaderBanner" class="panel-card" style="display: none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(20, 42, 30, 0.85), rgba(12, 24, 18, 0.95)); border: 1px solid var(--border-gold);">
+        <!-- Injected dynamically by renderRepeatFailuresView() -->
+      </div>
+
+      <!-- Machines Grid (Shown when ALL machines selected - Displays ALL 87 machines) -->
+      <div id="repeatMachinesSummarySection" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--gold-300); margin: 0;">
+              🚂 SWR Track Machine Fleet Directory (All 87 Monitored Machines):
+            </h3>
+            <div style="font-size: 11.5px; color: #a4bba9; margin-top: 2px;">
+              Click any machine below to immediately inspect its complete repeat failure history and isolated defect clusters one-by-one:
+            </div>
+          </div>
+          <span style="font-size: 11.5px; color: #a4bba9;" id="repeatMachinesCountBadge">Showing 87 of 87 machines</span>
+        </div>
+
+        <!-- Interactive Fleet Filter Controls -->
+        <div class="repeat-fleet-filter-bar" id="repeatFleetFilterBar">
+          <button type="button" class="repeat-fleet-pill active" data-filter="ALL" onclick="window.TM_APP.filterRepeatFleetGrid('ALL')">🌐 All 87 Machines</button>
+          <button type="button" class="repeat-fleet-pill" data-filter="REPEAT" onclick="window.TM_APP.filterRepeatFleetGrid('REPEAT')">🔥 With Recurring Defects</button>
+          <button type="button" class="repeat-fleet-pill" data-filter="CLEAN" onclick="window.TM_APP.filterRepeatFleetGrid('CLEAN')">✅ Zero Repeat (Clean)</button>
+          <button type="button" class="repeat-fleet-pill" data-filter="SBC" onclick="window.TM_APP.filterRepeatFleetGrid('SBC')">🔵 SBC Division</button>
+          <button type="button" class="repeat-fleet-pill" data-filter="MYS" onclick="window.TM_APP.filterRepeatFleetGrid('MYS')">🟢 MYS Division</button>
+          <button type="button" class="repeat-fleet-pill" data-filter="UBL" onclick="window.TM_APP.filterRepeatFleetGrid('UBL')">🟤 UBL Division</button>
+          <input type="text" id="repeatFleetSearchBox" placeholder="⚡ Filter machine no. (e.g. 2014, 8128)..." class="form-control" style="width: 220px; padding: 4px 10px; font-size: 11.5px; border-radius: 16px; margin-left: auto; background: rgba(18, 38, 26, 0.95); color: #fff; border: 1px solid var(--border-pista);" oninput="window.TM_APP.onRepeatFleetSearch(this.value)">
+        </div>
+
+        <div id="repeatMachinesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">
+          <!-- All 87 machine cards injected dynamically -->
+        </div>
+      </div>
+
+      <!-- Repeat Defect Clusters Container (All repeat cases listed one-by-one upon clicking/selecting machine) -->
+      <div class="panel-card">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+          <div class="panel-title gold-accent">
+            <span class="indicator-circle"></span>
+            <span id="repeatListingTitle">All Repeat Defect Cases — Detailed Component Breakdown</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-sm btn-dim" onclick="window.TM_APP.expandAllRepeatClusters()" style="font-size: 11px;">
+              ➕ Expand All
+            </button>
+            <button type="button" class="btn btn-sm btn-dim" onclick="window.TM_APP.collapseAllRepeatClusters()" style="font-size: 11px;">
+              ➖ Collapse All
+            </button>
+          </div>
+        </div>
+
+        <!-- Sticky Auto-Highlight Banner (Shown when user clicks on a repetitive case) -->
+        <div id="repeatActiveHighlightBanner" class="repeat-highlight-banner" style="display: none; margin-top: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">🎯</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 800; color: #fbbf24;" id="repeatHighlightBannerTitle">Linked Recurring Cases Highlighted</div>
+              <div style="font-size: 11.5px; color: #e5e7eb;" id="repeatHighlightBannerSub">All related occurrences sharing this exact component and mechanism are glowing below.</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-dim" onclick="window.TM_APP.clearRepeatCaseHighlight()" style="font-size: 11px; padding: 4px 10px;">
+            ✕ Clear Highlight
+          </button>
+        </div>
+
+        <div id="repeatClustersContainer" style="margin-top: 14px;">
+          <!-- Repeat clusters and their one-by-one cases injected here -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ====================================================================
+         TAB: IOH POH UPDATES MASTER DATABASE & MULTI-YEAR OVERHAUL SCHEDULES
+         ==================================================================== -->
+    <div class="tab-pane" id="ioh-poh-view">
+      
+      <!-- Top Control Header: Search, Actions, Summary -->
+      <div class="panel-card" style="margin-bottom: 14px;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div class="panel-title gold-accent" style="display: flex; align-items: center; gap: 8px;">
+              <span class="indicator-circle" style="background: #38bdf8; box-shadow: 0 0 8px rgba(56,189,248,0.7);"></span>
+              <span>SWR Track Machines — IOH &amp; POH Master Database &amp; Schedules</span>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">
+              Authentic multi-year overhaul timelines, master engine hours run, next due projections, and expenditure details from <code>IOH POH Updates.xlsx</code>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div class="search-box" style="width: 260px;">
+              <span class="search-icon">&#128269;</span>
+              <input type="text" id="iohPohSearchInput" class="form-control" placeholder="Search machine, depot, remark..." oninput="window.TM_APP.onIohPohSearch(this.value)">
+              <button type="button" class="search-clear-btn" id="iohPohSearchClear" onclick="window.TM_APP.clearIohPohSearch()" style="display: none;">&times;</button>
+            </div>
+            <button type="button" class="btn btn-secondary-pista" id="btnIohPohAddEntry" onclick="window.TM_APP.openIohPohAddModal()" title="Add new row entry to the active sheet">
+              <span>&#10133; Add Entry</span>
+            </button>
+            <button type="button" class="btn btn-dim" onclick="window.TM_APP.exportIohPohToExcel()" title="Export current sheet or full workbook to Excel (.xlsx)">
+              <span>&#128229; Export Sheet (.xlsx)</span>
+            </button>
+            <button type="button" class="btn btn-dim admin-only" onclick="window.TM_APP.resetIohPohToDefault()" title="Reset sheet data to original IOH POH Updates.xlsx dataset">
+              <span>&#128260; Reset to Original</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sheet Selector Pills (8 Sheets Available) -->
+        <div style="margin-top: 14px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--gold-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+            Select Overhaul Schedule / Projections Sheet (8 Sheets Available):
+          </div>
+          <div class="ioh-poh-sheet-nav-bar" id="iohPohSheetNav">
+            <!-- Sheet pills dynamically rendered here -->
+          </div>
+        </div>
+
+        <!-- Sheet Status & Summary Banner -->
+        <div style="margin-top: 12px; padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;" id="iohPohActiveSheetIcon">&#128197;</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #38bdf8;" id="iohPohActiveSheetTitle">Schedule for POH &amp; IOH of Machines for Year 2026-27</div>
+              <div style="font-size: 11px; color: var(--text-muted);" id="iohPohActiveSheetSubtitle">Sheet: 2026-27 | Official SWR POH/IOH Nominated &amp; Working Days Schedule</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);" id="iohPohCountBadge">
+              51 Entries
+            </span>
+            <span style="font-size: 11.5px; color: var(--text-muted);" id="iohPohFilteredNote"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Data Table Container -->
+      <div class="panel-card" style="padding: 0; overflow: hidden;">
+        <div class="table-container" style="max-height: 65vh; overflow-y: auto; overflow-x: auto;">
+          <table class="ioh-poh-table" id="iohPohTable">
+            <thead>
+              <tr id="iohPohTableHead">
+                <!-- Dynamically populated column headers -->
+              </tr>
+            </thead>
+            <tbody id="iohPohTableBody">
+              <!-- Dynamically populated table rows -->
+            </tbody>
+          </table>
+        </div>
+        <div id="iohPohEmptyState" style="display: none; padding: 40px 20px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 32px; margin-bottom: 8px;">&#128269;</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--text-main);">No matching records found</div>
+          <div style="font-size: 12px; margin-top: 4px;">Try searching for another machine number, depot or clear the search query.</div>
         </div>
       </div>
 
@@ -1732,20 +2052,61 @@
     </div>
   </div>
 
+  <!-- ====================================================================
+       MODAL: EDIT / ADD IOH POH SHEET RECORD
+       ==================================================================== -->
+  <div class="modal-overlay" id="iohPohEditModal">
+    <div class="modal-card" style="max-width: 720px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #38bdf8;">&#128736;&#65039;</span>
+          <span id="iohPohModalTitle">Edit IOH / POH Record</span>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.TM_APP.closeModal('iohPohEditModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 18px 24px;">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px; padding: 8px 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px;" id="iohPohModalSubtitle">
+          Modify fields for this record. All updates persist securely to local database.
+        </div>
+        
+        <form id="iohPohModalForm" onsubmit="event.preventDefault(); window.TM_APP.saveIohPohModalRecord();">
+          <div id="iohPohModalFields" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+            <!-- Dynamically populated based on active sheet columns -->
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; border-top: 1px solid rgba(147, 197, 114, 0.15);">
+        <div>
+          <button type="button" class="btn btn-danger-dim admin-only" id="btnIohPohModalDelete" onclick="window.TM_APP.deleteIohPohRecordFromModal()" style="display: none;">
+            <span>&#128465;&#65039; Delete Entry</span>
+          </button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-dim" onclick="window.TM_APP.closeModal('iohPohEditModal')">Cancel</button>
+          <button type="button" class="btn btn-primary-gold" id="btnIohPohModalSave" onclick="window.TM_APP.saveIohPohModalRecord()">
+            <span id="btnIohPohModalSaveText">&#128190; Save Changes</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Popup -->
   <div class="toast-notification" id="toastNotification">
     <span style="font-size: 18px;">🔔</span>
     <span id="toastMessageText">Action performed successfully.</span>
   </div>
 
-  <!-- Google Firebase Realtime Database SDKs (Compat mode for browser web applications) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
   <!-- Firebase Central Project Configuration (Step 4: paste keys here) -->
   <script src="firebase-config.js"></script>
   <!-- SWR Track Machine Real Fleet & Failure Database -->
   <script src="fleet_data.js"></script>
+  <!-- SWR Track Machine IOH POH Master Updates & Projections Dataset -->
+  <script src="ioh_poh_data.js"></script>
   <!-- Application Logic -->
   <script src="app.js"></script>
+  <!-- Google Firebase Realtime Database SDKs (Compat mode for browser web applications - non-blocking) -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" onload="if (window.CloudSync && typeof CloudSync.init === 'function') CloudSync.init();"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js" onload="if (window.CloudSync && typeof CloudSync.init === 'function') CloudSync.init();"></script>
 </body>
 </html>

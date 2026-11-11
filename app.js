@@ -522,6 +522,19 @@
     CurrentUser = null;
     document.body.classList.remove('role-admin');
     document.body.classList.remove('role-viewer');
+    document.body.classList.remove('cloud-sync-authorized');
+    document.body.classList.add('cloud-sync-forbidden');
+
+    const csIndicator = document.getElementById('cloudSyncIndicator');
+    const csHeaderBtn = document.getElementById('btnHeaderCloudSync');
+    const csBanner = document.getElementById('cloudRulesWarningBanner');
+    if (csIndicator) csIndicator.style.display = 'none';
+    if (csHeaderBtn) csHeaderBtn.style.display = 'none';
+    if (csBanner) csBanner.style.display = 'none';
+    document.querySelectorAll('.btn-cloud-tab').forEach(el => {
+      el.style.display = 'none';
+    });
+
     const overlay = document.getElementById('loginOverlay');
     const container = document.getElementById('appContainer');
     const chip = document.getElementById('userSessionChip');
@@ -560,6 +573,25 @@
     } else {
       document.body.classList.add('role-viewer');
       document.body.classList.remove('role-admin');
+    }
+
+    // Strict Cloud Sync Access Control: Admin 1 and Admin 2 only
+    const canCloud = isCloudSyncAuthorized();
+    const csIndicator = document.getElementById('cloudSyncIndicator');
+    const csHeaderBtn = document.getElementById('btnHeaderCloudSync');
+    const csBanner = document.getElementById('cloudRulesWarningBanner');
+    if (csIndicator) csIndicator.style.display = canCloud ? 'inline-flex' : 'none';
+    if (csHeaderBtn) csHeaderBtn.style.display = canCloud ? 'inline-flex' : 'none';
+    if (csBanner && !canCloud) csBanner.style.display = 'none';
+    document.querySelectorAll('.btn-cloud-tab').forEach(el => {
+      el.style.display = canCloud ? 'inline-flex' : 'none';
+    });
+    if (canCloud) {
+      document.body.classList.add('cloud-sync-authorized');
+      document.body.classList.remove('cloud-sync-forbidden');
+    } else {
+      document.body.classList.remove('cloud-sync-authorized');
+      document.body.classList.add('cloud-sync-forbidden');
     }
 
     updateThemeUI(getCurrentTheme());
@@ -835,6 +867,13 @@
     return CurrentUser && CurrentUser.role === 'ADMIN';
   }
 
+  // Cloud Synchronization Access Restriction: Admin 1 and Admin 2 Only
+  function isCloudSyncAuthorized() {
+    if (!CurrentUser) return false;
+    const uid = resolveUserId(CurrentUser.userId);
+    return uid === 'admin1@zbdypr' || uid === 'admin2@zbdypr';
+  }
+
   // Canonical SWR Machine Fleet Mapping (Strict 87-machine fleet across all 15 categories)
   const DEFAULT_FLEET_DIRECTORY = {
     'CSM': [
@@ -989,8 +1028,8 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v19 TM-FAST authentic fleet with purged July-Aug 2026 & intact Sept-Oct 2026 data)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V19_PURGED_JULY_AUG';
+  // Local Storage Keys (v20 TM-FAST authentic fleet with purged July-Aug 2026 & intact Sept-Oct 2026 data)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V20_PURGED_JULY_AUG';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V18_EXACT_SYNC';
   const HRM_STORAGE_KEY = 'TM_HRM_DATA_V18_EXACT_EXCEL_SYNC';
 
@@ -1122,9 +1161,17 @@
     setupEventListeners();
     initMonthComparisonControls();
     renderAll();
+    // Pre-populate repeat failures dropdown & clusters on startup
+    if (typeof renderRepeatFailuresView === 'function') {
+      try { renderRepeatFailuresView(); } catch(e) { console.warn('Deferred repeat view init:', e); }
+    }
     // Initialize Central Cloud Database Synchronization (Firebase)
     if (typeof CloudSync !== 'undefined') {
       CloudSync.init();
+    }
+    // Initialize IOH POH Updates Module
+    if (typeof initIohPohModule === 'function') {
+      try { initIohPohModule(); } catch(e) { console.warn('Deferred IOH POH init:', e); }
     }
     checkSession();
     // Pre-warm SheetJS in background
@@ -1148,6 +1195,34 @@
     return null;
   }
 
+  // Helper: Get list of all unique machine IDs across the entire fleet
+  function getAllFleetMachineIds() {
+    const ids = new Set();
+    if (typeof FLEET_DATABASE !== 'undefined' && FLEET_DATABASE) {
+      Object.keys(FLEET_DATABASE).forEach(id => {
+        if (id) ids.add(normalizeMachineNo(id));
+      });
+    }
+    if (typeof FLEET_DIRECTORY !== 'undefined' && FLEET_DIRECTORY) {
+      Object.keys(FLEET_DIRECTORY).forEach(c => {
+        (FLEET_DIRECTORY[c] || []).forEach(m => {
+          if (m && m.id) ids.add(normalizeMachineNo(m.id));
+        });
+      });
+    }
+    if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && Array.isArray(window.REAL_SWR_FLEET_DATA.machines)) {
+      window.REAL_SWR_FLEET_DATA.machines.forEach(m => {
+        if (m && m.id) ids.add(normalizeMachineNo(m.id));
+      });
+    }
+    if (AppState && AppState.failures) {
+      AppState.failures.forEach(f => {
+        if (f && f.machineNo) ids.add(normalizeMachineNo(f.machineNo));
+      });
+    }
+    return Array.from(ids).sort();
+  }
+
   // Load from LocalStorage or Official SWR Fleet Database
   function loadDataset() {
     try {
@@ -1164,7 +1239,7 @@
         'TM_FAILURE_SURVEILLANCE_DATA_V12_SBC_ALL', 'TM_FAILURE_FLEET_DIRECTORY_V12_SBC_ALL',
         'TM_FAILURE_SURVEILLANCE_DATA_V14_FAST', 'TM_FAILURE_FLEET_DIRECTORY_V14_FAST', 'TM_HRM_DATA_V14_FAST',
         'TM_HRM_DATA_V1', 'TM_HRM_DATA_V2', 'TM_HRM_DATA_V3', 'TM_HRM_DATA_V5_RBMV_UTV2', 'TM_HRM_DATA_V6_SBC_ALL', 'TM_HRM_DATA_V15_DDMMYYYY', 'TM_HRM_DATA_V16_ORDINAL_IOH_POH',
-        'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY'
+        'TM_FAILURE_SURVEILLANCE_DATA_V15_DDMMYYYY', 'TM_FAILURE_SURVEILLANCE_DATA_V19_PURGED_JULY_AUG'
       ].forEach(k => {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -1284,7 +1359,10 @@
         idbGet(STORAGE_KEY).then(idbFails => {
           if (Array.isArray(idbFails) && idbFails.length > AppState.failures.length) {
             const merged = CloudSync.mergeFailures(AppState.failures, idbFails);
-            AppState.failures = merged.list;
+            AppState.failures = merged.list.filter(f => {
+              const ymInfo = getFailureYearMonth(f);
+              return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
+            });
             classifyRepetitiveFailures(AppState.failures);
             updateMachineDropdown();
             renderAll();
@@ -1306,13 +1384,6 @@
         if (f.id === 'INC-DUO-8128-1062' || f.id === 'INC-FRM-57160-1541' || f.id === 'INC-MPT-12008-1659' || f.id === 'INC-MDU-57222-1557') return false;
         if (f.dateOfFailure === 'DESCRIPTION OF FAILURE' || f.natureOfFailure === 'REMARKS') return false;
         if (f.dateOfFailure === 'NA' && f.natureOfFailure === 'NA' && f.description === 'NA') return false;
-        return true;
-      });
-
-      // Requirement 1: Strictly exclude any July-August 2026 failures across all machines (01/07/2026 - 31/08/2026)
-      AppState.failures = AppState.failures.filter(f => {
-        const ymInfo = getFailureYearMonth(f);
-        if (ymInfo.ym === '2026-07' || ymInfo.ym === '2026-08') return false;
         return true;
       });
 
@@ -1343,6 +1414,18 @@
           f.remarks = 'NA';
         }
       });
+
+      // Requirement 1: Strictly exclude any July-August 2026 failures across all machines (01/07/2026 - 31/08/2026)
+      AppState.failures = AppState.failures.filter(f => {
+        const ymInfo = getFailureYearMonth(f);
+        if (ymInfo.ym === '2026-07' || ymInfo.ym === '2026-08') return false;
+        return true;
+      });
+
+      safeLocalStorageSet(STORAGE_KEY, JSON.stringify(AppState.failures));
+      if (typeof idbSet === 'function') {
+        idbSet(STORAGE_KEY, AppState.failures);
+      }
 
       if (typeof HRM_DATA === 'object') {
         Object.keys(HRM_DATA).forEach(mId => {
@@ -1512,7 +1595,13 @@
       });
 
       // Local-only entries come first so user's recent entries are front and center
-      const mergedList = [...localOnly, ...remoteList];
+      let mergedList = [...localOnly, ...remoteList];
+
+      // Requirement 1: Strictly purge any historical July-August 2026 failures (01/07/2026 - 31/08/2026) across all machines
+      mergedList = mergedList.filter(f => {
+        const ymInfo = getFailureYearMonth(f);
+        return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
+      });
 
       return {
         list: mergedList,
@@ -1647,9 +1736,9 @@
             renderAll();
             this.isSyncingFromRemote = false;
 
-            // If local had unsynced entries, immediately push merged dataset to cloud
-            if (merged.hasLocalNew) {
-              console.log(`CloudSync: Auto-pushing ${merged.localNewCount} local-only entries to Firebase Cloud.`);
+            // If local had unsynced entries or cleaned purged entries, immediately push merged dataset to cloud
+            if (merged.hasLocalNew || (remoteList.length > merged.list.length && isCloudSyncAuthorized())) {
+              console.log(`CloudSync: Auto-pushing clean purged dataset to Firebase Cloud.`);
               this.pushFailures().catch(() => {});
             }
           }
@@ -1909,6 +1998,10 @@
     },
 
     openModal() {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
       const modal = document.getElementById('cloudSyncModal');
       if (modal) {
         modal.classList.add('active');
@@ -2129,6 +2222,12 @@
   }
 
   function saveDataset() {
+    // Strictly ensure July-August 2026 historical failures remain purged across all machines
+    AppState.failures = AppState.failures.filter(f => {
+      const ymInfo = getFailureYearMonth(f);
+      return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
+    });
+
     safeLocalStorageSet(STORAGE_KEY, JSON.stringify(AppState.failures));
     safeLocalStorageSet(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
 
@@ -2137,7 +2236,7 @@
       idbSet(FLEET_STORAGE_KEY, FLEET_DIRECTORY);
     }
 
-    if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured) {
+    if (typeof CloudSync !== 'undefined' && CloudSync.isConfigured && isCloudSyncAuthorized()) {
       CloudSync.pushFailures().catch(() => {});
       CloudSync.pushFleet().catch(() => {});
     }
@@ -2156,40 +2255,285 @@
   }
 
   // ==========================================================================
-  // INTELLIGENT SEMANTIC DEFECT SURVEILLANCE & REPETITIVE FAILURE ENGINE
+  // REFINED COMPONENT-LEVEL REPEAT DEFECT SURVEILLANCE ENGINE
+  // Rigorous mechanical & electrical part recurrence matching across 87 machines
   // ==========================================================================
-  const CANONICAL_DEFECT_FAMILIES = [
-    { id: 'SQUEEZE_CYL', name: 'Squeezing Cylinder Defect', pat: /squeez\w*\s+cyl|male\s+squeez|female\s+squeez|inner\s+squeez|outer\s+squeez|big\s+squeez|small\s+squeez|hzs-ds|squeezing\s+cyl|squeezing\s+piston/i, sym: /seal|leak|burst|cut|worn|pressure|damage|oil/i },
-    { id: 'VIB_SHAFT', name: 'Tamping Vibration Shaft / Bearing Failure', pat: /vibrat\w*\s+shaft|vibrat\w*\s+unit|vibrat\w*\s+bearing|eccentric\s+shaft|main\s+bearing\s+flange/i, sym: /shaft|bearing|cut|seiz|damage|vibrat|flange|noise|hot|smoke/i },
-    { id: 'SPRING_CORD', name: 'Tamping Transducer Spring / Cord Wire Cut', pat: /tamping\s+bank\s+(?:cord\s+wire|spring)|tras?nducer\s+spring|cord\s+wire|hty2-00-12/i, sym: /cut|broken|damage|wire|spring|snapped/i },
-    { id: 'PIN_35MM', name: 'Tamping 35mm Extension Joint Pin Failure', pat: /35\s*mm\s+pin|23067096|extension\s+joint/i, sym: /pin|cut|broken|joint/i },
-    { id: 'TOOL_ARM', name: 'Tamping Tool Holder / Squeezing Arm Defect', pat: /tool\s+tilting|squeezing\s+arm|tool\s+holder|tamping\s+arm|tamping\s+tool/i, sym: /cut|broken|arm|cylinder|pin|wear|loose|fallen|bolt/i },
-    { id: 'TRANSDUCER', name: 'Lining / Leveling Transducer & Potentiometer Defect', pat: /tras?nducer|potentiometer|depth\s+transducer|lining\s+potentiometer|lining\s+disturbance|slewed/i, sym: /signal|malfunction|output|potentiometer|transducer|fluctuat|slewed|disturbance/i },
-    { id: 'CARDAN_SHAFT', name: 'Cardan / Propeller Shaft Defect', pat: /card[ao]n\s+shaft|propeller\s+shaft|flange\s+yoke|intermediate\s+shaft/i, sym: /groove|cut|yoke|broken|shaft|bolt|dummy|noise/i },
-    { id: 'AXLE_GEARBOX', name: 'Axle Drive & Gearbox Defect', pat: /axle\s+(?:1|2|3|4|gear\s*box)|axle\s+drive|revers\w*\s+gearbox|axle\s+clutch/i, sym: /stuck|gearbox|drive|leak|noise|seiz|clutch\s+pressure|drop/i },
-    { id: 'ENGINE_RPM', name: 'Engine RPM & Governor Fluctuation', pat: /rpm\s+(?:fluct|stuck|higher|hunt|meter|cable|motor)|governor|147901|control\s+rod/i, sym: /rpm|stuck|hunting|fluct|speed|high\s+rpm|control\s+rod|cable/i },
-    { id: 'ENGINE_START', name: 'Engine Starting & Cranking Troubles', pat: /engine\s+(?:not\s+start|shut\s+down|stopped|crank)|starter\s+motor|self\s+starter/i, sym: /start|crank|shut\s*down|stopped|cranking/i },
-    { id: 'ENGINE_COOLING', name: 'Engine Radiator, Water Pump & Fan Defect', pat: /radiator|fan\s+hub|water\s+pump|coolant|pulley.*belt|radiator\s+fan/i, sym: /leak|belt|bolt|cut|fan|pulley|temp|cool|broken/i },
-    { id: 'ENGINE_FUEL', name: 'Engine Fuel System & PT Pump Failure', pat: /pt\s+pump|fuel\s+(?:pump|inject|supply|pipe)|fuel\s+line/i, sym: /fuel|diesel|leak|shaft|coupler|calibrat|jammed/i },
-    { id: 'AIR_COMPRESSOR', name: 'Air Compressor & Pneumatic Braking Defect', pat: /air\s+compressor|unloader\s+valve|brake\s+cylinder|direct\s+brake|pneumatic\s+system/i, sym: /air|compressor|pressure|unloader|brake|build|releasing|leak/i },
-    { id: 'HYD_HOSE', name: 'Hydraulic High Pressure Hose Burst / Leak', pat: /hyd\w*\s+hose|driving\s+hose|16r02|4r02|dash\s+no\s*16|high\s+pressure\s+hose/i, sym: /hose|burst|leak|punct|crimp|fitting|end\s+fitting/i },
-    { id: 'HYD_VALVE', name: 'Hydraulic DC / Proportional Valve Malfunction', pat: /dc\s+valve|solenoid\s+valve|proportional\s+valve|relief\s+valve|lifting\s+valve/i, sym: /valve|elbow|leak|stick|solenoid|malfunction|output/i },
-    { id: 'HYD_PRESSURE', name: 'Hydraulic System Pressure & Pump Failure', pat: /hydraulic\s+system\s+pressure|hyd\w*\s+pump|variable\s+pump/i, sym: /pressure|pump|cavitat|flow|unable\s+to\s+develop/i },
-    { id: 'CONVEYOR', name: 'Conveyor System & Swivel Belt Defect', pat: /waste\s+conveyor|transfer\s+conveyor|conveyor\s+belt|conveyor\s+roller|swivel\s+belt|main\s+conveyor/i, sym: /conveyor|bearing|belt|roller|motor|pasting|layer|stuck|rotation/i },
-    { id: 'CUTTER_CHAIN', name: 'Cutter Chain, Bar & Sprocket Failure', pat: /cutter\s+chain|cutter\s+bar|sprocket|guide\s+trough|cutter\s+gearbox/i, sym: /chain|sprocket|bar|fell|bolt|broken|roller|guide\s+plate/i },
-    { id: 'ALTERNATOR_BAT', name: 'Alternator & Battery Charging Failure', pat: /alternator|dynamo|batter(?:y|ies)/i, sym: /charg|alternator|battery|voltage|low\s+charge/i },
-    { id: 'ELECTRICAL_HMI', name: 'Electrical Control Panel, Relay & HMI Defect', pat: /hmi|display\s+unit|control\s+panel|proximity\s+switch|relay\s+pcb|u111|u156/i, sym: /hmi|hang|display|panel|sensor|switch|relay|glowing/i }
+  const SPECIFIC_MACHINE_PARTS = [
+    // 1. TAMPING UNIT COMPONENTS
+    {
+      id: 'TAMP_SQUEEZE_CYL',
+      name: 'Tamping Squeezing Cylinder & Seals (HZS-DS)',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:squeez\w*\s+cyl|male\s+squeez|female\s+squeez|inner\s+squeez|outer\s+squeez|big\s+squeez|small\s+squeez|hzs-ds|squeezing\s+piston|squeezing\s+cylinder)\b/i,
+      sym: /\b(?:seal|leak|burst|cut|worn|pressure|damage|oil|piston|gland|packing|o-ring|ring)\b/i,
+      codes: ['hzs-ds']
+    },
+    {
+      id: 'TAMP_VIB_SHAFT',
+      name: 'Tamping Vibration Shaft & Bearings',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:vibrat\w*\s+shaft|vibrat\w*\s+unit|vibrat\w*\s+bearing|eccentric\s+shaft|main\s+bearing\s+flange|vibration\s+motor)\b/i,
+      sym: /\b(?:shaft|bearing|cut|seiz|damage|vibrat|flange|noise|hot|smoke|grease|broken)\b/i,
+      codes: ['1308 tvh', '66219', '67532']
+    },
+    {
+      id: 'TAMP_CORD_SPRING',
+      name: 'Transducer Cord Wire / Return Spring (HTY2-00-12)',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:tamping\s+bank\s+(?:cord\s+wire|spring)|tras?nducer\s+spring|cord\s+wire|hty2-00-12|depth\s+spring|return\s+spring)\b/i,
+      sym: /\b(?:cut|broken|damage|wire|spring|snapped|dislodged|missing)\b/i,
+      codes: ['hty2-00-12']
+    },
+    {
+      id: 'TAMP_35MM_PIN',
+      name: '35mm Extension Joint Pin (23067096)',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:35\s*mm\s+pin|23067096|extension\s+joint\s+pin|tamping\s+bank\s+pin)\b/i,
+      sym: /\b(?:pin|cut|broken|joint|sheared|come\s*out|fallen)\b/i,
+      codes: ['23067096']
+    },
+    {
+      id: 'TAMP_TOOL_ARM',
+      name: 'Tamping Tool Holder & Squeezing Arm',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:tool\s+tilting|squeezing\s+arm|tool\s+holder|tamping\s+arm|tamping\s+tool|tilting\s+arm)\b/i,
+      sym: /\b(?:cut|broken|arm|pin|wear|loose|fallen|bolt|crack|weld|sheared)\b/i,
+      codes: []
+    },
+    {
+      id: 'TAMP_LIFT_CYL',
+      name: 'Tamping Unit Lifting & Lowering Cylinder',
+      subsystem: 'Tamping Unit',
+      pat: /\b(?:tamping\s+lift\w*\s+cyl|bank\s+lift\w*\s+cyl|lifting\s+and\s+lowering\s+cyl|guide\s+column|guide\s+rod)\b/i,
+      sym: /\b(?:seal|leak|burst|cut|damage|bent|guide|column|bush)\b/i,
+      codes: []
+    },
+
+    // 2. LINING & LEVELING TRANSDUCERS & CYLINDERS
+    {
+      id: 'LINING_TRANSDUCER',
+      name: 'Lining / Leveling Transducer & Potentiometer (W.33.200)',
+      subsystem: 'Electrical',
+      pat: /\b(?:tras?nducer|potentiometer|depth\s+transducer|lining\s+potentiometer|lining\s+disturbance|versine\s+transducer|dac|gva)\b/i,
+      sym: /\b(?:signal|malfunction|output|potentiometer|transducer|fluctuat|slewed|disturbance|zero\s*error)\b/i,
+      codes: ['w.33.200']
+    },
+    {
+      id: 'LINING_CYLINDER',
+      name: 'Lining & Slewing Hydraulic Cylinder',
+      subsystem: 'Hydraulic',
+      pat: /\b(?:lining\s+cyl|slewing\s+cyl|cross\s+level\s+cyl|lining\s+bogie)\b/i,
+      sym: /\b(?:seal|leak|pressure|unable|burst|bent|pin)\b/i,
+      codes: []
+    },
+
+    // 3. ENGINE & POWERPACK
+    {
+      id: 'ENG_STARTER_MOTOR',
+      name: 'Engine Starter Motor & Solenoid (09D090)',
+      subsystem: 'Engine',
+      pat: /\b(?:starter\s+motor|self\s+starter|cranking\s+motor|starter\s+solenoid|starter\s+switch|09d090)\b/i,
+      sym: /\b(?:start|crank|not\s+cranking|solenoid|pinion|armature|burnt|stuck)\b/i,
+      codes: ['09d090']
+    },
+    {
+      id: 'ENG_COOLING_FAN',
+      name: 'Engine Radiator, Fan Belt & Idler Pulley',
+      subsystem: 'Engine',
+      pat: /\b(?:radiator|fan\s+hub|water\s+pump|coolant|pulley.*belt|radiator\s+fan|fan\s+belt|idler\s+pulley)\b/i,
+      sym: /\b(?:leak|belt|bolt|cut|fan|pulley|temp|cool|broken|bearing|overheat|hot)\b/i,
+      codes: []
+    },
+    {
+      id: 'ENG_ALTERNATOR_BAT',
+      name: 'Alternator, Dynamo & Battery Charging',
+      subsystem: 'Electrical',
+      pat: /\b(?:alternator|dynamo|batter(?:y|ies)|battery\s+charger|charging\s+circuit)\b/i,
+      sym: /\b(?:charg|alternator|battery|voltage|low\s+charge|drain|belt|regulator)\b/i,
+      codes: []
+    },
+    {
+      id: 'ENG_GOVERNOR_RPM',
+      name: 'Engine Governor & RPM Actuator (147901)',
+      subsystem: 'Engine',
+      pat: /\b(?:rpm\s+(?:fluct|stuck|higher|hunt|meter|cable|motor)|governor|147901|control\s+rod|accelerator\s+cable)\b/i,
+      sym: /\b(?:rpm|stuck|hunting|fluct|speed|high\s+rpm|control\s+rod|cable|not\s+raising)\b/i,
+      codes: ['147901']
+    },
+    {
+      id: 'ENG_TURBOCHARGER',
+      name: 'Engine Turbocharger & Exhaust Manifold',
+      subsystem: 'Engine',
+      pat: /\b(?:turbo\s*charger|exhaust\s+manifold|turbo\s+bearing|smoke\s+from\s+turbo)\b/i,
+      sym: /\b(?:red\s+hot|smoke|burst|leak|overheat|seized|oil\s+leak|exhaust)\b/i,
+      codes: []
+    },
+    {
+      id: 'ENG_FUEL_PUMP',
+      name: 'Engine Fuel System & PT Pump',
+      subsystem: 'Engine',
+      pat: /\b(?:pt\s+pump|fuel\s+(?:pump|inject|supply|pipe)|fuel\s+line|diesel\s+pipe|diesel\s+leak)\b/i,
+      sym: /\b(?:fuel|diesel|leak|shaft|coupler|calibrat|air\s*lock|choked|starvation)\b/i,
+      codes: []
+    },
+    {
+      id: 'ENG_SHUTDOWN_SOLENOID',
+      name: 'Engine Stop Solenoid & Shutdown Circuit (5U5)',
+      subsystem: 'Engine',
+      pat: /\b(?:shut\s*down\s+coil|stop\s+solenoid|engine\s+stop|5u5|fuel\s+shut\s*off)\b/i,
+      sym: /\b(?:shut\s*down|stopped|coil|burned|supply|solenoid|relay)\b/i,
+      codes: ['5u5']
+    },
+
+    // 4. TRANSMISSION & DRIVETRAIN
+    {
+      id: 'DRIVE_ZF_GEARBOX',
+      name: 'ZF Gearbox, Flange & Torque Converter',
+      subsystem: 'Mechanical',
+      pat: /\b(?:zf\s+gear\s*box|torque\s+converter|zf\s+transmission|gearbox\s+flange|zf\s+oil\s+cooler)\b/i,
+      sym: /\b(?:leak|flange|seal|bearing|converter|pressure|stuck|oil|noise)\b/i,
+      codes: []
+    },
+    {
+      id: 'DRIVE_CARDAN_SHAFT',
+      name: 'Cardan / Propeller Shaft & Flange Yoke',
+      subsystem: 'Mechanical',
+      pat: /\b(?:card[ao]n\s+shaft|propeller\s+shaft|flange\s+yoke|intermediate\s+shaft|cross\s+joint|u\s*joint)\b/i,
+      sym: /\b(?:groove|cut|yoke|broken|shaft|bolt|dummy|noise|crack|shear|play)\b/i,
+      codes: []
+    },
+    {
+      id: 'DRIVE_AXLE_GEARBOX',
+      name: 'Axle Drive, Axle Gearbox & Clutch',
+      subsystem: 'Mechanical',
+      pat: /\b(?:axle\s+(?:1|2|3|4|gear\s*box)|axle\s+drive|revers\w*\s+gearbox|axle\s+clutch|torque\s+arm)\b/i,
+      sym: /\b(?:stuck|gearbox|drive|leak|noise|seiz|clutch\s+pressure|drop|bracket|bolt)\b/i,
+      codes: []
+    },
+    {
+      id: 'DRIVE_CHAIN_SPROCKET',
+      name: 'Drive Chain, Sprockets & Linkages',
+      subsystem: 'Mechanical',
+      pat: /\b(?:driving\s+chain|drive\s+chain|chain\s+link|drive\s+sprocket|chain\s+tensioner)\b/i,
+      sym: /\b(?:broken|cut|chain|link|sprocket|fallen|disengaged|loose)\b/i,
+      codes: []
+    },
+
+    // 5. BALLAST CLEANING & CONVEYING (BCM, FRM, SBCM)
+    {
+      id: 'BALLAST_CUTTER_CHAIN',
+      name: 'Cutter Chain, Cutter Bar & Sprocket',
+      subsystem: 'Mechanical',
+      pat: /\b(?:cutter\s+chain|cutter\s+bar|cutter\s+sprocket|guide\s+trough|cutter\s+gearbox|corner\s+roller)\b/i,
+      sym: /\b(?:chain|sprocket|bar|fell|bolt|broken|roller|guide\s+plate|cut|jammed)\b/i,
+      codes: []
+    },
+    {
+      id: 'BALLAST_CONVEYOR',
+      name: 'Conveyor System & Swivel Belt',
+      subsystem: 'Mechanical',
+      pat: /\b(?:waste\s+conveyor|transfer\s+conveyor|conveyor\s+belt|conveyor\s+roller|swivel\s+belt|main\s+conveyor)\b/i,
+      sym: /\b(?:conveyor|bearing|belt|roller|motor|pasting|layer|stuck|rotation|torn|torn\s+out)\b/i,
+      codes: []
+    },
+    {
+      id: 'BALLAST_SCREEN',
+      name: 'Screen Unit & Eccentric Bearings',
+      subsystem: 'Mechanical',
+      pat: /\b(?:screen\s+mesh|screening\s+unit|screen\s+bearing|screen\s+eccentric|vibrating\s+screen)\b/i,
+      sym: /\b(?:screen|mesh|bearing|eccentric|choked|damage|tear|spring)\b/i,
+      codes: []
+    },
+
+    // 6. BALLAST REGULATING & BROOM (BRM)
+    {
+      id: 'BROOM_UNIT',
+      name: 'Broom Shaft, Rubber Elements & Drive Motor',
+      subsystem: 'Mechanical',
+      pat: /\b(?:broom\s+shaft|broom\s+rubber|broom\s+elements|broom\s+box|broom\s+motor|broom\s+drive)\b/i,
+      sym: /\b(?:rubber|shaft|motor|box|cut|worn|damaged|leak|drive)\b/i,
+      codes: []
+    },
+    {
+      id: 'PLOUGH_SYSTEM',
+      name: 'Shoulder & Center Plough Assembly',
+      subsystem: 'Mechanical',
+      pat: /\b(?:shoulder\s+plough|centre\s+plough|center\s+plough|plough\s+cylinder|wing\s+cylinder)\b/i,
+      sym: /\b(?:plough|blade|pin|cylinder|bent|stuck|locking|leak)\b/i,
+      codes: []
+    },
+
+    // 7. PNEUMATICS & BRAKING
+    {
+      id: 'PNEUM_COMPRESSOR',
+      name: 'Air Compressor & Unloader Valve',
+      subsystem: 'Pneumatic',
+      pat: /\b(?:air\s+compressor|unloader\s+valve|compressor\s+head|pressure\s+regulator|governor\s+valve)\b/i,
+      sym: /\b(?:air|compressor|pressure|unloader|build|not\s+building|cut\s*in|cut\s*out|leak)\b/i,
+      codes: []
+    },
+    {
+      id: 'PNEUM_BRAKE_SYSTEM',
+      name: 'Brake Cylinder, C2W & Distributor Valve (KE 127)',
+      subsystem: 'Pneumatic',
+      pat: /\b(?:brake\s+cylinder|direct\s+brake|c2w|distributor\s+valve|ke\s*valve|sa9|a9|emergency\s+brake)\b/i,
+      sym: /\b(?:brake|cylinder|releasing|jammed|valve|leak|pipe|not\s+applying|binding)\b/i,
+      codes: ['ke 127', 'c2w']
+    },
+
+    // 8. HYDRAULIC COMPONENTS
+    {
+      id: 'HYD_MAIN_PUMP',
+      name: 'Hydraulic Main & Variable Pump',
+      subsystem: 'Hydraulic',
+      pat: /\b(?:hydraulic\s+pump|variable\s+pump|tandem\s+pump|charge\s+pump|main\s+pump|linde\s+pump|rexroth\s+pump)\b/i,
+      sym: /\b(?:pump|cavitat|pressure|flow|unable|noise|slipping|coupling)\b/i,
+      codes: []
+    },
+    {
+      id: 'HYD_PROP_VALVE',
+      name: 'Hydraulic Proportional & Servo Valve',
+      subsystem: 'Hydraulic',
+      pat: /\b(?:proportional\s+valve|servo\s+valve|moog\s+valve|proportional\s+relief|pressure\s+reducing\s+valve)\b/i,
+      sym: /\b(?:valve|malfunction|output|sticking|spool|solenoid|null\s*bias)\b/i,
+      codes: []
+    },
+    {
+      id: 'HYD_SPECIFIC_HOSE',
+      name: 'Hydraulic High-Pressure Driving Hose (16R02 / 4R02)',
+      subsystem: 'Hydraulic',
+      pat: /\b(?:16r02|4r02|dash\s+no\s*16|driving\s+hose\s+burst|high\s+pressure\s+driving\s+hose)\b/i,
+      sym: /\b(?:hose|burst|leak|crimp|fitting)\b/i,
+      codes: ['16r02', '4r02']
+    },
+
+    // 9. ELECTRICAL & CONTROLS
+    {
+      id: 'ELECT_PCB_RELAY',
+      name: 'Control Panel Relay PCB & Logic Cards (EK-16V, EK-8V)',
+      subsystem: 'Electrical',
+      pat: /\b(?:relay\s+pcb|relay\s+board|control\s+card|logic\s+card|ek-16v|ek-8v|ek-347|ek-501|u111|u156|printed\s+circuit)\b/i,
+      sym: /\b(?:pcb|card|relay|burnt|track|chattering|malfunction|component|track\s+cut)\b/i,
+      codes: ['ek-16v', 'ek-8v', 'ek-347', 'ek-501', 'u111', 'u156']
+    },
+    {
+      id: 'ELECT_HMI_PLC',
+      name: 'HMI Display, PLC Controller & Proximity Sensors',
+      subsystem: 'Electrical',
+      pat: /\b(?:hmi|display\s+unit|datamatic|touch\s+panel|proximity\s+switch|limit\s+switch|plc\s+cpu)\b/i,
+      sym: /\b(?:hmi|hang|display|freeze|sensor|switch|blank|communication\s+fail)\b/i,
+      codes: []
+    }
   ];
 
-  const PART_CODE_REGEX = /\b(?:hty2-00-12|23067096|hzs-ds[\w.-]*|16r02|4r02|147901|w\.33\.200|3240743|5413187|3067459|3005962|4026171|66219|67532|1308\s*tvh|gh506|hy830|hy6rsj|09d090|ke\s*127)\b/gi;
+  const PART_CODE_REGEX = /\b(?:hty2-00-12|23067096|hzs-ds[\w.-]*|16r02|4r02|147901|w\.33\.200|3240743|5413187|3067459|3005962|4026171|66219|67532|1308\s*tvh|gh506|hy830|hy6rsj|09d090|ke\s*127|c2w|5u5|ek-16v|ek-8v|u111|u156)\b/gi;
 
   function extractFailureFeatures(f) {
-    // Primary text: strictly what happened in the incident (natureOfFailure and description)
     const compClean = (f.component || '').replace(/\(P\/N:[\s\S]*?\)/gi, '').trim();
     const primaryTxt = ((f.natureOfFailure || '') + ' ' + compClean + ' ' + (f.description || '')).toLowerCase();
-    const fullTxt = (primaryTxt + ' ' + (f.rootCause || '') + ' ' + (f.actionTaken || '') + ' ' + (f.partNo || '') + ' ' + (f.sparesUsed || '')).toLowerCase();
+    const fullTxt = (primaryTxt + ' ' + (f.rootCause || '') + ' ' + (f.actionTaken || '') + ' ' + (f.sparesUsed || '') + ' ' + (f.partNo || '')).toLowerCase();
 
-    // Part codes: can be anywhere in full text or partNo
+    // Specific part codes
     const codes = [];
     let m;
     PART_CODE_REGEX.lastIndex = 0;
@@ -2197,35 +2541,43 @@
       codes.push(m[0].toLowerCase());
     }
 
-    // Matched families: based on primary text of the actual incident!
-    const families = [];
-    CANONICAL_DEFECT_FAMILIES.forEach(fam => {
-      if (fam.pat.test(primaryTxt) && fam.sym.test(primaryTxt)) {
-        families.push(fam);
+    // Matched specific physical components
+    const matchedParts = [];
+    SPECIFIC_MACHINE_PARTS.forEach(part => {
+      if (part.pat.test(primaryTxt)) {
+        matchedParts.push(part);
       }
     });
 
-    return { primaryTxt, fullTxt, codes, families };
+    return { primaryTxt, fullTxt, codes, matchedParts };
   }
 
   function areFailuresRepetitive(a, b) {
+    // 1. MUST be on the exact same machine
     if (a.machineNo !== b.machineNo) return null;
 
-    // Check shared specific part codes
-    if (a._features && b._features && a._features.codes.length > 0 && b._features.codes.length > 0) {
-      for (let ca of a._features.codes) {
-        if (b._features.codes.includes(ca)) {
+    const fa = a._features;
+    const fb = b._features;
+    if (!fa || !fb) return null;
+
+    // 2. Exact Part Number / Part Code Match
+    if (fa.codes.length > 0 && fb.codes.length > 0) {
+      for (let ca of fa.codes) {
+        if (fb.codes.includes(ca)) {
           return 'Shared Part Code: ' + ca.toUpperCase();
         }
       }
     }
 
-    // Check shared component family
-    if (a._features && b._features) {
-      for (let fa of a._features.families) {
-        for (let fb of b._features.families) {
-          if (fa.id === fb.id) {
-            return fa.name;
+    // 3. Exact Physical Machine Component & Symptom Concordance
+    for (let pa of fa.matchedParts) {
+      for (let pb of fb.matchedParts) {
+        if (pa.id === pb.id) {
+          // Check symptom compatibility or verified component defect
+          const symA = pa.sym.test(fa.primaryTxt);
+          const symB = pa.sym.test(fb.primaryTxt);
+          if (symA || symB) {
+            return pa.name;
           }
         }
       }
@@ -2234,7 +2586,7 @@
     return null;
   }
 
-  // Repetitive Failure Surveillance Algorithm (Semantic Defect Matching)
+  // Repetitive Failure Surveillance Algorithm (Component-Level Recurrence Detection)
   function classifyRepetitiveFailures(list) {
     if (!list || !Array.isArray(list)) return;
 
@@ -2258,6 +2610,8 @@
       f.repeatCount = 1;
       f.defectFamily = '';
       f.repetitiveReason = '';
+      f.repeatClusterId = '';
+      f.repeatOccurrenceIndex = 1;
       f._features = extractFailureFeatures(f);
     });
 
@@ -2270,6 +2624,8 @@
     });
 
     // 4. Discover connected defect recurrence clusters on each machine
+    const discoveredClusters = [];
+
     Object.keys(byMachine).forEach(mId => {
       const recs = byMachine[mId];
       const n = recs.length;
@@ -2286,6 +2642,8 @@
       }
 
       const visited = new Array(n).fill(false);
+      let clusterIndexOnMachine = 0;
+
       for (let i = 0; i < n; i++) {
         if (!visited[i] && adj[i].length > 0) {
           const cluster = [];
@@ -2306,16 +2664,53 @@
           }
 
           if (cluster.length >= 2) {
-            cluster.forEach(c => {
+            clusterIndexOnMachine++;
+            // Sort incidents chronologically (earliest to latest)
+            cluster.sort((a, b) => getFailureTimestamp(a) - getFailureTimestamp(b));
+
+            const mInfo = getMachineInfo(mId) || {};
+            const cleanPartId = String(clusterReason).replace(/[^a-zA-Z0-9]/g, '_').toUpperCase().slice(0, 24);
+            const clusterId = `REP-${mId}-${cleanPartId}-${clusterIndexOnMachine}`;
+
+            const clusterObj = {
+              id: clusterId,
+              machineNo: mId,
+              category: cluster[0].category || mInfo.category || 'TRACK MACHINE',
+              division: cluster[0].division || mInfo.division || 'SBC',
+              componentName: clusterReason,
+              subsystem: cluster[0].subsystem || 'Mechanical',
+              repeatCount: cluster.length,
+              totalDownDays: cluster.reduce((sum, inc) => sum + (parseFloat(inc.totalDownDays) || ((parseFloat(inc.downHours) || 0) / 24) || 0), 0),
+              trafficBlockCount: cluster.filter(inc => {
+                const b = String(inc.whetherInBlock || '').toUpperCase();
+                return b === 'YES' || b.includes('BLOCK');
+              }).length,
+              firstDate: formatDateDisplay(cluster[0].dateOfFailure || cluster[0].breakdownTime),
+              lastDate: formatDateDisplay(cluster[cluster.length - 1].dateOfFailure || cluster[cluster.length - 1].breakdownTime),
+              firstTimestamp: getFailureTimestamp(cluster[0]),
+              lastTimestamp: getFailureTimestamp(cluster[cluster.length - 1]),
+              incidents: cluster
+            };
+
+            discoveredClusters.push(clusterObj);
+
+            cluster.forEach((c, idx) => {
               c.isRepetitive = true;
               c.repeatCount = Math.max(c.repeatCount || 1, cluster.length);
               c.defectFamily = clusterReason;
               c.repetitiveReason = `Recurring ${clusterReason} on ${mId} (${cluster.length}x cases)`;
+              c.repeatClusterId = clusterId;
+              c.repeatOccurrenceIndex = idx + 1;
             });
           }
         }
       }
     });
+
+    AppState.repeatClusters = discoveredClusters;
+    if (typeof updateTabBadges === 'function') {
+      updateTabBadges();
+    }
   }
 
   // Setup Category Pills in Top Navigation Bar
@@ -2551,6 +2946,17 @@
         ${repeats > 0 ? `<span class="meta-status-badge status-repetitive-pill">🚨 ${repeats} Repetitive Defect Cases</span>` : ''}
       `;
     }
+
+    const expBtn = document.getElementById('btnExportMachineCompleteExcel');
+    if (expBtn) {
+      if (AppState.selectedMachine && AppState.selectedMachine !== 'ALL') {
+        expBtn.innerHTML = `<span>📥 Export Excel Report (${escapeHtml(AppState.selectedMachine)})</span>`;
+        expBtn.title = `Export complete Excel report for machine ${AppState.selectedMachine} (History Registers, failure incidents, subsystem breakdown, repeat defects, overhaul schedules)`;
+      } else {
+        expBtn.innerHTML = `<span>📥 Export Machine Excel Report</span>`;
+        expBtn.title = `Export complete details of active machine as a comprehensive multi-sheet Excel report`;
+      }
+    }
   }
 
   // Filter failures based on Category, Machine, Search, Subsystem, and Status
@@ -2636,6 +3042,9 @@
     renderSubsystemDesk('Pneumatic', 'subsystemDesk-pneumatic');
     renderSubsystemDesk('Electrical', 'subsystemDesk-electrical');
     updateTabBadges();
+    if (AppState.activeTab === 'repeat-view' && typeof renderRepeatFailuresView === 'function') {
+      renderRepeatFailuresView();
+    }
   }
 
   // Indian Railways Financial Year Definitions
@@ -2845,48 +3254,58 @@
     }
   }
 
-  // Render Repetitive Failure & Surveillance Alert Panel
+  // Render Repetitive Failure & Surveillance Alert Panel / Slow Moving Ticker
   function renderSurveillanceAlerts(list) {
     const alertCard = document.getElementById('surveillanceAlertCard');
-    const repeatContainer = document.getElementById('repeatPillsContainer');
-    if (!alertCard || !repeatContainer) return;
-
-    const repeatCases = list.filter(f => f.isRepetitive);
-
-    if (repeatCases.length === 0) {
-      alertCard.style.display = 'none';
-      return;
+    if (alertCard) {
+      alertCard.style.display = 'none'; // Avoid old general flag
     }
 
-    alertCard.style.display = 'block';
-    repeatContainer.innerHTML = '';
+    const ticker = document.getElementById('repeatFailuresTicker');
+    if (ticker) {
+      ticker.style.display = 'flex';
+    }
+  }
 
-    // Group repeat cases
-    const seen = new Set();
-    repeatCases.slice(0, 8).forEach(f => {
-      const key = `${f.machineNo}-${f.subsystem}`;
-      if (seen.has(key)) return;
-      seen.add(key);
+  // Generic Tab Switcher
+  function switchTab(tabId) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    if (btn) {
+      btn.click();
+    } else {
+      AppState.activeTab = tabId;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabId));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === tabId));
+      if (tabId === 'repeat-view' && typeof renderRepeatFailuresView === 'function') {
+        renderRepeatFailuresView();
+      } else if (tabId === 'ioh-poh-view' && typeof renderIohPohView === 'function') {
+        renderIohPohView();
+      }
+    }
+  }
 
-      const card = document.createElement('div');
-      card.className = 'repeat-item-card';
-      card.style.cursor = 'pointer';
-      card.title = `Click to navigate & highlight recurring defect in ${f.machineNo} (${f.subsystem})`;
-      card.innerHTML = `
-        <span class="repeat-count-tag">${f.repeatCount || 2}x REPEAT</span>
-        <div class="repeat-text-block">
-          <strong>${f.machineNo} [${f.category}]</strong> • ${f.subsystem}
-          <span>${escapeHtml(f.component || (f.natureOfFailure ? f.natureOfFailure.substring(0, 45) : 'Recurring Defect'))}...</span>
-        </div>
-        <span style="font-size: 11px; color: var(--gold-400); margin-left: auto; display: flex; align-items: center; gap: 4px; font-weight: 600; white-space: nowrap;">
-          <span>Highlight</span> <span>👉</span>
-        </span>
-      `;
-      card.addEventListener('click', () => {
-        highlightFailure(f.id, f.subsystem, f.machineNo);
-      });
-      repeatContainer.appendChild(card);
-    });
+  // Navigate to Repeat Failures Tab from the Slow Moving Ticker
+  function openRepeatViewFromTicker() {
+    switchTab('repeat-view');
+    if (typeof onRepeatMachineChange === 'function') {
+      onRepeatMachineChange('ALL');
+    }
+    const view = document.getElementById('repeat-view');
+    if (view) {
+      view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // Navigate to IOH POH Updates Tab from the Slow Moving Ticker
+  function openIohPohViewFromTicker() {
+    switchTab('ioh-poh-view');
+    if (typeof selectIohPohSheet === 'function') {
+      selectIohPohSheet('2026-27');
+    }
+    const view = document.getElementById('ioh-poh-view');
+    if (view) {
+      view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   // Highlight and navigate to a specific failure entry (especially recurring defects)
@@ -7404,6 +7823,1573 @@
     if (bElec) bElec.textContent = countElec;
     const bAll = document.getElementById('badgeAllFailures');
     if (bAll) bAll.textContent = AppState.failures.length;
+
+    const bRep = document.getElementById('badgeRepeatFailures');
+    if (bRep) {
+      const repCount = AppState.repeatClusters ? AppState.repeatClusters.reduce((sum, c) => sum + (c.repeatCount || 0), 0) : 0;
+      bRep.textContent = repCount;
+    }
+  }
+
+  // ==========================================================================
+  // REPEAT FAILURES SURVEILLANCE & RECURRING DEFECT REGISTRY
+  // Dedicated Tab Controller, Component-Level Recurrence & Multi-Duration Filters
+  // ==========================================================================
+  AppState.repeatFilterMachine = 'ALL';
+  AppState.repeatFilterDuration = 'ALL';
+  AppState.repeatFilterSearch = '';
+  AppState.repeatCustomFrom = '';
+  AppState.repeatCustomTo = '';
+  AppState.repeatExpandedClusters = {};
+  AppState.repeatFleetGridFilter = 'ALL';
+  AppState.repeatFleetGridSearch = '';
+  AppState.highlightedRepeatCluster = null;
+
+  function filterRepeatFleetGrid(filterVal) {
+    AppState.repeatFleetGridFilter = filterVal || 'ALL';
+    document.querySelectorAll('.repeat-fleet-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-filter') === AppState.repeatFleetGridFilter);
+    });
+    renderRepeatFailuresView();
+  }
+
+  function onRepeatFleetSearch(q) {
+    AppState.repeatFleetGridSearch = (q || '').toLowerCase().trim();
+    renderRepeatFailuresView();
+  }
+
+  function toggleRepeatCaseHighlight(clusterId, el) {
+    if (!clusterId) return;
+    const banner = document.getElementById('repeatActiveHighlightBanner');
+    const titleEl = document.getElementById('repeatHighlightBannerTitle');
+    const subEl = document.getElementById('repeatHighlightBannerSub');
+
+    // If already highlighted, clicking again toggles off
+    if (AppState.highlightedRepeatCluster === clusterId) {
+      clearRepeatCaseHighlight();
+      showToast('Recurrence highlight cleared.');
+      return;
+    }
+
+    AppState.highlightedRepeatCluster = clusterId;
+
+    // Ensure the target cluster body is expanded
+    AppState.repeatExpandedClusters[clusterId] = true;
+    const body = document.getElementById(`clusterBody-${clusterId}`);
+    const chev = document.getElementById(`chevron-${clusterId}`);
+    if (body) body.classList.remove('collapsed');
+    if (chev) chev.classList.add('rotated');
+
+    // Find cluster info
+    const cl = (AppState.repeatClusters || []).find(c => c.id === clusterId);
+    const compName = cl ? cl.componentName : 'Recurring Component';
+    const machNo = cl ? cl.machineNo : '';
+    const caseCount = cl ? cl.repeatCount : 0;
+
+    // Remove previous highlights
+    document.querySelectorAll('.repeat-case-highlighted').forEach(node => node.classList.remove('repeat-case-highlighted'));
+    document.querySelectorAll('.repeat-cluster-highlighted').forEach(node => node.classList.remove('repeat-cluster-highlighted'));
+
+    // Highlight the parent cluster card
+    const clusterCard = document.getElementById(`clusterCard-${clusterId}`);
+    if (clusterCard) {
+      clusterCard.classList.add('repeat-cluster-highlighted');
+    }
+
+    // Highlight all companion incident cards
+    const matchingCards = document.querySelectorAll(`.repeat-incident-card[data-cluster-id="${clusterId}"]`);
+    matchingCards.forEach(c => c.classList.add('repeat-case-highlighted'));
+
+    // Update highlight banner
+    if (banner) {
+      banner.style.display = 'flex';
+      if (titleEl) titleEl.innerHTML = `🎯 Linked Recurrence Active: ${escapeHtml(compName)} on ${escapeHtml(machNo)} (${caseCount} Matching Occurrences)`;
+      if (subEl) subEl.innerHTML = `All ${caseCount} linked failure occurrences sharing this exact component are glowing in amber across the timeline.`;
+      banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    showToast(`🎯 Auto-highlighted ${matchingCards.length || caseCount} linked recurring cases for "${compName}" on ${machNo}`);
+  }
+
+  function clearRepeatCaseHighlight() {
+    AppState.highlightedRepeatCluster = null;
+    document.querySelectorAll('.repeat-case-highlighted').forEach(node => node.classList.remove('repeat-case-highlighted'));
+    document.querySelectorAll('.repeat-cluster-highlighted').forEach(node => node.classList.remove('repeat-cluster-highlighted'));
+    const banner = document.getElementById('repeatActiveHighlightBanner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  function onRepeatMachineChange(mId) {
+    AppState.repeatFilterMachine = mId || 'ALL';
+    renderRepeatFailuresView();
+  }
+
+  function onRepeatDurationChange(dur) {
+    AppState.repeatFilterDuration = dur || 'ALL';
+    const customBox = document.getElementById('repeatCustomDateBox');
+    if (customBox) {
+      customBox.style.display = (dur === 'CUSTOM') ? 'block' : 'none';
+    }
+    renderRepeatFailuresView();
+  }
+
+  function onRepeatCustomDateChange() {
+    const fromEl = document.getElementById('repeatCustomFrom');
+    const toEl = document.getElementById('repeatCustomTo');
+    AppState.repeatCustomFrom = fromEl ? fromEl.value : '';
+    AppState.repeatCustomTo = toEl ? toEl.value : '';
+    renderRepeatFailuresView();
+  }
+
+  function onRepeatSearch(q) {
+    AppState.repeatFilterSearch = q || '';
+    renderRepeatFailuresView();
+  }
+
+  function toggleRepeatCluster(clusterId) {
+    const body = document.getElementById(`clusterBody-${clusterId}`);
+    const chevron = document.getElementById(`chevron-${clusterId}`);
+    if (!body) return;
+    const isCurrentlyCollapsed = body.classList.contains('collapsed');
+    if (isCurrentlyCollapsed) {
+      body.classList.remove('collapsed');
+      if (chevron) chevron.classList.add('rotated');
+      AppState.repeatExpandedClusters[clusterId] = true;
+    } else {
+      body.classList.add('collapsed');
+      if (chevron) chevron.classList.remove('rotated');
+      AppState.repeatExpandedClusters[clusterId] = false;
+    }
+  }
+
+  function expandAllRepeatClusters() {
+    document.querySelectorAll('.repeat-cluster-body').forEach(b => b.classList.remove('collapsed'));
+    document.querySelectorAll('.repeat-chevron').forEach(c => c.classList.add('rotated'));
+    (AppState.repeatClusters || []).forEach(cl => {
+      AppState.repeatExpandedClusters[cl.id] = true;
+    });
+  }
+
+  function collapseAllRepeatClusters() {
+    document.querySelectorAll('.repeat-cluster-body').forEach(b => b.classList.add('collapsed'));
+    document.querySelectorAll('.repeat-chevron').forEach(c => c.classList.remove('rotated'));
+    (AppState.repeatClusters || []).forEach(cl => {
+      AppState.repeatExpandedClusters[cl.id] = false;
+    });
+  }
+
+  function selectRepeatMachine(mId) {
+    AppState.repeatFilterMachine = mId;
+    const sel = document.getElementById('repeatMachineSelect');
+    if (sel) sel.value = mId;
+    renderRepeatFailuresView();
+    const banner = document.getElementById('repeatMachineHeaderBanner');
+    if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openMachineHrmDesk(mId) {
+    if (!mId) return;
+    const mInfo = getMachineInfo(mId);
+    if (mInfo && mInfo.category) {
+      AppState.selectedCategory = mInfo.category;
+    }
+    AppState.selectedMachine = mId;
+    setupCategoryPills();
+    updateMachineDropdown();
+
+    // Switch to HRM tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const hrmTabBtn = document.getElementById('tabBtnHrm');
+    if (hrmTabBtn) hrmTabBtn.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    const hrmPane = document.getElementById('hrm-view');
+    if (hrmPane) hrmPane.classList.add('active');
+    AppState.activeTab = 'hrm-view';
+
+    renderHrmView();
+    updateTabBadges();
+    showToast(`Navigated to ${mId} in History Register Module (HRM)`);
+  }
+
+  function exportRepeatFailures(type) {
+    const allClusters = AppState.repeatClusters || [];
+    const selectedMachine = AppState.repeatFilterMachine || 'ALL';
+    const filtered = selectedMachine === 'ALL' ? allClusters : allClusters.filter(c => c.machineNo === selectedMachine);
+
+    const rows = [];
+    filtered.forEach(cl => {
+      cl.incidents.forEach((inc, idx) => {
+        rows.push({
+          'Machine No': inc.machineNo,
+          'Category': inc.category || cl.category,
+          'Division': inc.division || cl.division,
+          'Recurring Component': cl.componentName,
+          'Subsystem': cl.subsystem,
+          'Occurrence': `#${idx + 1}`,
+          'Failure Date': formatDateDisplay(inc.dateOfFailure || inc.breakdownTime),
+          'Rectification Date': (inc.status === 'UNDER REPAIR' || (!inc.dateOfRectification && !inc.fitTime)) ? 'Active' : formatDateDisplay(inc.dateOfRectification || inc.fitTime),
+          'Down Time (Days)': (inc.totalDownDays !== undefined && inc.totalDownDays !== null) ? `${parseFloat(inc.totalDownDays)} day(s)` : `${((parseFloat(inc.downHours) || 0) / 24).toFixed(1)} day(s)`,
+          'Traffic Block': inc.whetherInBlock || 'NO',
+          'Nature of Failure': inc.natureOfFailure || inc.description,
+          'Action Taken': inc.actionTaken || inc.stepsTaken,
+          'Spares / Part No': inc.sparesUsed || inc.partNo,
+          'Section': inc.section || 'Block Section',
+          'Certified By': inc.certifiedBy || 'SSE/TM'
+        });
+      });
+    });
+
+    if (rows.length === 0) {
+      showToast('No repeat failure records to export.');
+      return;
+    }
+
+    if (typeof XLSX !== 'undefined') {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Repeat_Failures");
+      XLSX.writeFile(wb, `TM_FAST_Repeat_Failures_${selectedMachine}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast(`Exported ${rows.length} repeat failure records to Excel`);
+    } else {
+      const headers = Object.keys(rows[0]);
+      let csv = headers.join(',') + '\n';
+      rows.forEach(r => {
+        csv += headers.map(h => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `TM_FAST_Repeat_Failures_${selectedMachine}.csv`;
+      link.click();
+      showToast(`Exported ${rows.length} repeat failure records to CSV`);
+    }
+  }
+
+  function renderRepeatFailuresView() {
+    const container = document.getElementById('repeatClustersContainer');
+    const machineSelect = document.getElementById('repeatMachineSelect');
+    const kpiClusters = document.getElementById('kpiRepeatClusters');
+    const kpiIncidents = document.getElementById('kpiRepeatIncidents');
+    const kpiDownDays = document.getElementById('kpiRepeatDownDays');
+    const kpiBlockCases = document.getElementById('kpiRepeatBlockCases');
+    const banner = document.getElementById('repeatMachineHeaderBanner');
+    const machinesSummary = document.getElementById('repeatMachinesSummarySection');
+    const machinesGrid = document.getElementById('repeatMachinesGrid');
+    const titleEl = document.getElementById('repeatListingTitle');
+    const badgeRepeatClustersCount = document.getElementById('badgeRepeatClustersCount');
+
+    if (!container) return;
+
+    if (!AppState.repeatClusters || AppState.repeatClusters.length === 0) {
+      if (AppState.failures && AppState.failures.length > 0) {
+        classifyRepetitiveFailures(AppState.failures);
+      }
+    }
+
+    const allClusters = AppState.repeatClusters || [];
+    const selectedMachine = AppState.repeatFilterMachine || 'ALL';
+    const duration = AppState.repeatFilterDuration || 'ALL';
+    const searchQ = (AppState.repeatFilterSearch || '').toLowerCase().trim();
+
+    // 1. Populate Machine Dropdown with All 87 Fleet Machines
+    if (machineSelect) {
+      const clustersByM = {};
+      allClusters.forEach(cl => {
+        if (!clustersByM[cl.machineNo]) clustersByM[cl.machineNo] = [];
+        clustersByM[cl.machineNo].push(cl);
+      });
+      const repMachineNos = Object.keys(clustersByM).sort();
+
+      let html = `<option value="ALL" ${selectedMachine === 'ALL' ? 'selected' : ''}>🌐 All Machines (View All ${repMachineNos.length} Machines with Recurring Cases)</option>`;
+      if (repMachineNos.length > 0) {
+        html += `<optgroup label="⚠️ Machines with Recurring Failures (${repMachineNos.length} Machines)">`;
+        repMachineNos.forEach(mId => {
+          const clList = clustersByM[mId] || [];
+          const mInfo = getMachineInfo(mId) || {};
+          const cat = mInfo.category || (clList[0] ? clList[0].category : '');
+          const div = mInfo.division || (clList[0] ? clList[0].division : '');
+          const incCount = clList.reduce((sum, c) => sum + (c.repeatCount || 0), 0);
+          const metaStr = [cat, div].filter(Boolean).join(' • ');
+          html += `<option value="${mId}" ${mId === selectedMachine ? 'selected' : ''}>${mId} [${metaStr}] — ${clList.length} Defect Group${clList.length > 1 ? 's' : ''} (${incCount} Cases)</option>`;
+        });
+        html += `</optgroup>`;
+      }
+
+      // Also list other machines in 87-fleet
+      const allFleetMachines = getAllFleetMachineIds().sort();
+      const otherMachines = allFleetMachines.filter(m => !clustersByM[m]);
+      if (otherMachines.length > 0) {
+        html += `<optgroup label="✅ Other Monitored Fleet Machines (${otherMachines.length} Machines - 0 Repeat Cases)">`;
+        otherMachines.forEach(mId => {
+          const mInfo = getMachineInfo(mId) || {};
+          const cat = mInfo.category || '';
+          const div = mInfo.division || '';
+          const metaStr = [cat, div].filter(Boolean).join(' • ');
+          html += `<option value="${mId}" ${mId === selectedMachine ? 'selected' : ''}>${mId} ${metaStr ? '[' + metaStr + ']' : ''} (0 Repeat Cases)</option>`;
+        });
+        html += `</optgroup>`;
+      }
+      machineSelect.innerHTML = html;
+      machineSelect.value = selectedMachine;
+    }
+
+    // 2. Filter Clusters based on Selected Machine, Duration, and Search Query
+    const now = Date.now();
+    let maxDatasetTs = 0;
+    AppState.failures.forEach(f => {
+      const ts = getFailureTimestamp(f);
+      if (ts > maxDatasetTs) maxDatasetTs = ts;
+    });
+    if (maxDatasetTs === 0) maxDatasetTs = now;
+
+    function isWithinDuration(ts) {
+      if (!ts || ts === 0) return true;
+      if (duration === 'ALL') return true;
+      if (duration === '30D') return ts >= (maxDatasetTs - 30 * 86400000);
+      if (duration === '90D') return ts >= (maxDatasetTs - 90 * 86400000);
+      if (duration === '180D') return ts >= (maxDatasetTs - 180 * 86400000);
+      if (duration === 'FY2627') {
+        const start = new Date(2026, 3, 1, 0, 0, 0).getTime();
+        const end = new Date(2027, 2, 31, 23, 59, 59).getTime();
+        return ts >= start && ts <= end;
+      }
+      if (duration === 'FY2526') {
+        const start = new Date(2025, 3, 1, 0, 0, 0).getTime();
+        const end = new Date(2026, 2, 31, 23, 59, 59).getTime();
+        return ts >= start && ts <= end;
+      }
+      if (duration === '2026') {
+        const start = new Date(2026, 0, 1, 0, 0, 0).getTime();
+        const end = new Date(2026, 11, 31, 23, 59, 59).getTime();
+        return ts >= start && ts <= end;
+      }
+      if (duration === 'CUSTOM') {
+        const fromEl = document.getElementById('repeatCustomFrom');
+        const toEl = document.getElementById('repeatCustomTo');
+        const fVal = fromEl ? fromEl.value : AppState.repeatCustomFrom;
+        const tVal = toEl ? toEl.value : AppState.repeatCustomTo;
+        const fTs = fVal ? new Date(fVal).getTime() : 0;
+        const tTs = tVal ? new Date(tVal).getTime() + 86400000 : Infinity;
+        return ts >= fTs && ts <= tTs;
+      }
+      return true;
+    }
+
+    const filteredClusters = [];
+    allClusters.forEach(cl => {
+      // Machine filter
+      if (selectedMachine !== 'ALL' && cl.machineNo !== selectedMachine) return;
+
+      // Search filter
+      if (searchQ) {
+        const matchComp = (cl.componentName || '').toLowerCase().includes(searchQ);
+        const matchMach = (cl.machineNo || '').toLowerCase().includes(searchQ);
+        const matchInc = cl.incidents.some(inc => {
+          const nat = (inc.natureOfFailure || inc.description || '').toLowerCase();
+          const act = (inc.actionTaken || inc.stepsTaken || '').toLowerCase();
+          const sp = (inc.sparesUsed || inc.partNo || '').toLowerCase();
+          return nat.includes(searchQ) || act.includes(searchQ) || sp.includes(searchQ);
+        });
+        if (!matchComp && !matchMach && !matchInc) return;
+      }
+
+      // Duration filter: filter incidents inside cluster
+      const validIncidents = cl.incidents.filter(inc => isWithinDuration(getFailureTimestamp(inc)));
+      if (validIncidents.length >= 2) {
+        filteredClusters.push({
+          ...cl,
+          incidents: validIncidents,
+          repeatCount: validIncidents.length,
+          totalDownDays: validIncidents.reduce((s, inc) => s + (parseFloat(inc.totalDownDays) || ((parseFloat(inc.downHours) || 0) / 24) || 0), 0),
+          trafficBlockCount: validIncidents.filter(inc => {
+            const b = String(inc.whetherInBlock || '').toUpperCase();
+            return b === 'YES' || b.includes('BLOCK');
+          }).length,
+          firstDate: formatDateDisplay(validIncidents[0].dateOfFailure || validIncidents[0].breakdownTime),
+          lastDate: formatDateDisplay(validIncidents[validIncidents.length - 1].dateOfFailure || validIncidents[validIncidents.length - 1].breakdownTime)
+        });
+      } else if (duration === 'ALL' && cl.incidents.length >= 2) {
+        filteredClusters.push(cl);
+      }
+    });
+
+    // KPIs calculation
+    const totalClustersCount = filteredClusters.length;
+    const totalIncidentsCount = filteredClusters.reduce((s, cl) => s + cl.repeatCount, 0);
+    const totalDownDaysLost = filteredClusters.reduce((s, cl) => s + cl.totalDownDays, 0);
+    const totalBlockCount = filteredClusters.reduce((s, cl) => s + cl.trafficBlockCount, 0);
+
+    if (kpiClusters) kpiClusters.textContent = totalClustersCount;
+    if (kpiIncidents) kpiIncidents.textContent = totalIncidentsCount;
+    if (kpiDownDays) kpiDownDays.textContent = `${totalDownDaysLost.toFixed(1)} day(s)`;
+    if (kpiBlockCases) kpiBlockCases.textContent = `${totalBlockCount} In-Block`;
+    if (badgeRepeatClustersCount) {
+      badgeRepeatClustersCount.innerHTML = `🔁 ${totalClustersCount} Repeat Clusters Active`;
+    }
+
+    // 3. Render Header Banner or Machines Grid
+    if (selectedMachine !== 'ALL') {
+      if (machinesSummary) machinesSummary.style.display = 'none';
+      if (banner) {
+        banner.style.display = 'block';
+        const mInfo = getMachineInfo(selectedMachine) || {};
+        const cat = mInfo.category || (filteredClusters[0] ? filteredClusters[0].category : 'TRACK MACHINE');
+        const div = mInfo.division || (filteredClusters[0] ? filteredClusters[0].division : 'SBC');
+        const model = mInfo.model || `${cat} Track Machine`;
+        banner.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span class="badge badge-subsystem">${escapeHtml(cat)}</span>
+                <span class="badge" style="background: rgba(37,99,235,0.2); color:#60a5fa; border:1px solid rgba(37,99,235,0.4);">🔵 ${escapeHtml(div)}</span>
+                <span class="badge badge-fit">✅ ${escapeHtml(mInfo.status || 'FIT')}</span>
+              </div>
+              <h2 style="font-size: 22px; font-weight: 800; color: var(--gold-300); margin: 0;">${escapeHtml(selectedMachine)}</h2>
+              <div style="font-size: 12px; color: #a4bba9; margin-top: 3px;">${escapeHtml(model)}</div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <button type="button" class="btn btn-dim" onclick="window.TM_APP.onRepeatMachineChange('ALL')" style="font-size: 11.5px; padding: 6px 12px;">
+                ⬅ View All Machines with Repeat Cases
+              </button>
+              <button type="button" class="btn btn-secondary-pista" onclick="window.TM_APP.openMachineHrmDesk('${selectedMachine}')" style="font-size: 11.5px; padding: 6px 12px;">
+                📜 Open in HRM Desk ↗
+              </button>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(147, 197, 114, 0.15);">
+            <div>
+              <div style="font-size: 11px; color: #a4bba9;">Repeat Clusters:</div>
+              <div style="font-size: 18px; font-weight: 800; color: #f87171;">${totalClustersCount}</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #a4bba9;">Repeat Incidents:</div>
+              <div style="font-size: 18px; font-weight: 800; color: #fbbf24;">${totalIncidentsCount}</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #a4bba9;">Down Time:</div>
+              <div style="font-size: 18px; font-weight: 800; color: #60a5fa;">${totalDownDaysLost.toFixed(1)} day(s)</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #a4bba9;">Traffic Block:</div>
+              <div style="font-size: 18px; font-weight: 800; color: #f472b6;">${totalBlockCount} in Block</div>
+            </div>
+          </div>
+        `;
+      }
+      if (titleEl) {
+        titleEl.textContent = `Repeat Defect Clusters on ${selectedMachine} — All Cases Listed One-by-One`;
+      }
+    } else {
+      if (banner) banner.style.display = 'none';
+      if (machinesSummary) {
+        machinesSummary.style.display = 'block';
+
+        // 87-Machine Fleet Matrix: Group existing repeat clusters by machine
+        const mGrouped = {};
+        allClusters.forEach(cl => {
+          if (!mGrouped[cl.machineNo]) {
+            mGrouped[cl.machineNo] = {
+              machineNo: cl.machineNo,
+              category: cl.category,
+              division: cl.division,
+              clusters: [],
+              totalIncidents: 0,
+              totalDownDays: 0,
+              blockCases: 0
+            };
+          }
+          mGrouped[cl.machineNo].clusters.push(cl);
+          mGrouped[cl.machineNo].totalIncidents += cl.repeatCount;
+          mGrouped[cl.machineNo].totalDownDays += cl.totalDownDays;
+          mGrouped[cl.machineNo].blockCases += cl.trafficBlockCount;
+        });
+
+        // Gather all 87 fleet machines irrespective of whether they have repeat cases or not
+        const allFleetMachineIds = getAllFleetMachineIds();
+        const gridFilter = AppState.repeatFleetGridFilter || 'ALL';
+        const gridSearch = (AppState.repeatFleetGridSearch || '').toLowerCase().trim();
+
+        let fullFleetList = allFleetMachineIds.map(mId => {
+          const mInfo = getMachineInfo(mId) || {};
+          const existing = mGrouped[mId];
+          if (existing) {
+            return {
+              machineNo: mId,
+              category: mInfo.category || existing.category || 'TM',
+              division: mInfo.division || existing.division || 'SBC',
+              status: mInfo.status || 'FIT',
+              clusters: existing.clusters,
+              hasRepeat: existing.clusters.length > 0,
+              repeatClustersCount: existing.clusters.length,
+              totalIncidents: existing.totalIncidents,
+              totalDownDays: existing.totalDownDays,
+              blockCases: existing.blockCases
+            };
+          } else {
+            return {
+              machineNo: mId,
+              category: mInfo.category || 'TM',
+              division: mInfo.division || 'SBC',
+              status: mInfo.status || 'FIT',
+              clusters: [],
+              hasRepeat: false,
+              repeatClustersCount: 0,
+              totalIncidents: 0,
+              totalDownDays: 0,
+              blockCases: 0
+            };
+          }
+        });
+
+        // Filter list based on Quick Filter Pills & Search Box
+        if (gridFilter === 'REPEAT') {
+          fullFleetList = fullFleetList.filter(item => item.hasRepeat);
+        } else if (gridFilter === 'CLEAN') {
+          fullFleetList = fullFleetList.filter(item => !item.hasRepeat);
+        } else if (gridFilter === 'SBC' || gridFilter === 'MYS' || gridFilter === 'UBL') {
+          fullFleetList = fullFleetList.filter(item => String(item.division).toUpperCase() === gridFilter);
+        }
+
+        if (gridSearch) {
+          fullFleetList = fullFleetList.filter(item => 
+            item.machineNo.toLowerCase().includes(gridSearch) ||
+            item.category.toLowerCase().includes(gridSearch) ||
+            item.division.toLowerCase().includes(gridSearch)
+          );
+        }
+
+        // Sort: repeat machines first by incidents count, then zero-repeat machines alphabetically
+        fullFleetList.sort((a, b) => {
+          if (a.hasRepeat && !b.hasRepeat) return -1;
+          if (!a.hasRepeat && b.hasRepeat) return 1;
+          if (a.hasRepeat && b.hasRepeat) return b.totalIncidents - a.totalIncidents;
+          return a.machineNo.localeCompare(b.machineNo);
+        });
+
+        const countBadge = document.getElementById('repeatMachinesCountBadge');
+        if (countBadge) {
+          countBadge.textContent = `Showing ${fullFleetList.length} of ${allFleetMachineIds.length} fleet machines`;
+        }
+
+        if (machinesGrid) {
+          if (fullFleetList.length === 0) {
+            machinesGrid.innerHTML = `
+              <div style="grid-column: 1/-1; padding: 24px; text-align: center; color: #a4bba9; background: rgba(18, 38, 26, 0.4); border-radius: 8px;">
+                No machines matched the filter criteria "${escapeHtml(gridFilter)}". Click "All 87 Machines" to view the entire fleet.
+              </div>
+            `;
+          } else {
+            machinesGrid.innerHTML = fullFleetList.map(item => {
+              if (item.hasRepeat) {
+                return `
+                  <div class="repeat-machine-card" onclick="window.TM_APP.selectRepeatMachine('${item.machineNo}')" title="Click to inspect all ${item.totalIncidents} repeat failure cases for ${item.machineNo} one-by-one">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <span class="badge badge-subsystem" style="font-size: 10px;">${escapeHtml(item.category)}</span>
+                      <span class="badge" style="font-size: 10px; background: rgba(37,99,235,0.2); color:#60a5fa; border:1px solid rgba(37,99,235,0.4);">🔵 ${escapeHtml(item.division)}</span>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 800; color: var(--gold-300);">${escapeHtml(item.machineNo)}</div>
+                    <div style="display: flex; gap: 8px; margin-top: 10px; font-size: 11px; flex-wrap: wrap;">
+                      <span style="color: #f87171; font-weight: 700;">🔥 ${item.repeatClustersCount} Defect Group${item.repeatClustersCount > 1 ? 's' : ''}</span>
+                      <span style="color: #fbbf24; font-weight: 700;">• ${item.totalIncidents} Cases</span>
+                      <span style="color: #60a5fa; font-weight: 700;">• ${item.totalDownDays.toFixed(1)} day(s)</span>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 10px; color: #f87171;">⚠️ Recurring Defect</span>
+                      <span style="font-size: 11px; color: var(--gold-400); font-weight: 700;">Inspect Cases ➔</span>
+                    </div>
+                  </div>
+                `;
+              } else {
+                return `
+                  <div class="repeat-machine-card zero-repeat" onclick="window.TM_APP.selectRepeatMachine('${item.machineNo}')" title="Click to view details for ${item.machineNo}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <span class="badge badge-subsystem" style="font-size: 10px;">${escapeHtml(item.category)}</span>
+                      <span class="badge" style="font-size: 10px; background: rgba(37,99,235,0.2); color:#60a5fa; border:1px solid rgba(37,99,235,0.4);">🔵 ${escapeHtml(item.division)}</span>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 800; color: #a4bba9;">${escapeHtml(item.machineNo)}</div>
+                    <div style="display: flex; gap: 8px; margin-top: 10px; font-size: 11px; flex-wrap: wrap;">
+                      <span style="color: #4ade80; font-weight: 700;">✅ Zero Repeat Failures</span>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 10px; color: #4ade80;">Reliable in period</span>
+                      <span style="font-size: 11px; color: #a4bba9; font-weight: 600;">View Details ➔</span>
+                    </div>
+                  </div>
+                `;
+              }
+            }).join('');
+          }
+        }
+      }
+      if (titleEl) {
+        titleEl.textContent = `All Repeat Defect Cases Across Monitored Fleet (${filteredClusters.length} Clusters)`;
+      }
+    }
+
+    // 4. Render All Repeat Defect Clusters and their one-by-one cases
+    if (filteredClusters.length === 0) {
+      if (selectedMachine !== 'ALL') {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: #a4bba9; background: rgba(14, 28, 20, 0.5); border-radius: 8px; border: 1px solid rgba(74, 222, 128, 0.3);">
+            <div style="font-size: 38px; margin-bottom: 10px;">✅</div>
+            <div style="font-size: 17px; font-weight: 700; color: #4ade80;">Zero Recurring Defect Cases on ${escapeHtml(selectedMachine)}</div>
+            <div style="font-size: 12px; margin-top: 6px; max-width: 520px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+              This machine has no recurring component failures recorded during the selected duration period. All monitored assemblies and mechanical parts are operating within normal reliability parameters.
+            </div>
+            <div style="margin-top: 16px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary-pista" onclick="window.TM_APP.openMachineHrmDesk('${escapeHtml(selectedMachine)}')" style="font-size: 11.5px; padding: 6px 14px;">
+                📜 View Failure History in HRM Desk ↗
+              </button>
+              <button type="button" class="btn btn-dim" onclick="window.TM_APP.onRepeatMachineChange('ALL')" style="font-size: 11.5px; padding: 6px 14px;">
+                ⬅ Back to Full 87-Fleet Grid
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: #a4bba9;">
+            <div style="font-size: 38px; margin-bottom: 10px;">✅</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--gold-300);">No Repeat Failure Cases Detected</div>
+            <div style="font-size: 12px; margin-top: 4px; max-width: 500px; margin-left: auto; margin-right: auto;">
+              No verified repeat component failures match the duration criteria (${escapeHtml(duration)}). All machine components operating without recurring defects.
+            </div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    let clustersHtml = '';
+    const activeHighlightedCluster = AppState.highlightedRepeatCluster;
+
+    filteredClusters.forEach((cl, clIdx) => {
+      const isExpanded = (AppState.repeatExpandedClusters[cl.id] !== undefined)
+        ? AppState.repeatExpandedClusters[cl.id]
+        : (selectedMachine !== 'ALL' || clIdx < 8 || activeHighlightedCluster === cl.id);
+
+      const isClusterHighlighted = (activeHighlightedCluster === cl.id);
+      const isHighRecurrence = cl.repeatCount >= 3;
+      const badgeRecurrenceClass = isHighRecurrence ? 'repeat-recurrence-badge high' : 'repeat-recurrence-badge';
+
+      clustersHtml += `
+        <div class="repeat-cluster-card ${isClusterHighlighted ? 'repeat-cluster-highlighted' : ''}" id="clusterCard-${escapeHtml(cl.id)}">
+          <div class="repeat-cluster-header" onclick="window.TM_APP.toggleRepeatCluster('${escapeHtml(cl.id)}')">
+            <div class="repeat-cluster-title-box">
+              <span class="${badgeRecurrenceClass}">
+                🔁 ${cl.repeatCount}x Recurrence (${cl.repeatCount} Cases)
+              </span>
+              <span style="font-size: 14.5px; font-weight: 800; color: var(--gold-300);">
+                ${escapeHtml(cl.componentName)}
+              </span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 10.5px;">
+                ${escapeHtml(cl.subsystem)}
+              </span>
+              <span class="badge badge-subsystem" style="font-size: 10.5px;">
+                🚂 ${escapeHtml(cl.machineNo)}
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: #a4bba9; flex-wrap: wrap;">
+              <button type="button" class="repeat-highlight-trigger-btn" onclick="event.stopPropagation(); window.TM_APP.toggleRepeatCaseHighlight('${escapeHtml(cl.id)}', this)" title="Autohighlight all companion cases for this defect group">
+                🎯 Highlight Linked Cases (${cl.repeatCount})
+              </button>
+              <span>⏱️ <strong>${cl.totalDownDays.toFixed(1)} day(s)</strong></span>
+              <span>📅 ${cl.firstDate} ➔ ${cl.lastDate}</span>
+              <span class="repeat-chevron ${isExpanded ? 'rotated' : ''}" id="chevron-${escapeHtml(cl.id)}">▼</span>
+            </div>
+          </div>
+
+          <div class="repeat-cluster-body ${isExpanded ? '' : 'collapsed'}" id="clusterBody-${escapeHtml(cl.id)}">
+            <div style="font-size: 11.5px; color: #a4bba9; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <span>Chronological Case-by-Case Breakdown (${cl.repeatCount} verified recurring occurrences on ${escapeHtml(cl.machineNo)}):</span>
+              <span style="color: var(--gold-400); font-family: var(--font-mono); font-size: 11px;">
+                👉 Click any case card to autohighlight all linked occurrences
+              </span>
+            </div>
+      `;
+
+      cl.incidents.forEach((inc, incIdx) => {
+        const isFirst = (incIdx === 0);
+        const isCaseHighlighted = (activeHighlightedCluster === cl.id);
+        const occBadge = isFirst
+          ? `<span class="repeat-occ-badge first">#1 Initial Incident</span>`
+          : `<span class="repeat-occ-badge recurrence">#${incIdx + 1} Recurring Case (${incIdx}x Repeat)</span>`;
+
+        const failDate = formatDateDisplay(inc.dateOfFailure || inc.breakdownTime);
+        const fitDate = (inc.status === 'UNDER REPAIR' || (!inc.dateOfRectification && !inc.fitTime))
+          ? '⏳ Under Repair'
+          : formatDateDisplay(inc.dateOfRectification || inc.fitTime);
+
+        const dDays = (inc.totalDownDays !== undefined && inc.totalDownDays !== null)
+          ? `${parseFloat(inc.totalDownDays)} day(s)`
+          : `${((parseFloat(inc.downHours) || 0) / 24).toFixed(1)} day(s)`;
+
+        const isBlock = (String(inc.whetherInBlock || '').toUpperCase() === 'YES' || String(inc.whetherInBlock || '').toUpperCase().includes('BLOCK'));
+        const blockBadge = isBlock
+          ? `<span class="badge badge-block" style="font-size: 10px;">🚨 IN BLOCK</span>`
+          : `<span class="badge badge-nonblock" style="font-size: 10px;">🟢 NON-BLOCK</span>`;
+
+        const natureText = inc.natureOfFailure || inc.description || '-';
+        const actionText = inc.actionTaken || inc.stepsTaken || '-';
+        const sparesText = inc.sparesUsed || inc.partNo || '';
+
+        clustersHtml += `
+          <div class="repeat-incident-card ${isFirst ? 'first-case' : 'repeat-case'} ${isCaseHighlighted ? 'repeat-case-highlighted' : ''}" 
+               id="repeatIncidentCard-${escapeHtml(inc.id || String(incIdx))}"
+               data-cluster-id="${escapeHtml(cl.id)}"
+               onclick="window.TM_APP.toggleRepeatCaseHighlight('${escapeHtml(cl.id)}', this)"
+               style="cursor: pointer;"
+               title="Click to autohighlight all ${cl.repeatCount} linked repeat cases for ${escapeHtml(cl.componentName)}">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                ${occBadge}
+                ${isCaseHighlighted ? `<span class="repeat-highlight-badge">🎯 LINKED (${incIdx + 1}/${cl.repeatCount})</span>` : ''}
+                ${blockBadge}
+                <span style="font-weight: 700; color: #fff; font-size: 12px;">📅 Breakdown: ${escapeHtml(failDate)}</span>
+                <span style="color: #a4bba9; font-size: 11.5px;">➔ Fit: ${escapeHtml(fitDate)}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-family: var(--font-mono); font-weight: 700; color: #60a5fa; font-size: 12px;">⏱️ ${escapeHtml(dDays)}</span>
+                <div style="display: inline-flex; gap: 6px;">
+                  <button type="button" class="btn btn-sm btn-secondary-pista" onclick="event.stopPropagation(); window.TM_APP.jumpToSearchResult('${escapeHtml(inc.machineNo)}', '${escapeHtml(inc.category || cl.category)}', '${escapeHtml(inc.subsystem || cl.subsystem)}', '${escapeHtml(inc.id || '')}', '')" style="padding: 3px 10px; font-size: 11px;">
+                    🎯 Jump to Desk ↗
+                  </button>
+                  ${isUserAdmin() ? `
+                  <button type="button" class="btn btn-sm btn-edit-incident" onclick="event.stopPropagation(); window.TM_APP.openEditFailureModal('${escapeHtml(inc.id)}')" style="padding: 3px 8px; font-size: 11px;" title="Edit this failure record">
+                    ✏️ Edit
+                  </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; font-size: 12px; margin-top: 6px;">
+              <div>
+                <span style="color: var(--gold-400); font-weight: 700;">Nature of Failure:</span>
+                <div style="color: #f3f4f6; margin-top: 2px; line-height: 1.4;">${escapeHtml(natureText)}</div>
+              </div>
+              <div>
+                <span style="color: #34d399; font-weight: 700;">Action Taken &amp; Spares:</span>
+                <div style="color: #d1d5db; margin-top: 2px; line-height: 1.4;">
+                  ${escapeHtml(actionText)}
+                  ${sparesText ? `<div style="margin-top: 3px; font-size: 11px; color: #a4bba9;"><strong>Spares/Part:</strong> ${escapeHtml(sparesText)}</div>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(147, 197, 114, 0.15); font-size: 10.5px; color: #a4bba9;">
+              <div>
+                <span>Section: <strong>${escapeHtml(inc.section || 'Block Section')}</strong></span>
+                ${inc.certifiedBy ? ` &bull; <span>Certified By: <strong style="color: var(--gold-300);">${escapeHtml(inc.certifiedBy)}</strong></span>` : ''}
+              </div>
+              <div style="font-family: var(--font-mono); color: var(--gold-400);">
+                Click card to autohighlight linked companion cases
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      clustersHtml += `
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = clustersHtml;
+  }
+
+  // ==========================================================================
+  // IOH POH UPDATES MASTER DATABASE & MULTI-YEAR OVERHAUL SCHEDULES MODULE
+  // Preserves 100% of authentic data across all 11 sheets from IOH POH Updates.xlsx
+  // ==========================================================================
+  const IOH_POH_STORAGE_KEY = 'TM_IOH_POH_UPDATES_V1';
+  let IohPohState = {
+    data: null,
+    activeSheet: '2026-27',
+    searchQuery: '',
+    editingRowIdx: null
+  };
+
+  // 8 Active Sub-Tabs for IOH POH Updates (Sub-tabs 09, 10, 11 removed as instructed)
+  const ALLOWED_IOH_POH_SHEETS = [
+    '2026-27',
+    '2025-26',
+    '2024-25',
+    '2023-24',
+    '2022-23',
+    '2021-22',
+    '2020-21',
+    'IOH POH Duration'
+  ];
+
+  const IOH_POH_CONFIG = {
+    '2026-27': {
+      label: '2026-27',
+      icon: '📅',
+      title: 'Schedule for POH & IOH of Machines for Year 2026-27',
+      subtitle: 'Official SWR POH/IOH Nominated & Working Days Schedule',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'S. No.', 'Machine', 'Divn.', 'POH/IOH Workshop', 'Month',
+        'Start Date', 'End Date', 'Total Days', 'Nominated Days',
+        'Delay / Ahead (Days)', 'Engine Hr.', 'Remark'
+      ]
+    },
+    '2025-26': {
+      label: '2025-26',
+      icon: '📅',
+      title: 'Schedule for POH of Machines for Year 2025-26',
+      subtitle: 'Turnaround duration, workshop, and engine hours at POH',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'S. No.', 'Machine', 'Divn.', 'POH/IOH Workshop',
+        'Start Date', 'End Date', 'Total Days', 'Nominated Days',
+        'Delay / Ahead (Days)', 'Engine Hr.', 'Remark'
+      ]
+    },
+    '2024-25': {
+      label: '2024-25',
+      icon: '📅',
+      title: 'POH of Machines during year 2024-25',
+      subtitle: 'Completed overhauls with start, end dates, and cycle remarks',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'Sl. No.', 'Machine', 'Carried out at', 'Start Date', 'End Date',
+        'Total Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Remark', 'Notes', 'Status'
+      ]
+    },
+    '2023-24': {
+      label: '2023-24',
+      icon: '📅',
+      title: 'POH of Machines during year 2023-24',
+      subtitle: 'Completed overhauls with start, end dates, and cycle remarks',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'Sl. No.', 'Machine', 'Carried out at', 'Start Date', 'End Date',
+        'Total Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Remark'
+      ]
+    },
+    '2022-23': {
+      label: '2022-23',
+      icon: '📅',
+      title: 'POH of Machines during year 2022-23',
+      subtitle: 'Historical overhaul timeline',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'Sl. No.', 'Machine', 'Carried out at', 'Start Date', 'End Date',
+        'Total Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Remark'
+      ]
+    },
+    '2021-22': {
+      label: '2021-22',
+      icon: '📅',
+      title: 'POH of Machines during year 2021-22',
+      subtitle: 'Historical overhaul timeline',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'Sl. No.', 'Machine', 'Carried out at', 'Start Date', 'End Date',
+        'Total Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Remark'
+      ]
+    },
+    '2020-21': {
+      label: '2020-21',
+      icon: '📅',
+      title: 'POH of Machines during year 2020-21',
+      subtitle: 'Historical overhaul timeline',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'Sl. No.', 'Machine', 'Carried out at', 'Start Date', 'End Date',
+        'Total Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Remark'
+      ]
+    },
+    'IOH POH Duration': {
+      label: 'IOH POH Duration',
+      icon: '⏱️',
+      title: 'IOH/POH Duration as per IRTMM-2019 (Annx. 8.1, pg245)',
+      subtitle: 'Indian Railways standard schedule norms and engine hour thresholds',
+      headerRowIdx: 1,
+      dataStartIdx: 3,
+      headers: [
+        'Machine Type', 'IOH Duration (Days)', '1st POH Duration (Days)',
+        'Subsequent POHs Duration (Days)', 'IOH Due at E. Hrs', 'POH Due at E. Hrs'
+      ]
+    },
+    'Engine hrs for IOH POH': {
+      label: 'Engine Hours & Projections',
+      icon: '⚙️',
+      title: 'Master Machine Engine Hours Run & Next Overhaul Projections',
+      subtitle: 'Comprehensive 5-year overhaul roadmap across 107 SWR machines',
+      headerRowIdx: 0,
+      dataStartIdx: 3,
+      headers: [
+        'S. No.', 'Machine', 'Divn.', 'Date of Comm.', 'Last IOH EH', 'Last IOH Date',
+        'Last POH EH', 'Last POH Date', 'EH as on 31.08.2026', 'EH Run since IOH',
+        'EH Run since POH', 'EH Run Prev IOH/POH', 'Prev FY EH (31-03-25)',
+        'Prev FY EH (31-03-26)', 'EH Run/Month', 'Next Due IOH (Mos)', 'Next Due POH (Mos)',
+        '2000/Avg Run', '2025-26 IOH', '2025-26 POH', '2026-27 IOH', '2026-27 POH',
+        '2027-28 IOH', '2027-28 POH', '2028-29 IOH', '2028-29 POH', '2029-30 IOH', '2029-30 POH',
+        'Remark'
+      ]
+    },
+    '2026-27 ?? ????': {
+      label: 'POH Completed 2026-27',
+      icon: '✅',
+      title: 'POH of Machines Completed in Year 2026-27 (till July-2026)',
+      subtitle: 'Actual working days excluding national holidays vs nominated days',
+      headerRowIdx: 1,
+      dataStartIdx: 2,
+      headers: [
+        'S. No.', 'Machine', 'POH/IOH Workshop', 'Start Date', 'End Date',
+        'Total Working Days', 'Nominated Days', 'Delay / Ahead (Days)', 'Engine Hr.', 'Remark', 'Holidays Excluded'
+      ]
+    },
+    '???11': {
+      label: 'Expenditure & Spares',
+      icon: '💰',
+      title: 'POH Expenditure, Workshop Bills & Turnaround Analysis',
+      subtitle: 'Advance bills, final bills, total workshop costs, and datamatic spares billing',
+      headerRowIdx: 0,
+      dataStartIdx: 1,
+      headers: [
+        'S. No.', 'Machine', 'POH Workshop', 'Advance Bill (₹)', 'Final Bill (₹)',
+        'Total Cost (₹)', 'Spares Cost (₹)', 'Start Date', 'End Date', 'Turnaround Days',
+        'Nominated Days', 'Delay / Ahead (Days)', 'Engine Hr.', 'Overhaul Cycle / Remarks'
+      ]
+    }
+  };
+
+  function getIohPohConfig(sheetKey) {
+    if (IOH_POH_CONFIG[sheetKey]) return IOH_POH_CONFIG[sheetKey];
+    if (sheetKey && (sheetKey.includes('पूर्ण') || sheetKey.includes('????') || sheetKey.includes('2026-27 ??'))) {
+      return IOH_POH_CONFIG['2026-27 ?? ????'];
+    }
+    if (sheetKey && (sheetKey.includes('11') || sheetKey.includes('शीट') || sheetKey.includes('???11'))) {
+      return IOH_POH_CONFIG['???11'];
+    }
+    return {
+      label: sheetKey,
+      icon: '📋',
+      title: `Schedule Data: ${sheetKey}`,
+      subtitle: `SWR Track Machine Overhaul Database`,
+      headerRowIdx: 0,
+      dataStartIdx: 1,
+      headers: []
+    };
+  }
+
+  function getEffectiveIohPohHeaders(sheet, cfg) {
+    const rawRows = sheet.rawRows || [];
+    let maxCols = cfg.headers.length;
+    for (let r = 0; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (row && row.length > maxCols) {
+        for (let c = maxCols; c < row.length; c++) {
+          if (row[c] !== null && row[c] !== undefined && String(row[c]).trim() !== '') {
+            maxCols = c + 1;
+          }
+        }
+      }
+    }
+    const headers = [...cfg.headers];
+    while (headers.length < maxCols) {
+      headers.push(`Field ${headers.length + 1}`);
+    }
+    return headers;
+  }
+
+  function formatIohPohCell(val, headerName) {
+    if (val === null || val === undefined || val === '') return '-';
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const mon = String(d.getMonth() + 1).padStart(2, '0');
+        const yr = d.getFullYear();
+        return `${day}-${mon}-${yr}`;
+      }
+    }
+    if (typeof val === 'number') {
+      const hn = headerName ? headerName.toLowerCase() : '';
+      // Any days column (Total Days, Nominated Days, Turnaround Days, Total Working Days, etc.) must NEVER display a Rupee symbol
+      if (hn.includes('day')) {
+        return String(val);
+      }
+      // Currency formatting for financial / cost / billing columns only (and never if it has 'day')
+      if ((hn.includes('₹') || hn.includes('rs.') || hn.includes('bill') || hn.includes('cost') || hn.includes('adv') || hn.includes('spare') || hn.includes('expenditure')) && !hn.includes('day')) {
+        return '₹ ' + Math.round(val).toLocaleString('en-IN');
+      }
+      if ((hn.includes('eh') || hn.includes('engine hr')) && val >= 1000) {
+        return Math.round(val).toLocaleString('en-IN') + ' hrs';
+      }
+      if (!Number.isInteger(val)) {
+        return val.toFixed(2);
+      }
+      return String(val);
+    }
+    return String(val);
+  }
+
+  function renderIohPohDelayAheadBadge(val) {
+    const num = Number(val);
+    if (isNaN(num)) return escapeHtml(String(val));
+    if (num < 0) {
+      return `<span class="badge" style="background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35); font-weight: 700;">Ahead: ${Math.abs(num)}d</span>`;
+    } else if (num > 0) {
+      return `<span class="badge" style="background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.35); font-weight: 700;">Delay: +${num}d</span>`;
+    } else {
+      return `<span class="badge" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); font-weight: 700;">On Time (0d)</span>`;
+    }
+  }
+
+  function initIohPohModule() {
+    try {
+      const saved = localStorage.getItem(IOH_POH_STORAGE_KEY);
+      if (saved) {
+        IohPohState.data = JSON.parse(saved);
+      }
+    } catch(e) {
+      console.warn('Failed to parse cached IOH POH data from localStorage:', e);
+    }
+
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+        IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+      }
+    }
+
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      console.warn('IOH POH data not loaded yet.');
+      return;
+    }
+
+    // Default to '2026-27' or first allowed sheet
+    if (!IohPohState.activeSheet || !ALLOWED_IOH_POH_SHEETS.includes(IohPohState.activeSheet)) {
+      IohPohState.activeSheet = '2026-27';
+    }
+
+    const badge = document.getElementById('badgeIohPohUpdates');
+    if (badge) {
+      badge.textContent = ALLOWED_IOH_POH_SHEETS.length;
+    }
+
+    renderIohPohView();
+  }
+
+  function renderIohPohView() {
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+        IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+      }
+    }
+    renderIohPohSheetNav();
+    renderIohPohTable();
+  }
+
+  function renderIohPohSheetNav() {
+    const nav = document.getElementById('iohPohSheetNav');
+    if (!nav || !IohPohState.data || !IohPohState.data.sheets) return;
+
+    let navHtml = '';
+
+    ALLOWED_IOH_POH_SHEETS.forEach(sKey => {
+      const s = IohPohState.data.sheets[sKey];
+      if (!s) return;
+      const cfg = getIohPohConfig(sKey);
+      const isActive = sKey === IohPohState.activeSheet;
+      const rawRows = s.rawRows || [];
+      const count = rawRows.length > cfg.dataStartIdx ? rawRows.length - cfg.dataStartIdx : rawRows.length;
+
+      navHtml += `
+        <button type="button" class="ioh-poh-sheet-pill ${isActive ? 'active' : ''}" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(sKey)}')" title="${escapeHtml(cfg.title)}">
+          <span>${cfg.icon}</span>
+          <span>${escapeHtml(cfg.label)}</span>
+          <span class="ioh-poh-sheet-count-tag">${count}</span>
+        </button>
+      `;
+    });
+
+    nav.innerHTML = navHtml;
+  }
+
+  function selectIohPohSheet(sheetKey) {
+    if (!ALLOWED_IOH_POH_SHEETS.includes(sheetKey)) {
+      const match = ALLOWED_IOH_POH_SHEETS.find(k => k === sheetKey || k.includes(sheetKey));
+      sheetKey = match || '2026-27';
+    }
+    IohPohState.activeSheet = sheetKey;
+    IohPohState.searchQuery = '';
+    const input = document.getElementById('iohPohSearchInput');
+    if (input) input.value = '';
+    const clearBtn = document.getElementById('iohPohSearchClear');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    renderIohPohSheetNav();
+    renderIohPohTable();
+  }
+
+  function renderIohPohTable() {
+    const tableHead = document.getElementById('iohPohTableHead');
+    const tableBody = document.getElementById('iohPohTableBody');
+    const emptyState = document.getElementById('iohPohEmptyState');
+    const countBadge = document.getElementById('iohPohCountBadge');
+    const filteredNote = document.getElementById('iohPohFilteredNote');
+    const iconEl = document.getElementById('iohPohActiveSheetIcon');
+    const titleEl = document.getElementById('iohPohActiveSheetTitle');
+    const subtitleEl = document.getElementById('iohPohActiveSheetSubtitle');
+
+    if (!tableHead || !tableBody || !IohPohState.data || !IohPohState.data.sheets) return;
+
+    const sheetKey = IohPohState.activeSheet;
+    const sheet = IohPohState.data.sheets[sheetKey];
+    if (!sheet) return;
+
+    const cfg = getIohPohConfig(sheetKey);
+    const headers = getEffectiveIohPohHeaders(sheet, cfg);
+    const rawRows = sheet.rawRows || [];
+
+    if (iconEl) iconEl.textContent = cfg.icon;
+    if (titleEl) titleEl.textContent = cfg.title;
+    if (subtitleEl) subtitleEl.textContent = `Sheet: ${sheetKey} | ${cfg.subtitle}`;
+
+    // Render Table Header
+    let headHtml = `
+      <th style="width: 45px; text-align: center;">#</th>
+      ${headers.map(h => `<th style="white-space: nowrap;">${escapeHtml(h)}</th>`).join('')}
+      <th style="width: 140px; text-align: center; white-space: nowrap;">Actions</th>
+    `;
+    tableHead.innerHTML = headHtml;
+
+    // Filter Data Rows
+    const dataStart = cfg.dataStartIdx;
+    const query = (IohPohState.searchQuery || '').toLowerCase();
+    const isAdmin = isUserAdmin();
+
+    let renderedCount = 0;
+    let totalDataRows = 0;
+    let bodyHtml = '';
+
+    for (let r = dataStart; r < rawRows.length; r++) {
+      const row = rawRows[r] || [];
+      totalDataRows++;
+
+      // Check for section divider rows
+      const isDivider = row[0] && String(row[0]).toLowerCase().includes('schedule') && (!row[1] || row[1] === '');
+      if (isDivider) {
+        bodyHtml += `
+          <tr class="ioh-poh-section-divider">
+            <td colspan="${headers.length + 2}" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-weight: 800; font-size: 12.5px; padding: 10px 14px; letter-spacing: 0.5px;">
+              ${escapeHtml(String(row[0]))}
+            </td>
+          </tr>
+        `;
+        continue;
+      }
+
+      // Search match
+      if (query) {
+        const matches = row.some(cell => cell !== null && cell !== undefined && String(cell).toLowerCase().includes(query));
+        if (!matches) continue;
+      }
+
+      renderedCount++;
+      const displayIdx = r - dataStart + 1;
+
+      const cellsHtml = headers.map((h, colIdx) => {
+        const rawVal = row[colIdx];
+        const isDelayAhead = h.toLowerCase().includes('delay') || h.toLowerCase().includes('ahead');
+        if (isDelayAhead && rawVal !== '' && rawVal !== null && rawVal !== undefined) {
+          return `<td style="text-align: center; white-space: nowrap;">${renderIohPohDelayAheadBadge(rawVal)}</td>`;
+        }
+        const formatted = formatIohPohCell(rawVal, h);
+        const isNumeric = typeof rawVal === 'number' || (formatted.startsWith('₹') || formatted.endsWith('hrs') || formatted.endsWith('d'));
+        return `<td style="${isNumeric ? 'font-family: var(--font-mono);' : ''}">${escapeHtml(formatted)}</td>`;
+      }).join('');
+
+      bodyHtml += `
+        <tr class="ioh-poh-row" data-row-idx="${r}">
+          <td style="text-align: center; font-weight: 700; color: var(--gold-400);">${displayIdx}</td>
+          ${cellsHtml}
+          <td style="text-align: center; white-space: nowrap;">
+            <button type="button" class="btn btn-sm btn-dim" onclick="window.TM_APP.openIohPohEditModal(${r})" title="Edit this entry" style="padding: 3px 8px; font-size: 11px; margin-right: 4px;">
+              ✏️ Edit
+            </button>
+            ${isAdmin ? `
+              <button type="button" class="btn btn-sm btn-danger-dim" onclick="window.TM_APP.deleteIohPohRecord(${r})" title="Delete this entry permanently" style="padding: 3px 8px; font-size: 11px;">
+                🗑️ Delete
+              </button>
+            ` : `
+              <button type="button" class="btn btn-sm btn-dim" disabled title="Admin login required to delete records" style="opacity: 0.35; cursor: not-allowed; padding: 3px 8px; font-size: 11px;">
+                🗑️
+              </button>
+            `}
+          </td>
+        </tr>
+      `;
+    }
+
+    tableBody.innerHTML = bodyHtml;
+
+    if (countBadge) {
+      countBadge.textContent = `${totalDataRows} Entries`;
+    }
+    if (filteredNote) {
+      if (query) {
+        filteredNote.textContent = `(Showing ${renderedCount} of ${totalDataRows} matching "${IohPohState.searchQuery}")`;
+      } else {
+        filteredNote.textContent = '';
+      }
+    }
+
+    if (emptyState) {
+      emptyState.style.display = (renderedCount === 0 && totalDataRows > 0) ? 'block' : 'none';
+    }
+  }
+
+  function onIohPohSearch(val) {
+    IohPohState.searchQuery = (val || '').trim().toLowerCase();
+    const clearBtn = document.getElementById('iohPohSearchClear');
+    if (clearBtn) clearBtn.style.display = IohPohState.searchQuery ? 'block' : 'none';
+    renderIohPohTable();
+  }
+
+  function clearIohPohSearch() {
+    IohPohState.searchQuery = '';
+    const input = document.getElementById('iohPohSearchInput');
+    if (input) input.value = '';
+    const clearBtn = document.getElementById('iohPohSearchClear');
+    if (clearBtn) clearBtn.style.display = 'none';
+    renderIohPohTable();
+  }
+
+  function openIohPohEditModal(rawRowIdx) {
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+        IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+      }
+    }
+    if (!IohPohState.activeSheet || !ALLOWED_IOH_POH_SHEETS.includes(IohPohState.activeSheet)) {
+      IohPohState.activeSheet = '2026-27';
+    }
+
+    const sheetKey = IohPohState.activeSheet;
+    const sheet = IohPohState.data && IohPohState.data.sheets ? IohPohState.data.sheets[sheetKey] : null;
+    if (!sheet) return;
+
+    const cfg = getIohPohConfig(sheetKey);
+    const headers = getEffectiveIohPohHeaders(sheet, cfg);
+    const row = sheet.rawRows[rawRowIdx] || [];
+
+    IohPohState.editingRowIdx = rawRowIdx;
+
+    const titleEl = document.getElementById('iohPohModalTitle');
+    const subEl = document.getElementById('iohPohModalSubtitle');
+    const fieldsContainer = document.getElementById('iohPohModalFields');
+    const deleteBtn = document.getElementById('btnIohPohModalDelete');
+    const saveBtnText = document.getElementById('btnIohPohModalSaveText');
+
+    if (titleEl) titleEl.textContent = `Edit Record — ${cfg.label}`;
+    const rowName = row[1] || row[0] || `Row #${rawRowIdx + 1}`;
+    if (subEl) subEl.textContent = `Editing record for "${rowName}". Changes will be saved locally.`;
+    if (saveBtnText) saveBtnText.textContent = '💾 Save Changes';
+
+    if (deleteBtn) {
+      deleteBtn.style.display = isUserAdmin() ? 'inline-flex' : 'none';
+    }
+
+    let fieldsHtml = '';
+    headers.forEach((h, colIdx) => {
+      let val = row[colIdx];
+      if (val === null || val === undefined) val = '';
+      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const mon = String(d.getMonth() + 1).padStart(2, '0');
+          val = `${day}-${mon}-${d.getFullYear()}`;
+        }
+      }
+      const isRemark = h.toLowerCase().includes('remark') || h.toLowerCase().includes('note');
+      if (isRemark) {
+        fieldsHtml += `
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <textarea class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" rows="2" style="font-size: 12.5px;">${escapeHtml(String(val))}</textarea>
+          </div>
+        `;
+      } else {
+        fieldsHtml += `
+          <div class="form-group">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <input type="text" class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" value="${escapeHtml(String(val))}" style="font-size: 12.5px;">
+          </div>
+        `;
+      }
+    });
+
+    if (fieldsContainer) fieldsContainer.innerHTML = fieldsHtml;
+    const modal = document.getElementById('iohPohEditModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+  }
+
+  function openIohPohAddModal() {
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+        IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+      }
+    }
+    if (!IohPohState.activeSheet || !ALLOWED_IOH_POH_SHEETS.includes(IohPohState.activeSheet)) {
+      IohPohState.activeSheet = '2026-27';
+    }
+
+    const sheetKey = IohPohState.activeSheet;
+    const sheet = IohPohState.data && IohPohState.data.sheets ? IohPohState.data.sheets[sheetKey] : null;
+    if (!sheet) {
+      showToast('Error: Overhaul sheet data not loaded. Please try again.', true);
+      return;
+    }
+
+    const cfg = getIohPohConfig(sheetKey);
+    const headers = getEffectiveIohPohHeaders(sheet, cfg);
+
+    IohPohState.editingRowIdx = -1; // New entry
+
+    const titleEl = document.getElementById('iohPohModalTitle');
+    const subEl = document.getElementById('iohPohModalSubtitle');
+    const fieldsContainer = document.getElementById('iohPohModalFields');
+    const deleteBtn = document.getElementById('btnIohPohModalDelete');
+    const saveBtnText = document.getElementById('btnIohPohModalSaveText');
+
+    if (titleEl) titleEl.textContent = `➕ Add New Record — ${cfg.label}`;
+    if (subEl) subEl.textContent = `Enter details for new machine / schedule entry in "${cfg.title}".`;
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    if (saveBtnText) saveBtnText.textContent = '➕ Add Entry';
+
+    // Calculate default next serial number
+    const nextSNo = sheet.rawRows.length > cfg.dataStartIdx ? sheet.rawRows.length - cfg.dataStartIdx + 1 : sheet.rawRows.length + 1;
+
+    let fieldsHtml = '';
+    headers.forEach((h, colIdx) => {
+      const isRemark = h.toLowerCase().includes('remark') || h.toLowerCase().includes('note');
+      let placeholder = '';
+      let defaultValue = '';
+
+      if (colIdx === 0 && (h.toLowerCase().includes('s.') || h.toLowerCase().includes('sl.'))) {
+        defaultValue = String(nextSNo);
+        placeholder = 'e.g. ' + nextSNo;
+      } else if (h.toLowerCase().includes('machine')) {
+        placeholder = 'e.g. DTE-56749, CSM-939, BCM-351';
+      } else if (h.toLowerCase().includes('divn')) {
+        placeholder = 'e.g. SBC, MYS, UBL';
+      } else if (h.toLowerCase().includes('workshop') || h.toLowerCase().includes('carried out')) {
+        placeholder = 'e.g. CPOH/RYP, STMRD/UBL, ZBD/YPR';
+      } else if (h.toLowerCase().includes('month')) {
+        placeholder = 'e.g. Dec26, Jan 27, Apr26';
+      } else if (h.toLowerCase().includes('date')) {
+        placeholder = 'DD-MM-YYYY (e.g. 15-01-2027)';
+      } else if (h.toLowerCase().includes('days') || h.toLowerCase().includes('engine')) {
+        placeholder = 'e.g. 60, 75, 12500';
+      } else if (isRemark) {
+        placeholder = 'e.g. 1st POH, 2nd POH, Planned for FY2026-27';
+      }
+
+      if (isRemark) {
+        fieldsHtml += `
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <textarea class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" rows="2" style="font-size: 12.5px;" placeholder="${escapeHtml(placeholder)}"></textarea>
+          </div>
+        `;
+      } else {
+        fieldsHtml += `
+          <div class="form-group">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <input type="text" class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" style="font-size: 12.5px;">
+          </div>
+        `;
+      }
+    });
+
+    if (fieldsContainer) fieldsContainer.innerHTML = fieldsHtml;
+    const modal = document.getElementById('iohPohEditModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+
+    // Auto-focus the first editable input (col 1 if col 0 is S.No., else col 0)
+    setTimeout(() => {
+      const firstInput = document.getElementById('iohPohField_1') || document.getElementById('iohPohField_0');
+      if (firstInput) firstInput.focus();
+    }, 150);
+  }
+
+  function saveIohPohModalRecord() {
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+        IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+      }
+    }
+    if (!IohPohState.activeSheet || !ALLOWED_IOH_POH_SHEETS.includes(IohPohState.activeSheet)) {
+      IohPohState.activeSheet = '2026-27';
+    }
+
+    const sheetKey = IohPohState.activeSheet;
+    const sheet = IohPohState.data && IohPohState.data.sheets ? IohPohState.data.sheets[sheetKey] : null;
+    if (!sheet) {
+      showToast('Error: Active sheet data is missing. Please refresh and try again.', true);
+      return;
+    }
+
+    const cfg = getIohPohConfig(sheetKey);
+    const headers = getEffectiveIohPohHeaders(sheet, cfg);
+    const form = document.getElementById('iohPohModalForm');
+    if (!form) return;
+
+    const newValues = [];
+    headers.forEach((h, colIdx) => {
+      const input = form.querySelector(`[name="col_${colIdx}"]`);
+      let val = input ? input.value.trim() : '';
+      if (val !== '' && !isNaN(val) && !val.includes('-') && !val.includes('/') && !val.includes('.')) {
+        val = Number(val);
+      } else if (val !== '' && !isNaN(val) && val.includes('.') && val.split('.').length === 2 && !val.includes(' ') && val.split('.')[1].length <= 4) {
+        val = parseFloat(val);
+      }
+      newValues.push(val);
+    });
+
+    // Validate if adding: ensure at least one field has been entered
+    const col0IsSNo = headers[0] && (headers[0].toLowerCase().includes('s.') || headers[0].toLowerCase().includes('sl.'));
+    const hasContent = col0IsSNo
+      ? newValues.some((v, idx) => idx > 0 && v !== '' && v !== null && v !== undefined)
+      : newValues.some(v => v !== '' && v !== null && v !== undefined);
+
+    if (!hasContent && IohPohState.editingRowIdx < 0) {
+      showToast('Please enter at least a machine number or details for the new entry.', true);
+      return;
+    }
+
+    if (IohPohState.editingRowIdx >= 0) {
+      sheet.rawRows[IohPohState.editingRowIdx] = newValues;
+      showToast(`Record updated successfully in ${cfg.label}.`);
+    } else {
+      if (!Array.isArray(sheet.rawRows)) {
+        sheet.rawRows = [];
+      }
+      sheet.rawRows.push(newValues);
+      sheet.rowCount = sheet.rawRows.length;
+      showToast(`New record added successfully to ${cfg.label}.`);
+    }
+
+    try {
+      localStorage.setItem(IOH_POH_STORAGE_KEY, JSON.stringify(IohPohState.data));
+    } catch(e) {
+      console.warn('Failed to persist IOH POH data to localStorage:', e);
+    }
+
+    closeModal('iohPohEditModal');
+    renderIohPohView();
+
+    // Scroll to the newly added row and briefly highlight it
+    if (IohPohState.editingRowIdx < 0) {
+      setTimeout(() => {
+        const tableBody = document.getElementById('iohPohTableBody');
+        if (tableBody && tableBody.lastElementChild) {
+          tableBody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          tableBody.lastElementChild.style.transition = 'background-color 0.4s ease';
+          tableBody.lastElementChild.style.backgroundColor = 'rgba(147, 197, 114, 0.28)';
+          setTimeout(() => {
+            if (tableBody.lastElementChild) {
+              tableBody.lastElementChild.style.backgroundColor = '';
+            }
+          }, 2000);
+        }
+      }, 100);
+    }
+  }
+
+  function deleteIohPohRecord(rawRowIdx) {
+    if (!isUserAdmin()) {
+      showToast('Action denied: Administrator access required to delete records.', true);
+      return;
+    }
+    const sheetKey = IohPohState.activeSheet;
+    const sheet = IohPohState.data && IohPohState.data.sheets ? IohPohState.data.sheets[sheetKey] : null;
+    if (!sheet || !sheet.rawRows[rawRowIdx]) return;
+
+    const row = sheet.rawRows[rawRowIdx];
+    const rowName = row[1] || row[0] || `Row #${rawRowIdx + 1}`;
+    if (!confirm(`Are you sure you want to permanently delete the entry for "${rowName}" from ${sheetKey}?`)) {
+      return;
+    }
+
+    sheet.rawRows.splice(rawRowIdx, 1);
+    sheet.rowCount = sheet.rawRows.length;
+
+    try {
+      localStorage.setItem(IOH_POH_STORAGE_KEY, JSON.stringify(IohPohState.data));
+    } catch(e) {
+      console.warn('Failed to persist deletion to localStorage:', e);
+    }
+
+    closeModal('iohPohEditModal');
+    renderIohPohView();
+    showToast(`Record for "${rowName}" deleted successfully.`);
+  }
+
+  function deleteIohPohRecordFromModal() {
+    if (IohPohState.editingRowIdx !== null && IohPohState.editingRowIdx >= 0) {
+      deleteIohPohRecord(IohPohState.editingRowIdx);
+    }
+  }
+
+  function resetIohPohToDefault() {
+    if (!isUserAdmin()) {
+      showToast('Action denied: Administrator access required to reset data.', true);
+      return;
+    }
+    if (!confirm('Are you sure you want to restore original IOH POH Updates data from the official Excel file? Any manual edits or additions will be reverted.')) {
+      return;
+    }
+    localStorage.removeItem(IOH_POH_STORAGE_KEY);
+    if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
+      IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
+    }
+    renderIohPohView();
+    showToast('IOH POH data reset to official Excel records successfully.');
+  }
+
+  function exportIohPohToExcel() {
+    if (typeof XLSX === 'undefined') {
+      showToast('SheetJS library is still initializing. Please retry in a few seconds.', true);
+      return;
+    }
+    try {
+      const wb = XLSX.utils.book_new();
+      ALLOWED_IOH_POH_SHEETS.forEach(sName => {
+        const s = IohPohState.data.sheets[sName];
+        if (s && s.rawRows) {
+          const ws = XLSX.utils.aoa_to_sheet(s.rawRows);
+          const safeName = sName.substring(0, 31).replace(/[\\/?*[\]]/g, '_');
+          XLSX.utils.book_append_sheet(wb, ws, safeName);
+        }
+      });
+      XLSX.writeFile(wb, `SWR_IOH_POH_Updates_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast('IOH POH Updates workbook exported to Excel successfully.');
+    } catch (e) {
+      console.error('Export failed:', e);
+      showToast('Failed to export workbook: ' + e.message, true);
+    }
   }
 
   // ==========================================================================
@@ -8648,6 +10634,524 @@
     }
   }
 
+  // Helper: Auto-fit column widths for SheetJS JSON worksheets
+  function applyAutoColWidths(ws, rows, minColWidth = 12, maxColWidth = 60) {
+    if (!ws || !rows || rows.length === 0) return;
+    const colKeys = Object.keys(rows[0]);
+    ws['!cols'] = colKeys.map(key => {
+      let maxLen = String(key).length;
+      for (let i = 0; i < rows.length; i++) {
+        const v = rows[i][key];
+        if (v !== undefined && v !== null) {
+          const str = String(v);
+          if (str.length > maxLen) {
+            maxLen = str.length;
+          }
+        }
+      }
+      return { wch: Math.min(Math.max(maxLen + 3, minColWidth), maxColWidth) };
+    });
+  }
+
+  // Helper: Auto-fit column widths for SheetJS AOA worksheets
+  function applyAoaColWidths(ws, aoaRows, minColWidth = 14, maxColWidth = 65) {
+    if (!ws || !aoaRows || aoaRows.length === 0) return;
+    const maxCols = Math.max(...aoaRows.map(r => (r ? r.length : 0)));
+    const widths = [];
+    for (let c = 0; c < maxCols; c++) {
+      let maxLen = 10;
+      for (let r = 0; r < aoaRows.length; r++) {
+        const v = (aoaRows[r] && aoaRows[r][c] !== undefined && aoaRows[r][c] !== null) ? aoaRows[r][c] : '';
+        const str = String(v);
+        if (str.length > maxLen) {
+          maxLen = str.length;
+        }
+      }
+      widths.push({ wch: Math.min(Math.max(maxLen + 3, minColWidth), maxColWidth) });
+    }
+    ws['!cols'] = widths;
+  }
+
+  // ==========================================================================
+  // COMPLETE MACHINE EXCEL DOSSIER EXPORT ENGINE (MULTI-SHEET WORKBOOK)
+  // Exports Machine Profile, 16 IR HRM Items, Historical Logs, All Failure Incidents,
+  // Subsystem Pareto Breakdown, Repeat Defects, and IOH/POH Overhauls with ZERO data loss
+  // ==========================================================================
+  async function exportCompleteMachineReport(targetMachineId) {
+    if (typeof XLSX === 'undefined' || !XLSX.utils) {
+      showToast('Loading SheetJS export engine...', false);
+      try {
+        await ensureXLSX();
+      } catch (e) {
+        showToast('SheetJS not ready for export: ' + e.message, true);
+        return;
+      }
+    }
+
+    // 1. Resolve Target Machine ID
+    let mId = targetMachineId;
+    if (!mId || mId === 'ALL') {
+      if (AppState.selectedMachine && AppState.selectedMachine !== 'ALL') {
+        mId = AppState.selectedMachine;
+      } else {
+        mId = getActiveMachineId();
+      }
+    }
+    if (!mId || mId === 'ALL') {
+      const allIds = getAllFleetMachineIds();
+      mId = allIds.length > 0 ? allIds[0] : 'BCM-351';
+    }
+
+    const normMid = normalizeMachineNo(mId);
+    const normMidUpper = normMid.toUpperCase();
+
+    // 2. Auto-heal HRM Data to ensure authentic 16 items and records are restored
+    healMachineHrm(normMid);
+    const hrm = HRM_DATA[normMid] || {
+      machineId: normMid,
+      machineName: normMid,
+      commissioningDate: '2016-01-01',
+      items: []
+    };
+
+    if (hrm && Array.isArray(hrm.items)) {
+      hrm.items.forEach(it => {
+        if (/IOH|POH/i.test(it.title)) syncHrmItemOrdinals(it);
+      });
+    }
+
+    // 3. Machine Metadata & Profile
+    const mInfo = getMachineInfo(normMid) || {};
+    const category = mInfo.category || AppState.selectedCategory || 'Track Machine';
+    const model = mInfo.model || `${category} Track Machine`;
+    const division = mInfo.division || 'SBC';
+    const depot = mInfo.depot || `${division} Track Base`;
+    const commDate = hrm.commissioningDate || hrm.commissioningRaw || mInfo.commissioningDate || (mInfo.year ? `${mInfo.year}-01-01` : 'NA');
+    const dynamicAge = calculateDynamicAge(commDate);
+
+    // 4. Retrieve All Failure Incidents for this Machine
+    const machFailures = (AppState.failures || []).filter(f => {
+      if (!f || !f.machineNo) return false;
+      const fNorm = normalizeMachineNo(f.machineNo).toUpperCase();
+      const fRaw = String(f.machineNo).trim().toUpperCase();
+      const fNormClean = fNorm.replace(/[^A-Z0-9]/g, '');
+      const tgtClean = normMidUpper.replace(/[^A-Z0-9]/g, '');
+      return fNorm === normMidUpper || fRaw === normMidUpper || (fNormClean && tgtClean && fNormClean === tgtClean);
+    });
+
+    // Sort failures newest first by timestamp
+    machFailures.sort((a, b) => getFailureTimestamp(b) - getFailureTimestamp(a));
+
+    const underRepair = machFailures.some(f => f.status === 'UNDER REPAIR');
+    const totalDownDaysVal = machFailures.reduce((sum, f) => sum + (parseFloat(f.totalDownDays) || ((parseFloat(f.downHours) || 0) / 24) || 0), 0);
+    const totalDownHoursVal = machFailures.reduce((sum, f) => sum + (parseFloat(f.downHours) || 0), 0);
+    const blockIncidentsCount = machFailures.filter(f => {
+      const b = String(f.whetherInBlock || '').toUpperCase();
+      return b === 'YES' || b.includes('BLOCK');
+    }).length;
+
+    // 5. Repetitive Clusters & Cases for this Machine
+    const machClusters = (AppState.repeatClusters || []).filter(cl => {
+      if (!cl || !cl.machineNo) return false;
+      const cNorm = normalizeMachineNo(cl.machineNo).toUpperCase();
+      const cRaw = String(cl.machineNo).trim().toUpperCase();
+      const cNormClean = cNorm.replace(/[^A-Z0-9]/g, '');
+      const tgtClean = normMidUpper.replace(/[^A-Z0-9]/g, '');
+      return cNorm === normMidUpper || cRaw === normMidUpper || (cNormClean && tgtClean && cNormClean === tgtClean);
+    });
+
+    // 6. Cross-reference IOH/POH Overhauls for this machine across all 8 sheets
+    const iohPohRows = [];
+    const sheetsSource = (IohPohState.data && IohPohState.data.sheets) ? IohPohState.data.sheets : (window.OFFICIAL_IOH_POH_DATA?.sheets || {});
+    ALLOWED_IOH_POH_SHEETS.forEach(sheetKey => {
+      const s = sheetsSource[sheetKey];
+      if (!s || !s.rawRows) return;
+      const cfg = getIohPohConfig(sheetKey);
+      const rawRows = s.rawRows || [];
+      const dataStart = cfg.dataStartIdx || 2;
+      let currentSection = 'Schedule';
+
+      for (let r = 0; r < rawRows.length; r++) {
+        const row = rawRows[r] || [];
+        if (row[0] && String(row[0]).toLowerCase().includes('schedule') && (!row[1] || row[1] === '')) {
+          currentSection = String(row[0]).trim();
+          continue;
+        }
+        if (r < dataStart) continue;
+
+        const rowMach = row[1];
+        if (!rowMach) continue;
+
+        const sMach = String(rowMach).trim().toUpperCase();
+        const sNorm = normalizeMachineNo(sMach).toUpperCase();
+        const sClean = sMach.replace(/[^A-Z0-9]/g, '');
+        const tgtClean = normMidUpper.replace(/[^A-Z0-9]/g, '');
+
+        let isMatch = (sMach === normMidUpper || sNorm === normMidUpper);
+        if (!isMatch && sClean && tgtClean) {
+          const sDigits = sMach.replace(/\D/g, '');
+          const tgtDigits = normMidUpper.replace(/\D/g, '');
+          if (sDigits && tgtDigits && sDigits === tgtDigits) {
+            isMatch = true;
+          }
+        }
+
+        if (isMatch) {
+          iohPohRows.push({
+            'Schedule Sheet / FY': sheetKey,
+            'Schedule Section': currentSection,
+            'Sl No': row[0] !== undefined && row[0] !== null ? String(row[0]) : '',
+            'Machine in Schedule': String(row[1] || ''),
+            'Division': String(row[2] || ''),
+            'Carried Out At / Workshop': String(row[3] || ''),
+            'Tentative / Nominated Month': String(row[4] || ''),
+            'Schedule Start Date': formatIohPohCell(row[5], 'Start Date'),
+            'Schedule End Date': formatIohPohCell(row[6], 'End Date'),
+            'Total Days Taken': row[7] !== undefined && row[7] !== null ? row[7] : '',
+            'Nominated Days': row[8] !== undefined && row[8] !== null ? row[8] : '',
+            'Delay (+) or Ahead (-) Days': row[9] !== undefined && row[9] !== null ? row[9] : '',
+            'Engine Hours @ Overhaul': row[10] !== undefined && row[10] !== null ? row[10] : '',
+            'Technical Remarks / Overhaul Notes': row[11] !== undefined && row[11] !== null ? String(row[11]) : ''
+          });
+        }
+      }
+    });
+
+    if (iohPohRows.length === 0) {
+      iohPohRows.push({
+        'Schedule Sheet / FY': 'All FY Registers (2020-21 to 2026-27)',
+        'Schedule Section': 'POH / IOH Master Registers',
+        'Sl No': '-',
+        'Machine in Schedule': normMid,
+        'Division': division,
+        'Carried Out At / Workshop': '-',
+        'Tentative / Nominated Month': '-',
+        'Schedule Start Date': '-',
+        'Schedule End Date': '-',
+        'Total Days Taken': '-',
+        'Nominated Days': '-',
+        'Delay (+) or Ahead (-) Days': '-',
+        'Engine Hours @ Overhaul': '-',
+        'Technical Remarks / Overhaul Notes': `No specific workshop overhaul milestones logged for machine ${normMid} across the 8 SWR IOH/POH schedule sheets.`
+      });
+    }
+
+    // 7. Subsystem Pareto Breakdown
+    const subsystems = ['Mechanical', 'Hydraulic', 'Pneumatic', 'Electrical', 'Engine', 'Tamping/Crane', 'General/Other'];
+    const subMap = {};
+    subsystems.forEach(s => {
+      subMap[s.toLowerCase()] = { name: s, count: 0, downDays: 0, downHours: 0, blockCount: 0, components: {} };
+    });
+
+    machFailures.forEach(f => {
+      const subRaw = (f.subsystem || 'Mechanical').trim();
+      let matchedKey = Object.keys(subMap).find(k => subRaw.toLowerCase().includes(k)) || 'general/other';
+      const entry = subMap[matchedKey];
+      entry.count++;
+      entry.downDays += parseFloat(f.totalDownDays) || ((parseFloat(f.downHours) || 0) / 24) || 0;
+      entry.downHours += parseFloat(f.downHours) || 0;
+      const isBlock = String(f.whetherInBlock || '').toUpperCase() === 'YES' || String(f.whetherInBlock || '').toUpperCase().includes('BLOCK');
+      if (isBlock) entry.blockCount++;
+
+      const comp = (f.component || f.natureOfFailure || 'Unspecified').trim();
+      entry.components[comp] = (entry.components[comp] || 0) + 1;
+    });
+
+    const totalMachineFailures = machFailures.length;
+    const subsystemRows = Object.values(subMap).map(e => {
+      const sortedComps = Object.entries(e.components).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, cnt]) => `${c} (${cnt}x)`).join(', ');
+      const pct = totalMachineFailures > 0 ? ((e.count / totalMachineFailures) * 100).toFixed(1) + '%' : '0.0%';
+      return {
+        'Subsystem': e.name,
+        'Total Incident Count': e.count,
+        'Total Down Days': parseFloat(e.downDays.toFixed(2)),
+        'Total Down Hours': parseFloat(e.downHours.toFixed(1)),
+        'Traffic Block Incidents': e.blockCount,
+        'Share of Machine Failures (%)': pct,
+        'Top Failing Components / Assemblies': sortedComps || 'None'
+      };
+    });
+
+    // 8. History Register 16 Items
+    const hrmItemsRows = (hrm.items || []).map((it, idx) => {
+      let latestTag = '';
+      if (/IOH|POH/i.test(it.title) && it.records && it.records.length > 0) {
+        const validRecs = it.records.filter(r => parseRecordTimestamp(r) > 0);
+        if (validRecs.length > 0) {
+          validRecs.sort((a, b) => parseRecordTimestamp(a) - parseRecordTimestamp(b));
+          const latestRec = validRecs[validRecs.length - 1];
+          latestTag = latestRec.ordinalTag || `(${getOrdinalSuffix(validRecs.length)} ${/IOH/i.test(it.title) ? 'IOH' : 'POH'})`;
+        }
+      }
+
+      const dateExport = (latestTag && it.presentDate && it.presentDate !== 'NA' && !/^(not done|nil|_|-)$/i.test(it.presentDate))
+        ? `${it.presentDate} ${latestTag}`
+        : (it.presentDate || 'NA');
+
+      return {
+        'Item No': it.itemNum || String(idx + 1),
+        'Parameter / Assembly Description': it.title,
+        'Latest Overhaul / Maintenance Date': dateExport,
+        'Cumulative Engine Hours': it.presentEngineHours || 'NA',
+        'Technical Remarks / Spares Replaced / Depot': it.presentRemarks || 'NA',
+        'Total Historical Records Logged': it.records ? it.records.length : 0,
+        'Maintenance Status': (it.records && it.records.length > 0)
+          ? `${it.records.length} Recorded Overhaul Milestones`
+          : ((it.presentDate && it.presentDate !== 'NA' && it.presentDate !== '_') ? 'Milestone Recorded' : 'Pending Initial Overhaul')
+      };
+    });
+
+    // 9. Detailed Historical Overhaul Logs
+    const hrmLogRows = [];
+    (hrm.items || []).forEach(it => {
+      if (it.records && it.records.length > 0) {
+        const sortedRecs = [...it.records];
+        sortedRecs.sort((a, b) => (parseRecordTimestamp(a) || 0) - (parseRecordTimestamp(b) || 0));
+        sortedRecs.forEach((r, rIdx) => {
+          hrmLogRows.push({
+            'Item No': it.itemNum,
+            'Assembly / Parameter': it.title,
+            'Log ID': r.id || `rec_${normMid}_${it.itemNum}_${rIdx + 1}`,
+            'Event / Overhaul Date': r.displayDate || r.rawDate || r.isoDate || 'NA',
+            'ISO Date': r.isoDate || '',
+            'Engine Hours @ Overhaul': r.engineHours || 'NA',
+            'Overhaul Ordinal Tag': r.ordinalTag || r.userOrdinalTag || (rIdx === 0 ? '1st' : `${rIdx + 1}th`),
+            'Work Done / Remarks / Spares': r.remarks || 'NA',
+            'Log Entry Type': r.isUserAdded ? 'Manual User Entry' : 'Master Authentic Record'
+          });
+        });
+      }
+    });
+
+    if (hrmLogRows.length === 0) {
+      hrmLogRows.push({
+        'Item No': '-',
+        'Assembly / Parameter': 'All Items',
+        'Log ID': '-',
+        'Event / Overhaul Date': 'NA',
+        'ISO Date': '',
+        'Engine Hours @ Overhaul': 'NA',
+        'Overhaul Ordinal Tag': '-',
+        'Work Done / Remarks / Spares': 'No detailed historical sub-logs logged for this machine. Refer to Sheet 2 (History Register 16 Items) for latest overhaul dates and engine hours.',
+        'Log Entry Type': 'Informational'
+      });
+    }
+
+    // 10. All Failure Incidents (with all 28 fields)
+    let failureRows = [];
+    if (machFailures.length > 0) {
+      failureRows = machFailures.map((f, idx) => {
+        const downD = parseFloat(f.totalDownDays) || ((parseFloat(f.downHours) || 0) / 24) || 0;
+        const downH = parseFloat(f.downHours) || 0;
+        const isBlock = String(f.whetherInBlock || '').toUpperCase() === 'YES' || String(f.whetherInBlock || '').toUpperCase().includes('BLOCK');
+        return {
+          'Sl No': idx + 1,
+          'Incident ID': f.id || `INC-${normMid}-${idx + 1}`,
+          'Machine Number': f.machineNo || normMid,
+          'Category': f.category || category,
+          'Division': f.division || division,
+          'Block Section / Location': f.section || 'NA',
+          'Date of Failure': f.dateOfFailure || f.breakdownTime || 'NA',
+          'Breakdown Time': f.breakdownTime || 'NA',
+          'Date of Rectification': f.dateOfRectification || f.fitTime || 'NA',
+          'Fit Time': f.fitTime || 'NA',
+          'In Traffic Block': isBlock ? 'YES' : 'NO',
+          'Total Down Days': parseFloat(downD.toFixed(2)),
+          'Total Down Hours': parseFloat(downH.toFixed(1)),
+          'Subsystem': f.subsystem || 'Mechanical',
+          'Component / Assembly': f.component || 'NA',
+          'Part Number': f.partNo || 'NA',
+          'Nature of Failure': f.natureOfFailure || f.description || 'NA',
+          'Root Cause': f.rootCause || 'NA',
+          'Steps Taken for Repair': f.stepsTaken || f.actionTaken || 'NA',
+          'Corrective Measures to Avoid Future Occurrence': f.correctiveMeasures || 'NA',
+          'Spares Consumed / Replaced': f.sparesUsed || 'NA',
+          'Is Repetitive?': f.isRepetitive ? `YES (${f.repeatCount || 2}x)` : 'NO',
+          'Repeat Occurrence Count': f.repeatCount || 1,
+          'Repetitive Reason / Defect Family': f.repetitiveReason || f.defectFamily || 'NA',
+          'Operational Status': f.status || 'FIT',
+          'Certified / Attended By': f.certifiedBy || 'NA',
+          'Technical Remarks': f.remarks || 'NA',
+          'Source Sheet / Register': f.sheet || 'MECHANICAL FAILURES'
+        };
+      });
+    } else {
+      failureRows.push({
+        'Sl No': 1,
+        'Incident ID': 'NIL',
+        'Machine Number': normMid,
+        'Category': category,
+        'Division': division,
+        'Block Section / Location': '-',
+        'Date of Failure': '-',
+        'Breakdown Time': '-',
+        'Date of Rectification': '-',
+        'Fit Time': '-',
+        'In Traffic Block': 'NO',
+        'Total Down Days': 0,
+        'Total Down Hours': 0,
+        'Subsystem': 'All Subsystems',
+        'Component / Assembly': 'None',
+        'Part Number': '-',
+        'Nature of Failure': `Zero failure incidents recorded for machine ${normMid}. Machine demonstrates 100% operational availability.`,
+        'Root Cause': '-',
+        'Steps Taken for Repair': '-',
+        'Corrective Measures to Avoid Future Occurrence': '-',
+        'Spares Consumed / Replaced': '-',
+        'Is Repetitive?': 'NO',
+        'Repeat Occurrence Count': 0,
+        'Repetitive Reason / Defect Family': '-',
+        'Operational Status': 'FIT',
+        'Certified / Attended By': 'SSE/TM/SWR',
+        'Technical Remarks': 'No defect logged in database.',
+        'Source Sheet / Register': 'AUTHENTIC SWR FLEET DATABASE'
+      });
+    }
+
+    // 11. Repetitive Defect Cases Sheet
+    let repeatRows = [];
+    if (machClusters.length > 0) {
+      machClusters.forEach((cl, idx) => {
+        const incList = cl.incidents || [];
+        const linkedIds = incList.map(inc => inc.id).filter(Boolean).join(', ');
+        const natures = incList.map(inc => `[${inc.dateOfFailure || inc.breakdownTime}]: ${inc.natureOfFailure || inc.description || 'Defect'}`).join(' | ');
+        repeatRows.push({
+          'Cluster ID': cl.id || `REP-${normMid}-${idx + 1}`,
+          'Recurring Component / Assembly': cl.componentName,
+          'Subsystem': cl.subsystem,
+          'Total Recurrences': cl.repeatCount,
+          'Total Down Days': parseFloat(Number(cl.totalDownDays || 0).toFixed(2)),
+          'Traffic Block Incidents': cl.trafficBlockCount || 0,
+          'First Occurrence Date': cl.firstDate || 'NA',
+          'Latest Occurrence Date': cl.lastDate || 'NA',
+          'Linked Incident IDs': linkedIds || 'NA',
+          'Detailed Incident Chronology & Descriptions': natures || 'NA'
+        });
+      });
+    } else {
+      const repFails = machFailures.filter(f => f.isRepetitive);
+      if (repFails.length > 0) {
+        repFails.forEach((f, idx) => {
+          repeatRows.push({
+            'Cluster ID': f.repeatClusterId || `REP-${normMid}-${idx + 1}`,
+            'Recurring Component / Assembly': f.component || 'Recurring Assembly',
+            'Subsystem': f.subsystem || 'Mechanical',
+            'Total Recurrences': f.repeatCount || 2,
+            'Total Down Days': parseFloat(Number(f.totalDownDays || 0).toFixed(2)),
+            'Traffic Block Incidents': (String(f.whetherInBlock || '').toUpperCase() === 'YES' || String(f.whetherInBlock || '').toUpperCase().includes('BLOCK')) ? 1 : 0,
+            'First Occurrence Date': f.dateOfFailure || f.breakdownTime || 'NA',
+            'Latest Occurrence Date': f.dateOfRectification || f.fitTime || 'NA',
+            'Linked Incident IDs': f.id || 'NA',
+            'Detailed Incident Chronology & Descriptions': f.natureOfFailure || f.description || 'NA'
+          });
+        });
+      } else {
+        repeatRows.push({
+          'Cluster ID': 'NIL',
+          'Recurring Component / Assembly': 'None Detected',
+          'Subsystem': 'All Subsystems',
+          'Total Recurrences': 0,
+          'Total Down Days': 0,
+          'Traffic Block Incidents': 0,
+          'First Occurrence Date': '-',
+          'Latest Occurrence Date': '-',
+          'Linked Incident IDs': 'None',
+          'Detailed Incident Chronology & Descriptions': `Zero repetitive failure clusters detected for machine ${normMid}. Reliability score is optimal.`
+        });
+      }
+    }
+
+    // 12. Sheet 1: Machine Profile & Comprehensive Summary
+    const totalHrmRecordsLogged = (hrm.items || []).reduce((sum, it) => sum + (it.records ? it.records.length : 0), 0);
+    const profileAoa = [
+      ['SOUTH WESTERN RAILWAY - TRACK MACHINE RELIABILITY & MAINTENANCE DOSSIER'],
+      ['Comprehensive Machine Performance, History Register & Incident Failure Audit Report'],
+      ['Report Export Date:', new Date().toLocaleString(), 'Machine Number:', normMid],
+      [],
+      ['SECTION 1: MACHINE MASTER SPECIFICATIONS & DYNAMIC OPERATIONAL STATUS'],
+      ['Parameter', 'Value', 'Additional Description / Specification'],
+      ['Machine Number', normMid, 'Canonical Fleet Identifier'],
+      ['Category', category, getCategoryDisplayNameWithFull(category)],
+      ['Machine Model', model, 'Manufacturer & Model Designation'],
+      ['Assigned Division', division, `${division} Division (South Western Railway)`],
+      ['Home Depot / Base', depot, 'Operational Track Base / Maintenance Depot'],
+      ['Commissioning Date', formatDateDisplay(commDate), 'Official Date of Induction into Service'],
+      ['Current Dynamic Age', dynamicAge.text, `Dynamic Age calculated as on ${new Date().toISOString().substring(0, 10)}`],
+      ['Operational Status', underRepair ? 'UNDER SITE REPAIR' : 'FIT FOR SERVICE', underRepair ? 'Active Breakdown Under Rectification' : 'Ready for Line Operations'],
+      [],
+      ['SECTION 2: LIFETIME PERFORMANCE & RELIABILITY KPI METRICS'],
+      ['KPI Metric', 'Value', 'Benchmark / Reference'],
+      ['Total Failure Incidents Recorded', machFailures.length, 'All verified logged breakdowns'],
+      ['Traffic Block Incidents (Line Affecting)', blockIncidentsCount, 'Incidents directly causing line/block burst'],
+      ['Total Breakdown Down Time (Days)', parseFloat(totalDownDaysVal.toFixed(2)), 'Cumulative downtime in full days'],
+      ['Total Breakdown Down Time (Hours)', parseFloat(totalDownHoursVal.toFixed(1)), 'Cumulative downtime in hours'],
+      ['Repeat / Recurring Failure Clusters', machClusters.length, 'Identified recurring defect groups'],
+      ['Total Repetitive Failure Incidents', machClusters.reduce((sum, c) => sum + (c.repeatCount || 0), 0), 'Incidents belonging to repeat clusters'],
+      ['Total History Register Overhauls Logged', totalHrmRecordsLogged, 'Cumulative records across 16 IR items'],
+      ['SWR Workshop IOH/POH Schedule Entries', iohPohRows.length, 'Entries across 8 official FY overhaul sheets'],
+      [],
+      ['SECTION 3: SUBSYSTEM INCIDENT DISTRIBUTION & PARETO SHARE'],
+      ['Subsystem', 'Incidents Count', 'Down Days', 'Down Hours', 'Traffic Block Incidents', 'Pareto Share (%)']
+    ];
+
+    subsystemRows.forEach(sr => {
+      profileAoa.push([
+        sr['Subsystem'],
+        sr['Total Incident Count'],
+        sr['Total Down Days'],
+        sr['Total Down Hours'],
+        sr['Traffic Block Incidents'],
+        sr['Share of Machine Failures (%)']
+      ]);
+    });
+
+    // 13. Assemble Multi-Sheet Excel Workbook
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Profile & Summary
+    const wsProfile = XLSX.utils.aoa_to_sheet(profileAoa);
+    applyAoaColWidths(wsProfile, profileAoa);
+    XLSX.utils.book_append_sheet(wb, wsProfile, 'Profile & Summary');
+
+    // Sheet 2: History Register (16 Items)
+    const wsHrm16 = XLSX.utils.json_to_sheet(hrmItemsRows);
+    applyAutoColWidths(wsHrm16, hrmItemsRows);
+    XLSX.utils.book_append_sheet(wb, wsHrm16, 'History Register (16 Items)');
+
+    // Sheet 3: HRM Historical Logs Detail
+    const wsHrmLogs = XLSX.utils.json_to_sheet(hrmLogRows);
+    applyAutoColWidths(wsHrmLogs, hrmLogRows);
+    XLSX.utils.book_append_sheet(wb, wsHrmLogs, 'HRM Historical Logs');
+
+    // Sheet 4: All Failure Incidents
+    const wsFailures = XLSX.utils.json_to_sheet(failureRows);
+    applyAutoColWidths(wsFailures, failureRows);
+    XLSX.utils.book_append_sheet(wb, wsFailures, 'All Failure Incidents');
+
+    // Sheet 5: Subsystem Breakdown
+    const wsSub = XLSX.utils.json_to_sheet(subsystemRows);
+    applyAutoColWidths(wsSub, subsystemRows);
+    XLSX.utils.book_append_sheet(wb, wsSub, 'Subsystem Breakdown');
+
+    // Sheet 6: Repeat & Recurring Cases
+    const wsRepeat = XLSX.utils.json_to_sheet(repeatRows);
+    applyAutoColWidths(wsRepeat, repeatRows);
+    XLSX.utils.book_append_sheet(wb, wsRepeat, 'Repeat Failure Cases');
+
+    // Sheet 7: IOH POH Overhaul Schedule
+    const wsIohPoh = XLSX.utils.json_to_sheet(iohPohRows);
+    applyAutoColWidths(wsIohPoh, iohPohRows);
+    XLSX.utils.book_append_sheet(wb, wsIohPoh, 'IOH POH Overhauls');
+
+    // 14. Write and Trigger Download
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const cleanMid = normMid.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const exportFileName = `SWR_${cleanMid}_Complete_Dossier_Report_${todayStr}.xlsx`;
+
+    XLSX.writeFile(wb, exportFileName);
+    showToast(`Complete Excel dossier for ${normMid} exported successfully (${wb.SheetNames.length} sheets, ${machFailures.length} failures, ${totalHrmRecordsLogged} overhaul logs).`);
+  }
+
   function adjustSubsystemOptionsForMachine(machineIdOrCat) {
     const isCrane = isCraneMachine(machineIdOrCat);
     const optTamp = document.getElementById('optFormTampingUnit');
@@ -9066,6 +11570,10 @@
           setTimeout(() => {
             renderCharts(getFilteredFailures());
           }, 100);
+        } else if (tab === 'repeat-view') {
+          renderRepeatFailuresView();
+        } else if (tab === 'ioh-poh-view') {
+          renderIohPohView();
         } else if (tab === 'history-view') {
           renderTable(getAllMachineIncidentsChronological());
         }
@@ -9548,12 +12056,18 @@
   // Modal Helpers
   function openModal(id) {
     const modal = document.getElementById(id);
-    if (modal) modal.classList.add('active');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
   }
 
   function closeModal(id) {
     const modal = document.getElementById(id);
-    if (modal) modal.classList.remove('active');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
   }
 
   // Toast Notification
@@ -9588,7 +12102,8 @@
     }
   }
 
-  // Expose API for HTML Inline Handlers and Extensibility
+  // Expose AppState and API for HTML Inline Handlers and Extensibility
+  window.AppState = AppState;
   window.TM_APP = {
     // Authentication & RBAC Control
     handleLogin,
@@ -9692,6 +12207,7 @@
     updateHrmOvernightPreview,
     // Universal Date & Search Methods
     formatDateDisplay,
+    getFailureYearMonth,
     // Universal Search Methods
     performUniversalSearch,
     renderUniversalSearchResults,
@@ -9733,18 +12249,93 @@
     selectCategory,
     populateModalCategories,
     // Central Multi-User Cloud Synchronization Diagnostics & Control Methods
-    openCloudSyncModal: () => CloudSync.openModal(),
-    testCloudConnection: () => CloudSync.testCloudConnection(),
-    forceSyncLocalToCloud: () => CloudSync.forceSyncLocalToCloud(),
-    forcePullCloudData: () => CloudSync.forcePullCloudData(),
-    exportDatabaseSnapshot: () => CloudSync.exportDatabaseSnapshot(),
-    handleSnapshotImport: (f) => CloudSync.handleSnapshotImport(f),
+    isCloudSyncAuthorized,
+    openCloudSyncModal: () => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.openModal();
+    },
+    testCloudConnection: () => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.testCloudConnection();
+    },
+    forceSyncLocalToCloud: () => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.forceSyncLocalToCloud();
+    },
+    forcePullCloudData: () => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.forcePullCloudData();
+    },
+    exportDatabaseSnapshot: () => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.exportDatabaseSnapshot();
+    },
+    handleSnapshotImport: (f) => {
+      if (!isCloudSyncAuthorized()) {
+        showToast('Access Restricted: Cloud Synchronization is available only for Admin 1 and Admin 2.', true);
+        return;
+      }
+      CloudSync.handleSnapshotImport(f);
+    },
     getCloudSyncState: () => ({
       isConfigured: CloudSync.isConfigured,
       isConnected: CloudSync.isConnected,
       hasPermission: CloudSync.hasPermission,
       lastSyncTime: CloudSync.lastSyncTime
-    })
+    }),
+    // Repeat Failures Surveillance & Recurrence Registry Methods
+    renderRepeatFailuresView,
+    onRepeatMachineChange,
+    onRepeatDurationChange,
+    onRepeatCustomDateChange,
+    onRepeatSearch,
+    toggleRepeatCluster,
+    expandAllRepeatClusters,
+    collapseAllRepeatClusters,
+    selectRepeatMachine,
+    openMachineHrmDesk,
+    exportRepeatFailures,
+    getRepeatClusters: () => AppState.repeatClusters || [],
+    getAllFleetMachineIds,
+    filterRepeatFleetGrid,
+    onRepeatFleetSearch,
+    toggleRepeatCaseHighlight,
+    clearRepeatCaseHighlight,
+    openRepeatViewFromTicker,
+    // IOH POH Master Updates Module
+    initIohPohModule,
+    renderIohPohView,
+    renderIohPohSheetNav,
+    renderIohPohTable,
+    selectIohPohSheet,
+    onIohPohSearch,
+    clearIohPohSearch,
+    openIohPohEditModal,
+    openIohPohAddModal,
+    saveIohPohModalRecord,
+    deleteIohPohRecord,
+    deleteIohPohRecordFromModal,
+    resetIohPohToDefault,
+    exportIohPohToExcel,
+    openIohPohViewFromTicker,
+    getIohPohState: () => IohPohState,
+    exportCompleteMachineReport,
+    switchTab
   };
 
   // Launch on DOM ready
