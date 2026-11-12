@@ -7325,6 +7325,182 @@
     showToast(`⚡ Successfully retrieved and replaced missing History Register records across all ${regKeys.length} SWR fleet machines!`);
   }
 
+  // Helper: Reliable fuzzy/canonical machine identifier matcher across variants (e.g. 'DTE 56749' vs 'DTE-56749')
+  function isMachineIdenticalOrVariant(a, b) {
+    if (!a || !b) return false;
+    const strA = String(a).trim().toUpperCase();
+    const strB = String(b).trim().toUpperCase();
+    if (strA === strB) return true;
+    const cleanA = strA.replace(/[^A-Z0-9]/g, '');
+    const cleanB = strB.replace(/[^A-Z0-9]/g, '');
+    if (!cleanA || !cleanB) return false;
+    return cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA);
+  }
+
+  // Synchronize authentic overhaul data from IOH POH Updates dataset into HRM Items 1 & 2
+  function syncIohPohUpdatesToHrm(mId) {
+    if (!mId) return;
+    const normMid = normalizeMachineNo(mId);
+    if (!normMid) return;
+
+    healMachineHrm(normMid);
+    const hrm = HRM_DATA[normMid];
+    if (!hrm || !Array.isArray(hrm.items)) return;
+
+    const iohPohData = IohPohState?.data || (typeof window !== 'undefined' ? window.OFFICIAL_IOH_POH_DATA : null);
+    if (!iohPohData || !iohPohData.sheets) return;
+
+    let latestPoh = null;
+    let latestIoh = null;
+
+    const yearSheets = ['2026-27', '2025-26', '2024-25', '2023-24', '2022-23', '2021-22', '2020-21'];
+    for (const sKey of yearSheets) {
+      const sheet = iohPohData.sheets[sKey];
+      if (!sheet || !sheet.rawRows) continue;
+      const cfg = typeof getIohPohConfig === 'function' ? getIohPohConfig(sKey) : { dataStartIdx: 2 };
+      let currentSection = 'POH';
+
+      for (let r = cfg.dataStartIdx; r < sheet.rawRows.length; r++) {
+        const row = sheet.rawRows[r] || [];
+        const col0 = String(row[0] || '').toLowerCase();
+        if (col0.includes('schedule for ioh') || col0.includes('ioh')) currentSection = 'IOH';
+        else if (col0.includes('schedule for poh') || col0.includes('poh')) currentSection = 'POH';
+
+        const rawM = row[1];
+        if (!rawM) continue;
+
+        if (isMachineIdenticalOrVariant(rawM, normMid)) {
+          const hdrs = (cfg.headers || []).map(h => String(h).toLowerCase());
+          function getColVal(rx, defIdx) {
+            const foundIdx = hdrs.findIndex(h => rx.test(h));
+            const idx = foundIdx >= 0 ? foundIdx : defIdx;
+            return row[idx];
+          }
+
+          const rawStart = getColVal(/start\s*date/i, 5);
+          const rawEnd = getColVal(/end\s*date|completion/i, 6);
+          const rawEh = getColVal(/engine\s*h/i, 10);
+          const rawWs = getColVal(/workshop|carried/i, 3);
+          const rawRem = getColVal(/remark/i, 11);
+          const rawDays = getColVal(/total\s*days|working\s*days/i, 7);
+
+          const entry = {
+            sheetYear: sKey,
+            section: currentSection,
+            workshop: String(rawWs || '').trim(),
+            startDate: rawStart ? formatIohPohCell(rawStart, 'Start Date') : '',
+            endDate: rawEnd ? formatIohPohCell(rawEnd, 'End Date') : '',
+            engineHrs: rawEh ? formatIohPohCell(rawEh, 'Engine Hr.') : '',
+            remarks: String(rawRem || '').trim(),
+            totalDays: rawDays || ''
+          };
+
+          if (currentSection === 'POH' && !latestPoh) {
+            latestPoh = entry;
+          } else if (currentSection === 'IOH' && !latestIoh) {
+            latestIoh = entry;
+          }
+        }
+      }
+      if (latestPoh && latestIoh) break;
+    }
+
+    // Check Master Engine Hours sheet as fallback/enrichment
+    const ehSheet = iohPohData.sheets['Engine hrs for IOH POH'];
+    if (ehSheet && ehSheet.rawRows) {
+      for (let r = 3; r < ehSheet.rawRows.length; r++) {
+        const row = ehSheet.rawRows[r] || [];
+        if (isMachineIdenticalOrVariant(row[1], normMid)) {
+          if (!latestIoh || !isValidOverhaulDateStr(latestIoh.endDate)) {
+            const rawIohDate = row[5];
+            const rawIohEh = row[4];
+            if (rawIohDate || rawIohEh) {
+              latestIoh = {
+                sheetYear: 'Master Engine Hours',
+                section: 'IOH',
+                workshop: 'Depot/Base',
+                startDate: '',
+                endDate: rawIohDate ? formatIohPohCell(rawIohDate, 'Date') : '',
+                engineHrs: rawIohEh ? formatIohPohCell(rawIohEh, 'Engine Hr.') : '',
+                remarks: 'Master Engine Hours Dataset',
+                totalDays: ''
+              };
+            }
+          }
+          if (!latestPoh || !isValidOverhaulDateStr(latestPoh.endDate)) {
+            const rawPohDate = row[7];
+            const rawPohEh = row[6];
+            if (rawPohDate || rawPohEh) {
+              latestPoh = {
+                sheetYear: 'Master Engine Hours',
+                section: 'POH',
+                workshop: 'CPOH/RYP',
+                startDate: '',
+                endDate: rawPohDate ? formatIohPohCell(rawPohDate, 'Date') : '',
+                engineHrs: rawPohEh ? formatIohPohCell(rawPohEh, 'Engine Hr.') : '',
+                remarks: 'Master Engine Hours Dataset',
+                totalDays: ''
+              };
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    function isValidOverhaulDateStr(str) {
+      if (!str || str === '-' || str === 'NA') return false;
+      if (/^\d{1,4}$/.test(String(str).trim())) return false;
+      return true;
+    }
+
+    // Sync Item 1 (LAST IOH DETAILS)
+    if (latestIoh) {
+      const iohItem = hrm.items.find(it => it.itemNum === "1" || /IOH/i.test(it.title));
+      if (iohItem) {
+        const resolvedDate = isValidOverhaulDateStr(latestIoh.endDate) ? latestIoh.endDate :
+                             (isValidOverhaulDateStr(latestIoh.startDate) ? latestIoh.startDate : ('Scheduled ' + latestIoh.sheetYear));
+        if (!iohItem.presentDate || iohItem.presentDate === 'NA' || iohItem.presentDate === '' || /^\d{1,3}$/.test(String(iohItem.presentDate).trim())) {
+          iohItem.presentDate = resolvedDate;
+        }
+        if (!iohItem.presentEngineHours || iohItem.presentEngineHours === 'NA' || iohItem.presentEngineHours === '') {
+          iohItem.presentEngineHours = latestIoh.engineHrs || 'NA';
+        }
+        if (!iohItem.presentRemarks || iohItem.presentRemarks === 'NA' || iohItem.presentRemarks === '') {
+          const detail = [
+            latestIoh.workshop ? `Workshop: ${latestIoh.workshop}` : '',
+            latestIoh.remarks ? latestIoh.remarks : '',
+            latestIoh.totalDays ? `Duration: ${latestIoh.totalDays}d` : ''
+          ].filter(Boolean).join('; ');
+          iohItem.presentRemarks = detail || `IOH recorded in FY ${latestIoh.sheetYear}`;
+        }
+      }
+    }
+
+    // Sync Item 2 (LAST POH DETAILS)
+    if (latestPoh) {
+      const pohItem = hrm.items.find(it => it.itemNum === "2" || /POH/i.test(it.title));
+      if (pohItem) {
+        const resolvedDate = isValidOverhaulDateStr(latestPoh.endDate) ? latestPoh.endDate :
+                             (isValidOverhaulDateStr(latestPoh.startDate) ? latestPoh.startDate : ('Scheduled ' + latestPoh.sheetYear));
+        if (!pohItem.presentDate || pohItem.presentDate === 'NA' || pohItem.presentDate === '' || /^\d{1,3}$/.test(String(pohItem.presentDate).trim())) {
+          pohItem.presentDate = resolvedDate;
+        }
+        if (!pohItem.presentEngineHours || pohItem.presentEngineHours === 'NA' || pohItem.presentEngineHours === '') {
+          pohItem.presentEngineHours = latestPoh.engineHrs || 'NA';
+        }
+        if (!pohItem.presentRemarks || pohItem.presentRemarks === 'NA' || pohItem.presentRemarks === '') {
+          const detail = [
+            latestPoh.workshop ? `Workshop: ${latestPoh.workshop}` : '',
+            latestPoh.remarks ? latestPoh.remarks : '',
+            latestPoh.totalDays ? `Duration: ${latestPoh.totalDays}d` : ''
+          ].filter(Boolean).join('; ');
+          pohItem.presentRemarks = detail || `POH recorded in FY ${latestPoh.sheetYear}`;
+        }
+      }
+    }
+  }
+
   // Render History Register Module (Tab 1)
   function renderHrmView() {
     const mId = getActiveMachineId();
@@ -7332,6 +7508,7 @@
 
     // Auto-heal active machine if erased, missing, or incomplete
     const wasHealed = healMachineHrm(mId);
+    syncIohPohUpdatesToHrm(mId);
     if (wasHealed) {
       saveHrmData();
     }
@@ -8603,12 +8780,13 @@
   // IOH POH UPDATES MASTER DATABASE & MULTI-YEAR OVERHAUL SCHEDULES MODULE
   // Preserves 100% of authentic data across all 11 sheets from IOH POH Updates.xlsx
   // ==========================================================================
-  const IOH_POH_STORAGE_KEY = 'TM_IOH_POH_UPDATES_V1';
+  const IOH_POH_STORAGE_KEY = 'TM_IOH_POH_UPDATES_V5_STABLE';
   let IohPohState = {
     data: null,
     activeSheet: '2026-27',
     searchQuery: '',
-    editingRowIdx: null
+    editingRowIdx: null,
+    filterSelectedMachineOnly: false
   };
 
   // 8 Active Sub-Tabs for IOH POH Updates (Sub-tabs 09, 10, 11 removed as instructed)
@@ -8849,7 +9027,7 @@
     }
   }
 
-  function initIohPohModule() {
+  async function initIohPohModule() {
     try {
       const saved = localStorage.getItem(IOH_POH_STORAGE_KEY);
       if (saved) {
@@ -8859,14 +9037,53 @@
       console.warn('Failed to parse cached IOH POH data from localStorage:', e);
     }
 
+    // Tier 1: Check if official dataset is in window (loaded from ioh_poh_data.js)
     if (!IohPohState.data || !IohPohState.data.sheets) {
       if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
         IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
       }
     }
 
+    // Tier 2: Dynamic Fallback Fetch & Parse of Excel Workbook (if ioh_poh_data.js was not uploaded to GitHub)
     if (!IohPohState.data || !IohPohState.data.sheets) {
-      console.warn('IOH POH data not loaded yet.');
+      const candidatePaths = ['IOH POH Updates.xlsx', 'IOH%20POH%20Updates.xlsx', './IOH POH Updates.xlsx', 'data/IOH POH Updates.xlsx'];
+      for (const p of candidatePaths) {
+        try {
+          const resp = await fetch(p);
+          if (resp && resp.ok) {
+            const ab = await resp.arrayBuffer();
+            if (typeof ensureXLSX === 'function') await ensureXLSX();
+            if (typeof XLSX !== 'undefined') {
+              const wb = XLSX.read(ab, { type: 'array' });
+              const parsed = { sheetNames: wb.SheetNames, sheets: {} };
+              wb.SheetNames.forEach(sName => {
+                const ws = wb.Sheets[sName];
+                const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                parsed.sheets[sName] = {
+                  name: sName,
+                  rowCount: rawRows.length,
+                  rawRows: rawRows
+                };
+              });
+              IohPohState.data = parsed;
+              window.OFFICIAL_IOH_POH_DATA = parsed;
+              try {
+                localStorage.setItem(IOH_POH_STORAGE_KEY, JSON.stringify(parsed));
+              } catch(se) {}
+              console.info('Auto-recovered IOH POH dataset via SheetJS fetch from:', p);
+              break;
+            }
+          }
+        } catch(fe) {
+          // Continue to next candidate path
+        }
+      }
+    }
+
+    // Tier 3: If still missing, show clear guidance banner with in-app Excel file loader
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      console.warn('IOH POH data not loaded yet. Prompting user with guidance banner.');
+      renderIohPohMissingFileBanner();
       return;
     }
 
@@ -8883,11 +9100,99 @@
     renderIohPohView();
   }
 
+  function renderIohPohMissingFileBanner() {
+    const tableHead = document.getElementById('iohPohTableHead');
+    const tableBody = document.getElementById('iohPohTableBody');
+    const countBadge = document.getElementById('iohPohCountBadge');
+    const filteredNote = document.getElementById('iohPohFilteredNote');
+    if (countBadge) countBadge.textContent = '0 Entries';
+    if (filteredNote) filteredNote.textContent = 'Dataset Pending';
+
+    if (tableHead) tableHead.innerHTML = '<th style="text-align: center; padding: 12px;">Notice</th>';
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="12" style="padding: 40px 20px; text-align: center; background: rgba(15, 23, 42, 0.65);">
+            <div style="max-width: 680px; margin: 0 auto; padding: 24px; border: 1.5px dashed rgba(228, 193, 83, 0.5); border-radius: 12px; background: rgba(30, 41, 59, 0.85); box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+              <div style="font-size: 42px; margin-bottom: 12px;">📁</div>
+              <h3 style="color: var(--gold-400); margin-bottom: 8px; font-size: 18px; font-weight: 700;">IOH POH Dataset File Missing on GitHub</h3>
+              <p style="color: var(--text-secondary); font-size: 13.5px; line-height: 1.6; margin-bottom: 16px;">
+                The <strong>IOH POH Updates</strong> tab requires the new dataset script 
+                <strong style="color: #38bdf8; font-family: var(--font-mono);">ioh_poh_data.js</strong> to be uploaded to your GitHub repository root alongside <code>index.html</code>.
+              </p>
+              <div style="background: rgba(0, 0, 0, 0.4); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #cbd5e1; text-align: left; line-height: 1.6; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div style="font-weight: 700; color: #f8fafc; margin-bottom: 6px;">Required files to push/upload to your GitHub repository:</div>
+                <ul style="margin: 0 0 0 20px; padding: 0;">
+                  <li style="margin-bottom: 4px;"><strong style="color: #4ade80;">ioh_poh_data.js</strong> &mdash; <em>Crucial (contains all 8 overhaul sheets &amp; 142 machines)</em></li>
+                  <li style="margin-bottom: 4px;"><strong style="color: #60a5fa;">IOH POH Updates.xlsx</strong> &mdash; <em>Original workbook for automatic fallback parsing</em></li>
+                  <li><strong>index.html, app.js, style.css</strong> &mdash; <em>Latest updated frontend application files</em></li>
+                </ul>
+              </div>
+              <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px;">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                  Alternatively, you can load your local <code>IOH POH Updates.xlsx</code> directly right now without waiting for GitHub:
+                </p>
+                <label class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 13.5px;">
+                  <span>📂 Select &amp; Load IOH POH Updates.xlsx from Device</span>
+                  <input type="file" id="iohPohDirectFileInput" accept=".xlsx,.xls" style="display:none;" onchange="window.TM_APP.handleIohPohFileUpload(event)" />
+                </label>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  async function handleIohPohFileUpload(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    try {
+      showToast('Reading ' + file.name + '...', false);
+      if (typeof ensureXLSX === 'function') await ensureXLSX();
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const parsed = { sheetNames: wb.SheetNames, sheets: {} };
+          wb.SheetNames.forEach(name => {
+            const ws = wb.Sheets[name];
+            const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            parsed.sheets[name] = {
+              name,
+              rowCount: rawRows.length,
+              rawRows
+            };
+          });
+          IohPohState.data = parsed;
+          window.OFFICIAL_IOH_POH_DATA = parsed;
+          try {
+            localStorage.setItem(IOH_POH_STORAGE_KEY, JSON.stringify(parsed));
+          } catch(se) {}
+          showToast(`Successfully loaded ${wb.SheetNames.length} overhaul sheets!`);
+          renderIohPohView();
+        } catch(err) {
+          console.error('Error parsing uploaded excel:', err);
+          showToast('Failed to parse Excel file: ' + err.message, true);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch(err) {
+      console.error('File load error:', err);
+      showToast('Failed to read file: ' + err.message, true);
+    }
+  }
+
   function renderIohPohView() {
     if (!IohPohState.data || !IohPohState.data.sheets) {
       if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
         IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
       }
+    }
+    if (!IohPohState.data || !IohPohState.data.sheets) {
+      initIohPohModule();
+      return;
     }
     renderIohPohSheetNav();
     renderIohPohTable();
@@ -8935,6 +9240,11 @@
     renderIohPohTable();
   }
 
+  function toggleIohPohMachineFilter() {
+    IohPohState.filterSelectedMachineOnly = !IohPohState.filterSelectedMachineOnly;
+    renderIohPohTable();
+  }
+
   function renderIohPohTable() {
     const tableHead = document.getElementById('iohPohTableHead');
     const tableBody = document.getElementById('iohPohTableBody');
@@ -8959,6 +9269,71 @@
     if (titleEl) titleEl.textContent = cfg.title;
     if (subtitleEl) subtitleEl.textContent = `Sheet: ${sheetKey} | ${cfg.subtitle}`;
 
+    // Machine Awareness & Contextual Highlighting
+    const selectedMachine = AppState.selectedMachine && AppState.selectedMachine !== 'ALL' ? normalizeMachineNo(AppState.selectedMachine) : null;
+    const isDurationSheet = sheetKey === 'IOH POH Duration';
+    const dataStart = cfg.dataStartIdx;
+
+    let machineMatchesInSheet = 0;
+    if (selectedMachine && !isDurationSheet) {
+      for (let r = dataStart; r < rawRows.length; r++) {
+        const row = rawRows[r] || [];
+        if (isMachineIdenticalOrVariant(row[1], selectedMachine)) {
+          machineMatchesInSheet++;
+        }
+      }
+    }
+
+    const otherSheetsWithMachine = [];
+    if (selectedMachine && !isDurationSheet && IohPohState.data && IohPohState.data.sheets) {
+      ALLOWED_IOH_POH_SHEETS.forEach(sKey => {
+        if (sKey === sheetKey || sKey === 'IOH POH Duration') return;
+        const otherS = IohPohState.data.sheets[sKey];
+        if (!otherS || !otherS.rawRows) return;
+        const otherCfg = getIohPohConfig(sKey);
+        const hasMatch = otherS.rawRows.slice(otherCfg.dataStartIdx).some(r => isMachineIdenticalOrVariant(r[1], selectedMachine));
+        if (hasMatch) otherSheetsWithMachine.push(sKey);
+      });
+    }
+
+    const machineBannerContainer = document.getElementById('iohPohMachineContextBannerContainer');
+    if (machineBannerContainer) {
+      if (selectedMachine && !isDurationSheet) {
+        machineBannerContainer.style.display = 'block';
+        machineBannerContainer.innerHTML = `
+          <div class="ioh-poh-machine-context-banner">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 16px;">🎯</span>
+              <span>Machine Focus: <strong style="color: var(--gold-400); font-size: 13.5px;">${escapeHtml(AppState.selectedMachine)}</strong></span>
+              ${machineMatchesInSheet > 0 ? `
+                <span class="badge" style="background: rgba(228, 193, 83, 0.2); color: var(--gold-400); border: 1px solid rgba(228, 193, 83, 0.4);">
+                  ${machineMatchesInSheet} record${machineMatchesInSheet > 1 ? 's' : ''} in ${escapeHtml(sheetKey)}
+                </span>
+              ` : `
+                <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.3);">
+                  Not scheduled in ${escapeHtml(sheetKey)}
+                </span>
+              `}
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              ${machineMatchesInSheet > 0 ? `
+                <button type="button" class="btn btn-sm ${IohPohState.filterSelectedMachineOnly ? 'btn-primary' : 'btn-dim'}" onclick="window.TM_APP.toggleIohPohMachineFilter()" style="font-size: 11px; padding: 4px 10px;">
+                  ${IohPohState.filterSelectedMachineOnly ? '✓ Showing Focused Only' : '🔍 Filter to Machine'}
+                </button>
+              ` : ''}
+              ${otherSheetsWithMachine.length > 0 ? `
+                <span style="font-size: 11px; color: var(--text-muted);">Also found in:</span>
+                ${otherSheetsWithMachine.map(s => `<button type="button" class="btn btn-sm btn-dim" style="padding: 2px 7px; font-size: 10.5px;" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(s)}')">${escapeHtml(s)}</button>`).join('')}
+              ` : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        machineBannerContainer.style.display = 'none';
+        machineBannerContainer.innerHTML = '';
+      }
+    }
+
     // Render Table Header
     let headHtml = `
       <th style="width: 45px; text-align: center;">#</th>
@@ -8968,7 +9343,6 @@
     tableHead.innerHTML = headHtml;
 
     // Filter Data Rows
-    const dataStart = cfg.dataStartIdx;
     const query = (IohPohState.searchQuery || '').toLowerCase();
     const isAdmin = isUserAdmin();
 
@@ -8993,6 +9367,13 @@
         continue;
       }
 
+      // Machine Focus Check
+      const isMachineMatch = Boolean(selectedMachine && !isDurationSheet && isMachineIdenticalOrVariant(row[1], selectedMachine));
+
+      if (IohPohState.filterSelectedMachineOnly && selectedMachine && !isDurationSheet && !isMachineMatch) {
+        continue;
+      }
+
       // Search match
       if (query) {
         const matches = row.some(cell => cell !== null && cell !== undefined && String(cell).toLowerCase().includes(query));
@@ -9014,7 +9395,7 @@
       }).join('');
 
       bodyHtml += `
-        <tr class="ioh-poh-row" data-row-idx="${r}">
+        <tr class="ioh-poh-row ${isMachineMatch ? 'ioh-poh-row-highlighted' : ''}" data-row-idx="${r}">
           <td style="text-align: center; font-weight: 700; color: var(--gold-400);">${displayIdx}</td>
           ${cellsHtml}
           <td style="text-align: center; white-space: nowrap;">
@@ -9043,13 +9424,26 @@
     if (filteredNote) {
       if (query) {
         filteredNote.textContent = `(Showing ${renderedCount} of ${totalDataRows} matching "${IohPohState.searchQuery}")`;
+      } else if (IohPohState.filterSelectedMachineOnly && selectedMachine) {
+        filteredNote.textContent = `(Showing ${renderedCount} of ${totalDataRows} for ${AppState.selectedMachine})`;
       } else {
         filteredNote.textContent = '';
       }
     }
 
     if (emptyState) {
-      emptyState.style.display = (renderedCount === 0 && totalDataRows > 0) ? 'block' : 'none';
+      if (IohPohState.filterSelectedMachineOnly && renderedCount === 0) {
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = `
+          <div style="font-size: 32px; margin-bottom: 8px;">🔍</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--text-main);">No records for ${escapeHtml(AppState.selectedMachine)} in sheet ${escapeHtml(sheetKey)}</div>
+          <div style="font-size: 12px; margin-top: 6px;">
+            <button type="button" class="btn btn-sm btn-dim" onclick="window.TM_APP.toggleIohPohMachineFilter()">Show all rows in this sheet</button>
+          </div>
+        `;
+      } else {
+        emptyState.style.display = (renderedCount === 0 && totalDataRows > 0) ? 'block' : 'none';
+      }
     }
   }
 
@@ -10707,6 +11101,7 @@
 
     // 2. Auto-heal HRM Data to ensure authentic 16 items and records are restored
     healMachineHrm(normMid);
+    syncIohPohUpdatesToHrm(normMid);
     const hrm = HRM_DATA[normMid] || {
       machineId: normMid,
       machineName: normMid,
@@ -12333,6 +12728,9 @@
     resetIohPohToDefault,
     exportIohPohToExcel,
     openIohPohViewFromTicker,
+    toggleIohPohMachineFilter,
+    handleIohPohFileUpload,
+    syncIohPohUpdatesToHrm,
     getIohPohState: () => IohPohState,
     exportCompleteMachineReport,
     switchTab

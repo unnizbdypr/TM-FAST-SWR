@@ -5292,4 +5292,41 @@ body.cloud-sync-forbidden #cloudSyncModal {
   background: #fef3c7;
 }
 
+/* Machine Focus & Highlight in IOH POH Updates Tab */
+.ioh-poh-machine-context-banner {
+  background: rgba(228, 193, 83, 0.1);
+  border: 1px solid rgba(228, 193, 83, 0.35);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+[data-theme="light"] .ioh-poh-machine-context-banner {
+  background: #fef3c7;
+  border-color: #d97706;
+  color: #78350f;
+}
+
+.ioh-poh-table tr.ioh-poh-row-highlighted td {
+  background-color: rgba(228, 193, 83, 0.18) !important;
+  color: #fff !important;
+  border-bottom-color: rgba(228, 193, 83, 0.4) !important;
+  font-weight: 600;
+}
+.ioh-poh-table tr.ioh-poh-row-highlighted:hover td {
+  background-color: rgba(228, 193, 83, 0.28) !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-highlighted td {
+  background-color: #fef08a !important;
+  color: #713f12 !important;
+  border-bottom-color: #eab308 !important;
+}
+
+
 
