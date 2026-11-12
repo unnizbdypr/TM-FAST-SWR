@@ -5294,12 +5294,12 @@ body.cloud-sync-forbidden #cloudSyncModal {
 
 /* Machine Focus & Highlight in IOH POH Updates Tab */
 .ioh-poh-machine-context-banner {
-  background: rgba(228, 193, 83, 0.1);
-  border: 1px solid rgba(228, 193, 83, 0.35);
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(228, 193, 83, 0.4);
   border-radius: 8px;
   padding: 10px 16px;
   margin-top: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -5308,25 +5308,136 @@ body.cloud-sync-forbidden #cloudSyncModal {
   font-size: 13px;
 }
 [data-theme="light"] .ioh-poh-machine-context-banner {
-  background: #fef3c7;
-  border-color: #d97706;
-  color: #78350f;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
-.ioh-poh-table tr.ioh-poh-row-highlighted td {
-  background-color: rgba(228, 193, 83, 0.18) !important;
-  color: #fff !important;
-  border-bottom-color: rgba(228, 193, 83, 0.4) !important;
+/* POH Autohighlight: Violet Theme */
+.ioh-poh-table tr.ioh-poh-row-poh-highlighted td {
+  background-color: rgba(147, 51, 234, 0.22) !important;
+  color: #f3e8ff !important;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.45) !important;
   font-weight: 600;
 }
-.ioh-poh-table tr.ioh-poh-row-highlighted:hover td {
-  background-color: rgba(228, 193, 83, 0.28) !important;
+.ioh-poh-table tr.ioh-poh-row-poh-highlighted td:first-child {
+  border-left: 5px solid #a855f7 !important;
 }
-[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-highlighted td {
-  background-color: #fef08a !important;
+.ioh-poh-table tr.ioh-poh-row-poh-highlighted:hover td {
+  background-color: rgba(147, 51, 234, 0.32) !important;
+}
+.ioh-poh-table tr.ioh-poh-row-poh-highlighted .highlighted-machine-name {
+  color: #e9d5ff !important;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-poh-highlighted td {
+  background-color: #f3e8ff !important;
+  color: #4a044e !important;
+  border-bottom: 1px solid #d8b4fe !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-poh-highlighted td:first-child {
+  border-left: 5px solid #9333ea !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-poh-highlighted:hover td {
+  background-color: #e9d5ff !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-poh-highlighted .highlighted-machine-name {
+  color: #6b21a8 !important;
+  font-weight: 800;
+}
+
+/* IOH Autohighlight: Yellow Theme */
+.ioh-poh-table tr.ioh-poh-row-ioh-highlighted td {
+  background-color: rgba(234, 179, 8, 0.22) !important;
+  color: #fef9c3 !important;
+  border-bottom: 1px solid rgba(234, 179, 8, 0.45) !important;
+  font-weight: 600;
+}
+.ioh-poh-table tr.ioh-poh-row-ioh-highlighted td:first-child {
+  border-left: 5px solid #eab308 !important;
+}
+.ioh-poh-table tr.ioh-poh-row-ioh-highlighted:hover td {
+  background-color: rgba(234, 179, 8, 0.32) !important;
+}
+.ioh-poh-table tr.ioh-poh-row-ioh-highlighted .highlighted-machine-name {
+  color: #fef08a !important;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-ioh-highlighted td {
+  background-color: #fef9c3 !important;
   color: #713f12 !important;
-  border-bottom-color: #eab308 !important;
+  border-bottom: 1px solid #fde047 !important;
 }
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-ioh-highlighted td:first-child {
+  border-left: 5px solid #ca8a04 !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-ioh-highlighted:hover td {
+  background-color: #fef08a !important;
+}
+[data-theme="light"] .ioh-poh-table tr.ioh-poh-row-ioh-highlighted .highlighted-machine-name {
+  color: #854d0e !important;
+  font-weight: 800;
+}
+
+/* POH & IOH Pill Badges */
+.badge-poh-tag {
+  background: rgba(168, 85, 247, 0.28) !important;
+  color: #e9d5ff !important;
+  border: 1px solid #c084fc !important;
+  font-weight: 800 !important;
+  font-size: 10.5px !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.4);
+}
+[data-theme="light"] .badge-poh-tag {
+  background: #e9d5ff !important;
+  color: #581c87 !important;
+  border: 1px solid #a855f7 !important;
+}
+
+.badge-ioh-tag {
+  background: rgba(234, 179, 8, 0.28) !important;
+  color: #fef08a !important;
+  border: 1px solid #facc15 !important;
+  font-weight: 800 !important;
+  font-size: 10.5px !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.4);
+}
+[data-theme="light"] .badge-ioh-tag {
+  background: #fef08a !important;
+  color: #713f12 !important;
+  border: 1px solid #eab308 !important;
+}
+
+/* Tab Pill Indicators */
+.pill-dot-poh {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 6px #a855f7;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.pill-dot-ioh {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 6px #eab308;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 
 
 

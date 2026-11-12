@@ -1016,6 +1016,29 @@
     if (/^srgm.*(?:ir20-?4|ir20-?04)/i.test(s)) {
       return 'SRGM IR20-4';
     }
+    // RGM Rail Grinding Machine (Canonical: 'RGM-96-07')
+    if (/^rgm.*(?:ir96-?0?7|96-?0?7)/i.test(s)) {
+      return 'RGM-96-07';
+    }
+    // UNIMAT / UNI aliases: map UNI-xxxx to UNIMAT-xxxx
+    const uniMatch = s.match(/^(?:uni|unimat)[-\s]*(\d+)$/i);
+    if (uniMatch) {
+      return `UNIMAT-${uniMatch[1]}`;
+    }
+    // PBR -> BRM aliases: map PBR-xx to BRM-0xx / BRM-xx
+    const pbrMatch = s.match(/^pbr[-\s]*(\d+)$/i);
+    if (pbrMatch) {
+      const pNum = parseInt(pbrMatch[1], 10);
+      if (pNum === 4) return 'BRM-04';
+      if (pNum === 27) return 'BRM-027';
+      if (pNum === 33) return 'BRM-033';
+      return `BRM-${pbrMatch[1]}`;
+    }
+    // SBCM -> FRM aliases
+    const sbcmMatch = s.match(/^sbcm[-\s]*(\d+)$/i);
+    if (sbcmMatch) {
+      return `FRM-${sbcmMatch[1]}`;
+    }
     return s;
   }
 
@@ -3044,6 +3067,9 @@
     updateTabBadges();
     if (AppState.activeTab === 'repeat-view' && typeof renderRepeatFailuresView === 'function') {
       renderRepeatFailuresView();
+    }
+    if (typeof renderIohPohView === 'function') {
+      try { renderIohPohView(); } catch(e) {}
     }
   }
 
@@ -7325,16 +7351,111 @@
     showToast(`⚡ Successfully retrieved and replaced missing History Register records across all ${regKeys.length} SWR fleet machines!`);
   }
 
-  // Helper: Reliable fuzzy/canonical machine identifier matcher across variants (e.g. 'DTE 56749' vs 'DTE-56749')
+  // Canonical machine key generator for precise Indian Railways fleet & overhaul matching
+  function canonicalizeMachineKey(raw) {
+    if (!raw) return '';
+    const s = String(raw).trim().toUpperCase();
+
+    // 1. T28 Turnout Renewal machines (Canonical: 'T28_403_404' and 'T28_908')
+    if (/\bt-?28\b/i.test(s) || /^t-?28/i.test(s) || /turnout/i.test(s)) {
+      if (/908/i.test(s)) return 'T28_908';
+      if (/403|404/i.test(s)) return 'T28_403_404';
+    }
+    if (/403\s*&?\s*404|403\/404/i.test(s)) return 'T28_403_404';
+    if (/908\s*[ab]/i.test(s)) return 'T28_908';
+
+    // 2. SRGM Rail Grinding Machine (Canonical: 'SRGM_20_4')
+    if (/srgm.*(?:20-?4|20-?04|ir20-?4|ir20-?04)/i.test(s) || (/20-?0?4/i.test(s) && /srgm/i.test(s))) {
+      return 'SRGM_20_4';
+    }
+
+    // 3. RGM Rail Grinding Machine (Canonical: 'RGM_96_7')
+    if (/rgm.*(?:96-?7|96-?07|ir96-?7|ir96-?07)/i.test(s)) {
+      return 'RGM_96_7';
+    }
+
+    // 4. SQRS Semi-Quick Relaying System sets
+    if (/sqrs/i.test(s)) {
+      if (/19\s*&?\s*20/i.test(s)) return 'SQRS_19_20';
+      if (/37\s*&?\s*38/i.test(s)) return 'SQRS_37_38';
+      if (/51\s*&?\s*52/i.test(s)) return 'SQRS_51_52';
+      if (/7\s*&?\s*8/i.test(s)) return 'SQRS_7_8';
+      if (/3\s*&?\s*4/i.test(s)) return 'SQRS_3_4';
+    }
+
+    // 5. Clean non-alphanumeric
+    let clean = s.replace(/[^A-Z0-9]/g, '');
+
+    // Standardize category prefix aliases:
+    // UNIMAT -> UNI
+    // PBR -> BRM
+    // SBCM -> FRM
+    // DUOMATIC -> DUO
+    if (clean.startsWith('UNIMAT')) clean = 'UNI' + clean.slice(6);
+    else if (clean.startsWith('PBR')) clean = 'BRM' + clean.slice(3);
+    else if (clean.startsWith('SBCM')) clean = 'FRM' + clean.slice(4);
+    else if (clean.startsWith('DUOMATIC')) clean = 'DUO' + clean.slice(8);
+
+    // 6. Split Category Letters and Number Digits
+    // E.g. "UNI8277" -> cat="UNI", num="8277"
+    // E.g. "PCTM026" -> cat="PCTM", num="26"
+    // E.g. "UTV057" -> cat="UTV", num="57"
+    // E.g. "BRM027" -> cat="BRM", num="27"
+    // E.g. "DTE56749" -> cat="DTE", num="56749"
+    const m = clean.match(/^([A-Z]+)(\d+)$/);
+    if (m) {
+      let cat = m[1];
+      if (cat === 'UNIMAT') cat = 'UNI';
+      if (cat === 'PBR') cat = 'BRM';
+      if (cat === 'SBCM') cat = 'FRM';
+      if (cat === 'DUOMATIC') cat = 'DUO';
+
+      const numInt = parseInt(m[2], 10);
+      return `${cat}_${numInt}`;
+    }
+
+    // Pure number (e.g. "8277", "56749")
+    if (/^\d+$/.test(clean)) {
+      return `NUM_${parseInt(clean, 10)}`;
+    }
+
+    return clean;
+  }
+
+  // Reliable fuzzy/canonical machine identifier matcher across variants (e.g. 'DTE 56749' vs 'DTE-56749', 'UNI 8277' vs 'UNIMAT-8277')
   function isMachineIdenticalOrVariant(a, b) {
     if (!a || !b) return false;
     const strA = String(a).trim().toUpperCase();
     const strB = String(b).trim().toUpperCase();
     if (strA === strB) return true;
+
+    const canA = canonicalizeMachineKey(strA);
+    const canB = canonicalizeMachineKey(strB);
+
+    if (canA && canB) {
+      if (canA === canB) return true;
+
+      // Handle pure numeric comparison: e.g. "8277" vs "UNIMAT-8277"
+      if (canA.startsWith('NUM_') && canB.includes('_')) {
+        return canA.slice(4) === canB.split('_')[1];
+      }
+      if (canB.startsWith('NUM_') && canA.includes('_')) {
+        return canB.slice(4) === canA.split('_')[1];
+      }
+
+      // If both have explicit category_number keys, and they didn't match above, they are definitely different machines!
+      if (canA.includes('_') && canB.includes('_')) {
+        return false;
+      }
+    }
+
+    // Direct clean comparison fallback for arbitrary unformatted text
     const cleanA = strA.replace(/[^A-Z0-9]/g, '');
     const cleanB = strB.replace(/[^A-Z0-9]/g, '');
     if (!cleanA || !cleanB) return false;
-    return cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA);
+    if (cleanA === cleanB) return true;
+
+    return false;
   }
 
   // Synchronize authentic overhaul data from IOH POH Updates dataset into HRM Items 1 & 2
@@ -7360,11 +7481,14 @@
       const cfg = typeof getIohPohConfig === 'function' ? getIohPohConfig(sKey) : { dataStartIdx: 2 };
       let currentSection = 'POH';
 
-      for (let r = cfg.dataStartIdx; r < sheet.rawRows.length; r++) {
+      for (let r = 0; r < sheet.rawRows.length; r++) {
         const row = sheet.rawRows[r] || [];
-        const col0 = String(row[0] || '').toLowerCase();
-        if (col0.includes('schedule for ioh') || col0.includes('ioh')) currentSection = 'IOH';
-        else if (col0.includes('schedule for poh') || col0.includes('poh')) currentSection = 'POH';
+        if (typeof isIohPohDividerRow === 'function' && isIohPohDividerRow(row)) {
+          currentSection = getDividerSectionType(row, currentSection);
+          continue;
+        }
+        if (typeof isIohPohSubHeaderRow === 'function' && isIohPohSubHeaderRow(row)) continue;
+        if (r < cfg.dataStartIdx) continue;
 
         const rawM = row[1];
         if (!rawM) continue;
@@ -9198,10 +9322,63 @@
     renderIohPohTable();
   }
 
+  // Helper: Check if a row is a section divider banner (POH / IOH)
+  function isIohPohDividerRow(row) {
+    if (!row || row.length === 0 || !row[0]) return false;
+    const c0 = String(row[0]).trim().toLowerCase();
+    const c1 = row[1] !== null && row[1] !== undefined ? String(row[1]).trim().toLowerCase() : '';
+    // If col 1 has a genuine machine name that is not a table column header label, it is not a divider
+    if (c1 !== '' && c1 !== 'machine' && c1 !== 'machine no') return false;
+
+    return (
+      c0.includes('schedule for ioh') || c0.includes('schedule for poh') ||
+      c0.includes('ioh of machines') || c0.includes('poh of machines') ||
+      c0.includes('tentative schedule') ||
+      (/\b(?:ioh|poh)\b/i.test(c0) && (c0.includes('machine') || c0.includes('during') || c0.includes('year') || c0.includes('schedule')))
+    );
+  }
+
+  // Helper: Extract overhaul section from divider row
+  function getDividerSectionType(row, currentSection) {
+    if (!row || !row[0]) return currentSection || 'POH';
+    const c0 = String(row[0]).trim().toLowerCase();
+    if (c0.includes('ioh')) return 'IOH';
+    if (c0.includes('poh')) return 'POH';
+    return currentSection || 'POH';
+  }
+
+  // Helper: Check if a row is a repeated table sub-header inside the sheet
+  function isIohPohSubHeaderRow(row) {
+    if (!row || row.length < 2) return false;
+    const c0 = String(row[0] || '').trim().toLowerCase();
+    const c1 = String(row[1] || '').trim().toLowerCase();
+    return (
+      (c0.startsWith('sl') || c0.startsWith('s.') || c0 === 'sl. no.' || c0 === 's. no.' || c0 === '#') &&
+      (c1.includes('machine') || c1.includes('divn') || c1.includes('workshop') || c1.includes('carried'))
+    );
+  }
+
+  // Classify a row into POH or IOH based on section and row text
+  function classifyRowOverhaulType(row, currentSectionType) {
+    if (!row) return currentSectionType || 'POH';
+    const rowStr = row.map(c => String(c || '')).join(' ').toLowerCase();
+
+    // Check remarks and specific cycle text
+    if (/\b\d*(st|nd|rd|th)?\s*poh\b/i.test(rowStr) || /under\s*poh/i.test(rowStr) || /poh\s*completed/i.test(rowStr)) {
+      return 'POH';
+    }
+    if (/\b\d*(st|nd|rd|th)?\s*ioh\b/i.test(rowStr) || /under\s*ioh/i.test(rowStr) || /ioh\s*completed/i.test(rowStr)) {
+      return 'IOH';
+    }
+
+    return currentSectionType || 'POH';
+  }
+
   function renderIohPohSheetNav() {
     const nav = document.getElementById('iohPohSheetNav');
     if (!nav || !IohPohState.data || !IohPohState.data.sheets) return;
 
+    const selectedMachine = AppState.selectedMachine && AppState.selectedMachine !== 'ALL' ? normalizeMachineNo(AppState.selectedMachine) : null;
     let navHtml = '';
 
     ALLOWED_IOH_POH_SHEETS.forEach(sKey => {
@@ -9212,11 +9389,35 @@
       const rawRows = s.rawRows || [];
       const count = rawRows.length > cfg.dataStartIdx ? rawRows.length - cfg.dataStartIdx : rawRows.length;
 
+      // Check if selected machine has POH or IOH in this sheet
+      let hasPohInSheet = false;
+      let hasIohInSheet = false;
+      if (selectedMachine && sKey !== 'IOH POH Duration') {
+        let section = 'POH';
+        for (let r = 0; r < rawRows.length; r++) {
+          const row = rawRows[r] || [];
+          if (isIohPohDividerRow(row)) {
+            section = getDividerSectionType(row, section);
+            continue;
+          }
+          if (isIohPohSubHeaderRow(row)) continue;
+          if (r < cfg.dataStartIdx) continue;
+
+          if (isMachineIdenticalOrVariant(row[1], selectedMachine)) {
+            const ovType = classifyRowOverhaulType(row, section);
+            if (ovType === 'POH') hasPohInSheet = true;
+            if (ovType === 'IOH') hasIohInSheet = true;
+          }
+        }
+      }
+
       navHtml += `
         <button type="button" class="ioh-poh-sheet-pill ${isActive ? 'active' : ''}" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(sKey)}')" title="${escapeHtml(cfg.title)}">
           <span>${cfg.icon}</span>
           <span>${escapeHtml(cfg.label)}</span>
           <span class="ioh-poh-sheet-count-tag">${count}</span>
+          ${hasPohInSheet ? `<span class="pill-dot-poh" title="${escapeHtml(AppState.selectedMachine)} has POH in ${escapeHtml(sKey)} (Violet Theme)"></span>` : ''}
+          ${hasIohInSheet ? `<span class="pill-dot-ioh" title="${escapeHtml(AppState.selectedMachine)} has IOH in ${escapeHtml(sKey)} (Yellow Theme)"></span>` : ''}
         </button>
       `;
     });
@@ -9269,32 +9470,63 @@
     if (titleEl) titleEl.textContent = cfg.title;
     if (subtitleEl) subtitleEl.textContent = `Sheet: ${sheetKey} | ${cfg.subtitle}`;
 
-    // Machine Awareness & Contextual Highlighting
+    // Machine Awareness & Contextual Highlighting (POH in Violet, IOH in Yellow)
     const selectedMachine = AppState.selectedMachine && AppState.selectedMachine !== 'ALL' ? normalizeMachineNo(AppState.selectedMachine) : null;
     const isDurationSheet = sheetKey === 'IOH POH Duration';
     const dataStart = cfg.dataStartIdx;
 
-    let machineMatchesInSheet = 0;
+    let pohMatchesInSheet = 0;
+    let iohMatchesInSheet = 0;
     if (selectedMachine && !isDurationSheet) {
-      for (let r = dataStart; r < rawRows.length; r++) {
+      let sec = 'POH';
+      for (let r = 0; r < rawRows.length; r++) {
         const row = rawRows[r] || [];
+        if (isIohPohDividerRow(row)) {
+          sec = getDividerSectionType(row, sec);
+          continue;
+        }
+        if (isIohPohSubHeaderRow(row)) continue;
+        if (r < dataStart) continue;
+
         if (isMachineIdenticalOrVariant(row[1], selectedMachine)) {
-          machineMatchesInSheet++;
+          const ovType = classifyRowOverhaulType(row, sec);
+          if (ovType === 'POH') pohMatchesInSheet++;
+          else if (ovType === 'IOH') iohMatchesInSheet++;
         }
       }
     }
 
-    const otherSheetsWithMachine = [];
+    const otherSheetsPoh = [];
+    const otherSheetsIoh = [];
     if (selectedMachine && !isDurationSheet && IohPohState.data && IohPohState.data.sheets) {
       ALLOWED_IOH_POH_SHEETS.forEach(sKey => {
         if (sKey === sheetKey || sKey === 'IOH POH Duration') return;
         const otherS = IohPohState.data.sheets[sKey];
         if (!otherS || !otherS.rawRows) return;
         const otherCfg = getIohPohConfig(sKey);
-        const hasMatch = otherS.rawRows.slice(otherCfg.dataStartIdx).some(r => isMachineIdenticalOrVariant(r[1], selectedMachine));
-        if (hasMatch) otherSheetsWithMachine.push(sKey);
+        let sec = 'POH';
+        let foundPoh = false;
+        let foundIoh = false;
+        otherS.rawRows.forEach((r, rIdx) => {
+          if (isIohPohDividerRow(r)) {
+            sec = getDividerSectionType(r, sec);
+            return;
+          }
+          if (isIohPohSubHeaderRow(r)) return;
+          if (rIdx < otherCfg.dataStartIdx) return;
+
+          if (isMachineIdenticalOrVariant(r[1], selectedMachine)) {
+            const ovType = classifyRowOverhaulType(r, sec);
+            if (ovType === 'POH') foundPoh = true;
+            if (ovType === 'IOH') foundIoh = true;
+          }
+        });
+        if (foundPoh) otherSheetsPoh.push(sKey);
+        if (foundIoh) otherSheetsIoh.push(sKey);
       });
     }
+
+    const totalMatchesInSheet = pohMatchesInSheet + iohMatchesInSheet;
 
     const machineBannerContainer = document.getElementById('iohPohMachineContextBannerContainer');
     if (machineBannerContainer) {
@@ -9303,27 +9535,44 @@
         machineBannerContainer.innerHTML = `
           <div class="ioh-poh-machine-context-banner">
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <span style="font-size: 16px;">🎯</span>
-              <span>Machine Focus: <strong style="color: var(--gold-400); font-size: 13.5px;">${escapeHtml(AppState.selectedMachine)}</strong></span>
-              ${machineMatchesInSheet > 0 ? `
-                <span class="badge" style="background: rgba(228, 193, 83, 0.2); color: var(--gold-400); border: 1px solid rgba(228, 193, 83, 0.4);">
-                  ${machineMatchesInSheet} record${machineMatchesInSheet > 1 ? 's' : ''} in ${escapeHtml(sheetKey)}
+              <span style="font-size: 18px;">🎯</span>
+              <span>Machine Focus: <strong style="color: var(--gold-400); font-size: 14px;">${escapeHtml(AppState.selectedMachine)}</strong></span>
+              ${pohMatchesInSheet > 0 ? `
+                <span class="badge badge-poh-tag" style="padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                  🟣 ${pohMatchesInSheet} POH in ${escapeHtml(sheetKey)} (Violet)
                 </span>
-              ` : `
+              ` : ''}
+              ${iohMatchesInSheet > 0 ? `
+                <span class="badge badge-ioh-tag" style="padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                  🟡 ${iohMatchesInSheet} IOH in ${escapeHtml(sheetKey)} (Yellow)
+                </span>
+              ` : ''}
+              ${totalMatchesInSheet === 0 ? `
                 <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.3);">
                   Not scheduled in ${escapeHtml(sheetKey)}
                 </span>
-              `}
+              ` : ''}
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              ${machineMatchesInSheet > 0 ? `
+              ${totalMatchesInSheet > 0 ? `
                 <button type="button" class="btn btn-sm ${IohPohState.filterSelectedMachineOnly ? 'btn-primary' : 'btn-dim'}" onclick="window.TM_APP.toggleIohPohMachineFilter()" style="font-size: 11px; padding: 4px 10px;">
                   ${IohPohState.filterSelectedMachineOnly ? '✓ Showing Focused Only' : '🔍 Filter to Machine'}
                 </button>
               ` : ''}
-              ${otherSheetsWithMachine.length > 0 ? `
-                <span style="font-size: 11px; color: var(--text-muted);">Also found in:</span>
-                ${otherSheetsWithMachine.map(s => `<button type="button" class="btn btn-sm btn-dim" style="padding: 2px 7px; font-size: 10.5px;" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(s)}')">${escapeHtml(s)}</button>`).join('')}
+              ${(otherSheetsPoh.length > 0 || otherSheetsIoh.length > 0) ? `
+                <div style="display: inline-flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap;">
+                  <span>References in other years:</span>
+                  ${otherSheetsPoh.map(s => `
+                    <button type="button" class="btn btn-sm btn-dim" style="padding: 2px 7px; font-size: 10.5px; border-color: rgba(168,85,247,0.5); color: #c084fc;" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(s)}')" title="View POH in ${escapeHtml(s)}">
+                      🟣 ${escapeHtml(s)} (POH)
+                    </button>
+                  `).join('')}
+                  ${otherSheetsIoh.map(s => `
+                    <button type="button" class="btn btn-sm btn-dim" style="padding: 2px 7px; font-size: 10.5px; border-color: rgba(234,179,8,0.5); color: #facc15;" onclick="window.TM_APP.selectIohPohSheet('${escapeHtml(s)}')" title="View IOH in ${escapeHtml(s)}">
+                      🟡 ${escapeHtml(s)} (IOH)
+                    </button>
+                  `).join('')}
+                </div>
               ` : ''}
             </div>
           </div>
@@ -9349,14 +9598,14 @@
     let renderedCount = 0;
     let totalDataRows = 0;
     let bodyHtml = '';
+    let currentSectionType = 'POH';
 
-    for (let r = dataStart; r < rawRows.length; r++) {
+    for (let r = 0; r < rawRows.length; r++) {
       const row = rawRows[r] || [];
-      totalDataRows++;
 
       // Check for section divider rows
-      const isDivider = row[0] && String(row[0]).toLowerCase().includes('schedule') && (!row[1] || row[1] === '');
-      if (isDivider) {
+      if (isIohPohDividerRow(row)) {
+        currentSectionType = getDividerSectionType(row, currentSectionType);
         bodyHtml += `
           <tr class="ioh-poh-section-divider">
             <td colspan="${headers.length + 2}" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-weight: 800; font-size: 12.5px; padding: 10px 14px; letter-spacing: 0.5px;">
@@ -9366,6 +9615,19 @@
         `;
         continue;
       }
+
+      // Skip repeated sub-headers
+      if (isIohPohSubHeaderRow(row)) {
+        continue;
+      }
+
+      // Skip title/blank pre-data rows
+      if (r < dataStart) continue;
+
+      totalDataRows++;
+
+      // Determine overhaul type for this row (POH vs IOH)
+      const rowOverhaulType = classifyRowOverhaulType(row, currentSectionType);
 
       // Machine Focus Check
       const isMachineMatch = Boolean(selectedMachine && !isDurationSheet && isMachineIdenticalOrVariant(row[1], selectedMachine));
@@ -9381,7 +9643,9 @@
       }
 
       renderedCount++;
-      const displayIdx = r - dataStart + 1;
+      const displayIdx = (row[0] !== undefined && row[0] !== null && String(row[0]).trim() !== '' && !isNaN(row[0]))
+        ? row[0]
+        : totalDataRows;
 
       const cellsHtml = headers.map((h, colIdx) => {
         const rawVal = row[colIdx];
@@ -9391,11 +9655,30 @@
         }
         const formatted = formatIohPohCell(rawVal, h);
         const isNumeric = typeof rawVal === 'number' || (formatted.startsWith('₹') || formatted.endsWith('hrs') || formatted.endsWith('d'));
+
+        // Machine Name Column with Overhaul Type Badge when highlighted
+        if (colIdx === 1 && isMachineMatch) {
+          const tagClass = rowOverhaulType === 'POH' ? 'badge-poh-tag' : 'badge-ioh-tag';
+          return `
+            <td style="font-weight: 800; white-space: nowrap;">
+              <span style="display: inline-flex; align-items: center; gap: 8px;">
+                <span class="highlighted-machine-name">${escapeHtml(formatted)}</span>
+                <span class="badge ${tagClass}">${rowOverhaulType}</span>
+              </span>
+            </td>
+          `;
+        }
+
         return `<td style="${isNumeric ? 'font-family: var(--font-mono);' : ''}">${escapeHtml(formatted)}</td>`;
       }).join('');
 
+      // Autohighlight with Violet theme for POH, Yellow theme for IOH
+      const highlightClass = isMachineMatch 
+        ? (rowOverhaulType === 'POH' ? 'ioh-poh-row-poh-highlighted' : 'ioh-poh-row-ioh-highlighted')
+        : '';
+
       bodyHtml += `
-        <tr class="ioh-poh-row ${isMachineMatch ? 'ioh-poh-row-highlighted' : ''}" data-row-idx="${r}">
+        <tr class="ioh-poh-row ${highlightClass}" data-row-idx="${r}" data-overhaul-type="${rowOverhaulType}">
           <td style="text-align: center; font-weight: 700; color: var(--gold-400);">${displayIdx}</td>
           ${cellsHtml}
           <td style="text-align: center; white-space: nowrap;">
@@ -11168,10 +11451,11 @@
 
       for (let r = 0; r < rawRows.length; r++) {
         const row = rawRows[r] || [];
-        if (row[0] && String(row[0]).toLowerCase().includes('schedule') && (!row[1] || row[1] === '')) {
+        if (typeof isIohPohDividerRow === 'function' && isIohPohDividerRow(row)) {
           currentSection = String(row[0]).trim();
           continue;
         }
+        if (typeof isIohPohSubHeaderRow === 'function' && isIohPohSubHeaderRow(row)) continue;
         if (r < dataStart) continue;
 
         const rowMach = row[1];
@@ -11182,7 +11466,7 @@
         const sClean = sMach.replace(/[^A-Z0-9]/g, '');
         const tgtClean = normMidUpper.replace(/[^A-Z0-9]/g, '');
 
-        let isMatch = (sMach === normMidUpper || sNorm === normMidUpper);
+        let isMatch = isMachineIdenticalOrVariant(rowMach, normMidUpper) || (sMach === normMidUpper || sNorm === normMidUpper);
         if (!isMatch && sClean && tgtClean) {
           const sDigits = sMach.replace(/\D/g, '');
           const tgtDigits = normMidUpper.replace(/\D/g, '');
