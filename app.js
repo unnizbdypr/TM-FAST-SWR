@@ -1051,8 +1051,8 @@
     ? window.REAL_SWR_FLEET_DATA.failures
     : [];
 
-  // Local Storage Keys (v20 TM-FAST authentic fleet with purged July-Aug 2026 & intact Sept-Oct 2026 data)
-  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V20_PURGED_JULY_AUG';
+  // Local Storage Keys (v21 TM-FAST authentic fleet with active July & August 2026 failure entry support)
+  const STORAGE_KEY = 'TM_FAILURE_SURVEILLANCE_DATA_V21_ACTIVE_MONTHS';
   const FLEET_STORAGE_KEY = 'TM_FAILURE_FLEET_DIRECTORY_V18_EXACT_SYNC';
   const HRM_STORAGE_KEY = 'TM_HRM_DATA_V18_EXACT_EXCEL_SYNC';
 
@@ -1316,7 +1316,11 @@
         });
       });
 
-      const stored = localStorage.getItem(STORAGE_KEY);
+      let stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        // Seamlessly migrate existing data from V20 key if available
+        stored = localStorage.getItem('TM_FAILURE_SURVEILLANCE_DATA_V20_PURGED_JULY_AUG');
+      }
       if (stored) {
         AppState.failures = JSON.parse(stored);
       } else if (typeof window !== 'undefined' && window.REAL_SWR_FLEET_DATA && window.REAL_SWR_FLEET_DATA.failures && window.REAL_SWR_FLEET_DATA.failures.length > 0) {
@@ -1380,12 +1384,14 @@
       // Async fallback to IndexedDB if localStorage was wiped or quota-truncated
       if (typeof idbGet === 'function') {
         idbGet(STORAGE_KEY).then(idbFails => {
+          if (!idbFails || idbFails.length === 0) {
+            return idbGet('TM_FAILURE_SURVEILLANCE_DATA_V20_PURGED_JULY_AUG');
+          }
+          return idbFails;
+        }).then(idbFails => {
           if (Array.isArray(idbFails) && idbFails.length > AppState.failures.length) {
             const merged = CloudSync.mergeFailures(AppState.failures, idbFails);
-            AppState.failures = merged.list.filter(f => {
-              const ymInfo = getFailureYearMonth(f);
-              return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
-            });
+            AppState.failures = merged.list;
             classifyRepetitiveFailures(AppState.failures);
             updateMachineDropdown();
             renderAll();
@@ -1436,13 +1442,6 @@
         if (!f.remarks || f.remarks.trim() === '' || f.remarks.trim() === '-' || /^(no|nil)$/i.test(f.remarks.trim())) {
           f.remarks = 'NA';
         }
-      });
-
-      // Requirement 1: Strictly exclude any July-August 2026 failures across all machines (01/07/2026 - 31/08/2026)
-      AppState.failures = AppState.failures.filter(f => {
-        const ymInfo = getFailureYearMonth(f);
-        if (ymInfo.ym === '2026-07' || ymInfo.ym === '2026-08') return false;
-        return true;
       });
 
       safeLocalStorageSet(STORAGE_KEY, JSON.stringify(AppState.failures));
@@ -1619,12 +1618,6 @@
 
       // Local-only entries come first so user's recent entries are front and center
       let mergedList = [...localOnly, ...remoteList];
-
-      // Requirement 1: Strictly purge any historical July-August 2026 failures (01/07/2026 - 31/08/2026) across all machines
-      mergedList = mergedList.filter(f => {
-        const ymInfo = getFailureYearMonth(f);
-        return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
-      });
 
       return {
         list: mergedList,
@@ -2245,12 +2238,6 @@
   }
 
   function saveDataset() {
-    // Strictly ensure July-August 2026 historical failures remain purged across all machines
-    AppState.failures = AppState.failures.filter(f => {
-      const ymInfo = getFailureYearMonth(f);
-      return ymInfo.ym !== '2026-07' && ymInfo.ym !== '2026-08';
-    });
-
     safeLocalStorageSet(STORAGE_KEY, JSON.stringify(AppState.failures));
     safeLocalStorageSet(FLEET_STORAGE_KEY, JSON.stringify(FLEET_DIRECTORY));
 
@@ -8904,7 +8891,7 @@
   // IOH POH UPDATES MASTER DATABASE & MULTI-YEAR OVERHAUL SCHEDULES MODULE
   // Preserves 100% of authentic data across all 11 sheets from IOH POH Updates.xlsx
   // ==========================================================================
-  const IOH_POH_STORAGE_KEY = 'TM_IOH_POH_UPDATES_V5_STABLE';
+  const IOH_POH_STORAGE_KEY = 'TM_IOH_POH_UPDATES_V7_SEP_SLNO';
   let IohPohState = {
     data: null,
     activeSheet: '2026-27',
@@ -8934,22 +8921,22 @@
       headerRowIdx: 1,
       dataStartIdx: 2,
       headers: [
-        'S. No.', 'Machine', 'Divn.', 'POH/IOH Workshop', 'Month',
-        'Start Date', 'End Date', 'Total Days', 'Nominated Days',
-        'Delay / Ahead (Days)', 'Engine Hr.', 'Remark'
+        'S. No.', 'Machine', 'Divn.', 'POH/IOH to be carried out at', 'Tentative month',
+        'Start Date', 'End Date', 'Total Days', 'Actual Working Days (Excl. Sunday & NH)',
+        'Nominated Days for Schedule', 'Delayed or ahead of Scheduled Days', 'Engine Hr.', 'Remark'
       ]
     },
     '2025-26': {
       label: '2025-26',
       icon: '📅',
-      title: 'Schedule for POH of Machines for Year 2025-26',
-      subtitle: 'Turnaround duration, workshop, and engine hours at POH',
+      title: 'Schedule for POH & IOH of Machines for Year 2025-26',
+      subtitle: 'Turnaround duration, workshop, and engine hours at POH & IOH',
       headerRowIdx: 1,
       dataStartIdx: 2,
       headers: [
-        'S. No.', 'Machine', 'Divn.', 'POH/IOH Workshop',
-        'Start Date', 'End Date', 'Total Days', 'Nominated Days',
-        'Delay / Ahead (Days)', 'Engine Hr.', 'Remark'
+        'S. No.', 'Machine', 'Divn.', 'POH/IOH to be carried out at',
+        'Start Date', 'End Date', 'Total Days', 'Actual Working Days (Excl. Sunday & NH)',
+        'Nominated Days for Schedule', 'Delayed or ahead of Scheduled Days', 'Engine Hr', 'Remark'
       ]
     },
     '2024-25': {
@@ -9088,30 +9075,29 @@
   }
 
   function getEffectiveIohPohHeaders(sheet, cfg) {
+    if (cfg && cfg.headers && cfg.headers.length > 0) {
+      return [...cfg.headers];
+    }
     const rawRows = sheet.rawRows || [];
-    let maxCols = cfg.headers.length;
+    let maxCols = 0;
     for (let r = 0; r < rawRows.length; r++) {
       const row = rawRows[r];
       if (row && row.length > maxCols) {
-        for (let c = maxCols; c < row.length; c++) {
-          if (row[c] !== null && row[c] !== undefined && String(row[c]).trim() !== '') {
-            maxCols = c + 1;
-          }
-        }
+        maxCols = row.length;
       }
     }
-    const headers = [...cfg.headers];
-    while (headers.length < maxCols) {
-      headers.push(`Field ${headers.length + 1}`);
+    const headers = [];
+    for (let c = 0; c < maxCols; c++) {
+      headers.push(`Field ${c + 1}`);
     }
     return headers;
   }
 
   function formatIohPohCell(val, headerName) {
     if (val === null || val === undefined || val === '') return '-';
-    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
+    if (typeof val === 'string' && (/^\d{4}-\d{2}-\d{2}T/.test(val) || /^\d{4}-\d{2}-\d{2}$/.test(val))) {
+      const d = parseAnyDateToDateObj(val);
+      if (d) {
         const day = String(d.getDate()).padStart(2, '0');
         const mon = String(d.getMonth() + 1).padStart(2, '0');
         const yr = d.getFullYear();
@@ -9170,7 +9156,16 @@
 
     // Tier 2: Dynamic Fallback Fetch & Parse of Excel Workbook (if ioh_poh_data.js was not uploaded to GitHub)
     if (!IohPohState.data || !IohPohState.data.sheets) {
-      const candidatePaths = ['IOH POH Updates.xlsx', 'IOH%20POH%20Updates.xlsx', './IOH POH Updates.xlsx', 'data/IOH POH Updates.xlsx'];
+      const candidatePaths = [
+        'IOH POH Details Updated.xlsx',
+        'IOH%20POH%20Details%20Updated.xlsx',
+        'IOH POH Updates.xlsx',
+        'IOH%20POH%20Updates.xlsx',
+        './IOH POH Details Updated.xlsx',
+        './IOH POH Updates.xlsx',
+        'data/IOH POH Details Updated.xlsx',
+        'data/IOH POH Updates.xlsx'
+      ];
       for (const p of candidatePaths) {
         try {
           const resp = await fetch(p);
@@ -9423,6 +9418,25 @@
     });
 
     nav.innerHTML = navHtml;
+
+    // Update Add POH / Add IOH button visibility based on active sheet
+    const addPohBtn = document.getElementById('btnIohPohAddPohEntry');
+    const addIohBtn = document.getElementById('btnIohPohAddIohEntry');
+    if (addPohBtn) {
+      if (IohPohState.activeSheet === 'IOH POH Duration') {
+        addPohBtn.innerHTML = '<span>➕ Add Reference Entry</span>';
+        addPohBtn.title = 'Add new overhaul duration reference standard';
+        if (addIohBtn) addIohBtn.style.display = 'none';
+      } else {
+        addPohBtn.innerHTML = '<span>🟣 + Add POH Entry</span>';
+        addPohBtn.title = `Add new POH overhaul entry to FY ${IohPohState.activeSheet}`;
+        if (addIohBtn) {
+          addIohBtn.style.display = 'inline-flex';
+          addIohBtn.innerHTML = '<span>🟡 + Add IOH Entry</span>';
+          addIohBtn.title = `Add new IOH overhaul entry to FY ${IohPohState.activeSheet}`;
+        }
+      }
+    }
   }
 
   function selectIohPohSheet(sheetKey) {
@@ -9597,6 +9611,8 @@
 
     let renderedCount = 0;
     let totalDataRows = 0;
+    let pohSerial = 0;
+    let iohSerial = 0;
     let bodyHtml = '';
     let currentSectionType = 'POH';
 
@@ -9629,6 +9645,16 @@
       // Determine overhaul type for this row (POH vs IOH)
       const rowOverhaulType = classifyRowOverhaulType(row, currentSectionType);
 
+      // Separate serial numbering for POH and IOH
+      let sectionSerial = 0;
+      if (currentSectionType === 'POH' || rowOverhaulType === 'POH') {
+        pohSerial++;
+        sectionSerial = pohSerial;
+      } else {
+        iohSerial++;
+        sectionSerial = iohSerial;
+      }
+
       // Machine Focus Check
       const isMachineMatch = Boolean(selectedMachine && !isDurationSheet && isMachineIdenticalOrVariant(row[1], selectedMachine));
 
@@ -9643,11 +9669,15 @@
       }
 
       renderedCount++;
-      const displayIdx = (row[0] !== undefined && row[0] !== null && String(row[0]).trim() !== '' && !isNaN(row[0]))
-        ? row[0]
-        : totalDataRows;
+      const displayIdx = isDurationSheet ? totalDataRows : sectionSerial;
 
       const cellsHtml = headers.map((h, colIdx) => {
+        // For Col 0 (S. No. / Sl. No.), display the clean separate section serial number in FY schedule sheets
+        if (colIdx === 0 && !isDurationSheet) {
+          const serialColor = (currentSectionType === 'POH' || rowOverhaulType === 'POH') ? '#c084fc' : '#facc15';
+          return `<td style="text-align: center; font-weight: 700; color: ${serialColor}; font-family: var(--font-mono);">${displayIdx}</td>`;
+        }
+
         const rawVal = row[colIdx];
         const isDelayAhead = h.toLowerCase().includes('delay') || h.toLowerCase().includes('ahead');
         if (isDelayAhead && rawVal !== '' && rawVal !== null && rawVal !== undefined) {
@@ -9702,7 +9732,11 @@
     tableBody.innerHTML = bodyHtml;
 
     if (countBadge) {
-      countBadge.textContent = `${totalDataRows} Entries`;
+      if (isDurationSheet) {
+        countBadge.textContent = `${totalDataRows} Entries`;
+      } else {
+        countBadge.textContent = `${totalDataRows} Entries (${pohSerial} POH · ${iohSerial} IOH)`;
+      }
     }
     if (filteredNote) {
       if (query) {
@@ -9746,6 +9780,260 @@
     renderIohPohTable();
   }
 
+  // Parse any date representation (ISO string, DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, Excel serial) to a local Date object (normalized to midnight)
+  function parseAnyDateToDateObj(val) {
+    if (!val && val !== 0) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    const s = String(val).trim();
+    if (!s || s === '-' || s === '--' || /^(under|active|nil|none|ongoing|plan)/i.test(s)) return null;
+
+    // 1. ISO string with T, e.g. 2026-01-14T18:30:00.000Z
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+    }
+
+    // 2. YYYY-MM-DD
+    const isoMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (isoMatch) {
+      const y = parseInt(isoMatch[1], 10);
+      const m = parseInt(isoMatch[2], 10) - 1;
+      const d = parseInt(isoMatch[3], 10);
+      const dt = new Date(y, m, d);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    // 3. DD-MM-YYYY or DD/MM/YYYY
+    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (dmyMatch) {
+      const d = parseInt(dmyMatch[1], 10);
+      const m = parseInt(dmyMatch[2], 10) - 1;
+      const y = parseInt(dmyMatch[3], 10);
+      const dt = new Date(y, m, d);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    // 4. DD-MM-YY or DD/MM/YY
+    const dmyShortMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
+    if (dmyShortMatch) {
+      const d = parseInt(dmyShortMatch[1], 10);
+      const m = parseInt(dmyShortMatch[2], 10) - 1;
+      const y = 2000 + parseInt(dmyShortMatch[3], 10);
+      const dt = new Date(y, m, d);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    // 5. Excel serial numbers (e.g. 45000)
+    const serialMatch = s.match(/^(\d{5})(?:\.0+)?$/);
+    if (serialMatch) {
+      const serial = parseInt(serialMatch[1], 10);
+      const dt = new Date((serial - 25569) * 86400 * 1000);
+      if (!isNaN(dt.getTime())) {
+        return new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
+      }
+    }
+
+    const dt = new Date(s);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function toIsoDateInputVal(val) {
+    const dt = parseAnyDateToDateObj(val);
+    if (!dt) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function toDdmmyyyy(val) {
+    if (val === null || val === undefined) return '';
+    const s = String(val).trim();
+    if (!s || s === '-' || s === '--' || /^(under|active|nil|none|ongoing|plan)/i.test(s)) return s;
+    const dt = parseAnyDateToDateObj(val);
+    if (!dt) return s;
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${d}-${m}-${y}`;
+  }
+
+  // Calculate turnaround total days (inclusive: +1 day)
+  function calculateTurnaroundTotalDays(startDateVal, endDateVal) {
+    const dtStart = parseAnyDateToDateObj(startDateVal);
+    const dtEnd = parseAnyDateToDateObj(endDateVal);
+    if (!dtStart || !dtEnd) return null;
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const utcStart = Date.UTC(dtStart.getFullYear(), dtStart.getMonth(), dtStart.getDate());
+    const utcEnd = Date.UTC(dtEnd.getFullYear(), dtEnd.getMonth(), dtEnd.getDate());
+    const diffDays = Math.round((utcEnd - utcStart) / msPerDay) + 1;
+    return diffDays;
+  }
+
+  // Real-time auto-calculation of Total Days and Delay / Ahead in the IOH POH modal
+  function recalcIohPohModalCalculations() {
+    const form = document.getElementById('iohPohModalForm');
+    if (!form) return;
+
+    const sheetKey = IohPohState.activeSheet || '2026-27';
+    const sheet = IohPohState.data && IohPohState.data.sheets ? IohPohState.data.sheets[sheetKey] : null;
+    const cfg = getIohPohConfig(sheetKey);
+    const headers = getEffectiveIohPohHeaders(sheet, cfg);
+
+    const colStartIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('start') && lower.includes('date');
+    });
+    const colEndIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('end') && lower.includes('date');
+    });
+    const colTotalDaysIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('total') && lower.includes('day');
+    });
+    const colWorkingDaysIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('working') && lower.includes('day');
+    });
+    const colNomDaysIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('nom') && lower.includes('day');
+    });
+    const colDelayIdx = headers.findIndex(h => {
+      const lower = h.toLowerCase();
+      return lower.includes('delay') || lower.includes('ahead');
+    });
+
+    const inputStart = colStartIdx >= 0 ? document.getElementById(`iohPohField_${colStartIdx}`) : null;
+    const inputEnd = colEndIdx >= 0 ? document.getElementById(`iohPohField_${colEndIdx}`) : null;
+    const inputTotalDays = colTotalDaysIdx >= 0 ? document.getElementById(`iohPohField_${colTotalDaysIdx}`) : null;
+    const inputWorkingDays = colWorkingDaysIdx >= 0 ? document.getElementById(`iohPohField_${colWorkingDaysIdx}`) : null;
+    const inputNomDays = colNomDaysIdx >= 0 ? document.getElementById(`iohPohField_${colNomDaysIdx}`) : null;
+    const inputDelay = colDelayIdx >= 0 ? document.getElementById(`iohPohField_${colDelayIdx}`) : null;
+
+    const startVal = inputStart ? inputStart.value.trim() : '';
+    const endVal = inputEnd ? inputEnd.value.trim() : '';
+
+    // 1. Auto-calculate Total Days when Start Date and End Date are entered
+    if (inputStart && inputEnd && inputTotalDays) {
+      const badgeTotalDays = document.getElementById(`iohPohCalcBadge_${colTotalDaysIdx}`);
+      if (startVal && endVal) {
+        const days = calculateTurnaroundTotalDays(startVal, endVal);
+        if (days !== null) {
+          if (days > 0) {
+            inputTotalDays.value = days;
+            if (badgeTotalDays) {
+              badgeTotalDays.innerHTML = `<span class="ioh-poh-calc-pill ioh-poh-calc-pill-green">✓ Auto-calculated: ${days} calendar days (${escapeHtml(startVal)} to ${escapeHtml(endVal)})</span>`;
+              badgeTotalDays.style.display = 'block';
+            }
+          } else {
+            if (badgeTotalDays) {
+              badgeTotalDays.innerHTML = `<span class="ioh-poh-calc-pill ioh-poh-calc-pill-red">⚠️ End Date cannot be before Start Date</span>`;
+              badgeTotalDays.style.display = 'block';
+            }
+          }
+        } else {
+          if (badgeTotalDays) badgeTotalDays.style.display = 'none';
+        }
+      } else {
+        if (badgeTotalDays) badgeTotalDays.style.display = 'none';
+      }
+    }
+
+    // 2. Auto-calculate Delay / Ahead by comparing with Nominated Days
+    if (inputDelay && inputNomDays) {
+      const badgeDelay = document.getElementById(`iohPohCalcBadge_${colDelayIdx}`);
+      const nomVal = inputNomDays.value.trim();
+      const nomNum = Number(nomVal);
+
+      // Effective days: prioritize Actual Working Days if entered, else Total Days
+      let effDays = null;
+      let effLabel = 'Total Days';
+
+      if (inputWorkingDays && inputWorkingDays.value.trim() !== '' && !isNaN(Number(inputWorkingDays.value.trim()))) {
+        effDays = Number(inputWorkingDays.value.trim());
+        effLabel = 'Working Days';
+      } else if (inputTotalDays && inputTotalDays.value.trim() !== '' && !isNaN(Number(inputTotalDays.value.trim()))) {
+        effDays = Number(inputTotalDays.value.trim());
+        effLabel = 'Total Days';
+      }
+
+      if (effDays !== null && !isNaN(nomNum) && nomVal !== '') {
+        const diff = effDays - nomNum;
+        inputDelay.value = diff;
+
+        if (badgeDelay) {
+          if (diff < 0) {
+            badgeDelay.innerHTML = `<span class="ioh-poh-calc-pill ioh-poh-calc-pill-green">🟢 Ahead of Schedule by ${Math.abs(diff)} days (${effDays} ${effLabel} vs ${nomNum} Nominated)</span>`;
+          } else if (diff > 0) {
+            badgeDelay.innerHTML = `<span class="ioh-poh-calc-pill ioh-poh-calc-pill-red">🔴 Delayed by +${diff} days (${effDays} ${effLabel} vs ${nomNum} Nominated)</span>`;
+          } else {
+            badgeDelay.innerHTML = `<span class="ioh-poh-calc-pill ioh-poh-calc-pill-yellow">🟡 On Time: 0 days delay (${effDays} ${effLabel} matches ${nomNum} Nominated)</span>`;
+          }
+          badgeDelay.style.display = 'block';
+        }
+      } else {
+        if (badgeDelay) badgeDelay.style.display = 'none';
+      }
+    }
+  }
+
+  function triggerIohPohCalendar(colIdx) {
+    const calPicker = document.getElementById(`iohPohCalPicker_${colIdx}`);
+    if (!calPicker) return;
+    const txtInput = document.getElementById(`iohPohField_${colIdx}`);
+    if (txtInput && txtInput.value) {
+      const iso = toIsoDateInputVal(txtInput.value);
+      if (iso) calPicker.value = iso;
+    }
+    if (typeof calPicker.showPicker === 'function') {
+      try {
+        calPicker.showPicker();
+        return;
+      } catch(e) {}
+    }
+    calPicker.click();
+  }
+
+  function attachIohPohModalListeners(headers) {
+    headers.forEach((h, colIdx) => {
+      const isDate = h.toLowerCase().includes('date') || h.toLowerCase() === 'start date' || h.toLowerCase() === 'end date' || h.toLowerCase().includes('date of');
+      const txtInput = document.getElementById(`iohPohField_${colIdx}`);
+      const calPicker = document.getElementById(`iohPohCalPicker_${colIdx}`);
+
+      if (isDate && txtInput && calPicker) {
+        calPicker.addEventListener('change', function() {
+          if (this.value) {
+            const parts = this.value.split('-');
+            if (parts.length === 3) {
+              txtInput.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              recalcIohPohModalCalculations();
+            }
+          }
+        });
+
+        txtInput.addEventListener('input', function() {
+          const iso = toIsoDateInputVal(this.value);
+          if (iso) {
+            calPicker.value = iso;
+          }
+          recalcIohPohModalCalculations();
+        });
+      } else if (txtInput) {
+        const isCalcDep = h.toLowerCase().includes('day') || h.toLowerCase().includes('delay') || h.toLowerCase().includes('ahead');
+        if (isCalcDep) {
+          txtInput.addEventListener('input', recalcIohPohModalCalculations);
+        }
+      }
+    });
+
+    // Run initial calculation to render badges if editing or prefilled
+    recalcIohPohModalCalculations();
+  }
+
   function openIohPohEditModal(rawRowIdx) {
     if (!IohPohState.data || !IohPohState.data.sheets) {
       if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
@@ -9785,20 +10073,47 @@
     headers.forEach((h, colIdx) => {
       let val = row[colIdx];
       if (val === null || val === undefined) val = '';
-      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
-        const d = new Date(val);
-        if (!isNaN(d.getTime())) {
-          const day = String(d.getDate()).padStart(2, '0');
-          const mon = String(d.getMonth() + 1).padStart(2, '0');
-          val = `${day}-${mon}-${d.getFullYear()}`;
-        }
-      }
+
       const isRemark = h.toLowerCase().includes('remark') || h.toLowerCase().includes('note');
+      const isDateCol = h.toLowerCase().includes('date') || h.toLowerCase() === 'start date' || h.toLowerCase() === 'end date' || h.toLowerCase().includes('date of');
+      const isTotalDays = h.toLowerCase().includes('total') && h.toLowerCase().includes('day');
+      const isDelayAhead = h.toLowerCase().includes('delay') || h.toLowerCase().includes('ahead');
+
       if (isRemark) {
         fieldsHtml += `
           <div class="form-group" style="grid-column: 1 / -1;">
             <label class="form-label">${escapeHtml(h)}</label>
             <textarea class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" rows="2" style="font-size: 12.5px;">${escapeHtml(String(val))}</textarea>
+          </div>
+        `;
+      } else if (isDateCol) {
+        const displayVal = toDdmmyyyy(val);
+        const isoVal = toIsoDateInputVal(val);
+        fieldsHtml += `
+          <div class="form-group" id="iohPohGroup_${colIdx}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label class="form-label" style="margin-bottom: 0;">${escapeHtml(h)}</label>
+              <span style="font-size: 11px; color: #38bdf8; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
+                📅 Calendar
+              </span>
+            </div>
+            <div class="ioh-poh-date-wrap">
+              <input type="text" class="form-control ioh-poh-date-input" name="col_${colIdx}" id="iohPohField_${colIdx}" 
+                     value="${escapeHtml(displayVal)}" placeholder="DD-MM-YYYY (or click 📅)" 
+                     autocomplete="off" style="font-size: 12.5px;">
+              <div class="ioh-poh-cal-btn-wrap" onclick="window.TM_APP.triggerIohPohCalendar(${colIdx})" title="Click to choose date from calendar">
+                <input type="date" id="iohPohCalPicker_${colIdx}" class="ioh-poh-native-date-picker" value="${isoVal}" tabindex="-1">
+                <span class="ioh-poh-cal-icon">📅</span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (isTotalDays || isDelayAhead) {
+        fieldsHtml += `
+          <div class="form-group" id="iohPohGroup_${colIdx}">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <input type="text" class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" value="${escapeHtml(String(val))}" style="font-size: 12.5px;">
+            <div id="iohPohCalcBadge_${colIdx}" style="display: none; margin-top: 4px;"></div>
           </div>
         `;
       } else {
@@ -9817,9 +10132,11 @@
       modal.style.display = 'flex';
       modal.classList.add('active');
     }
+
+    attachIohPohModalListeners(headers);
   }
 
-  function openIohPohAddModal() {
+  function openIohPohAddModal(targetSection) {
     if (!IohPohState.data || !IohPohState.data.sheets) {
       if (typeof window !== 'undefined' && window.OFFICIAL_IOH_POH_DATA) {
         IohPohState.data = JSON.parse(JSON.stringify(window.OFFICIAL_IOH_POH_DATA));
@@ -9838,7 +10155,11 @@
 
     const cfg = getIohPohConfig(sheetKey);
     const headers = getEffectiveIohPohHeaders(sheet, cfg);
+    const isDurationSheet = sheetKey === 'IOH POH Duration';
 
+    // Normalize target section: default 'POH' unless explicitly 'IOH'
+    targetSection = targetSection === 'IOH' ? 'IOH' : 'POH';
+    IohPohState.addingSection = targetSection;
     IohPohState.editingRowIdx = -1; // New entry
 
     const titleEl = document.getElementById('iohPohModalTitle');
@@ -9847,17 +10168,70 @@
     const deleteBtn = document.getElementById('btnIohPohModalDelete');
     const saveBtnText = document.getElementById('btnIohPohModalSaveText');
 
-    if (titleEl) titleEl.textContent = `➕ Add New Record — ${cfg.label}`;
-    if (subEl) subEl.textContent = `Enter details for new machine / schedule entry in "${cfg.title}".`;
     if (deleteBtn) deleteBtn.style.display = 'none';
-    if (saveBtnText) saveBtnText.textContent = '➕ Add Entry';
 
-    // Calculate default next serial number
-    const nextSNo = sheet.rawRows.length > cfg.dataStartIdx ? sheet.rawRows.length - cfg.dataStartIdx + 1 : sheet.rawRows.length + 1;
+    // Calculate separate count for POH and IOH in the active sheet
+    let pohCount = 0;
+    let iohCount = 0;
+    let curSec = 'POH';
+    (sheet.rawRows || []).forEach((r, idx) => {
+      if (isIohPohDividerRow(r)) {
+        curSec = getDividerSectionType(r, curSec);
+        return;
+      }
+      if (isIohPohSubHeaderRow(r)) return;
+      if (idx < cfg.dataStartIdx) return;
+      const ov = classifyRowOverhaulType(r, curSec);
+      if (ov === 'POH') pohCount++;
+      else if (ov === 'IOH') iohCount++;
+    });
+
+    const nextSNo = isDurationSheet 
+      ? (sheet.rawRows.length > cfg.dataStartIdx ? sheet.rawRows.length - cfg.dataStartIdx + 1 : 1)
+      : (targetSection === 'POH' ? pohCount + 1 : iohCount + 1);
+
+    if (isDurationSheet) {
+      if (titleEl) titleEl.innerHTML = `➕ Add Benchmark Reference — ${escapeHtml(cfg.label)}`;
+      if (subEl) subEl.textContent = `Enter details for new overhaul duration reference standard.`;
+      if (saveBtnText) saveBtnText.textContent = `➕ Add Reference`;
+    } else if (targetSection === 'POH') {
+      if (titleEl) titleEl.innerHTML = `<span style="color: #c084fc;">🟣 Add New POH Record</span> — ${escapeHtml(cfg.label)}`;
+      if (subEl) subEl.textContent = `Enter details for new Periodic Overhaul (POH) entry in FY ${cfg.label}. (Next POH Serial: #${nextSNo})`;
+      if (saveBtnText) saveBtnText.textContent = `🟣 Add POH Entry (#${nextSNo})`;
+    } else {
+      if (titleEl) titleEl.innerHTML = `<span style="color: #facc15;">🟡 Add New IOH Record</span> — ${escapeHtml(cfg.label)}`;
+      if (subEl) subEl.textContent = `Enter details for new Intermediate Overhaul (IOH) entry in FY ${cfg.label}. (Next IOH Serial: #${nextSNo})`;
+      if (saveBtnText) saveBtnText.textContent = `🟡 Add IOH Entry (#${nextSNo})`;
+    }
 
     let fieldsHtml = '';
+
+    // Category Selector Header in Modal (for FY sheets)
+    if (!isDurationSheet) {
+      fieldsHtml += `
+        <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">Overhaul Category:</span>
+            <span class="badge ${targetSection === 'POH' ? 'badge-poh-tag' : 'badge-ioh-tag'}" style="font-size: 12px; padding: 4px 10px;">${targetSection} Entry</span>
+          </div>
+          <div style="display: inline-flex; gap: 6px;">
+            <button type="button" class="btn btn-sm ${targetSection === 'POH' ? 'btn-primary' : 'btn-dim'}" onclick="window.TM_APP.openIohPohAddModal('POH')" style="font-size: 11px; padding: 3px 10px; ${targetSection === 'POH' ? 'background: #9333ea; border-color: #a855f7; color: #fff;' : ''}">
+              🟣 POH Section
+            </button>
+            <button type="button" class="btn btn-sm ${targetSection === 'IOH' ? 'btn-warning' : 'btn-dim'}" onclick="window.TM_APP.openIohPohAddModal('IOH')" style="font-size: 11px; padding: 3px 10px; ${targetSection === 'IOH' ? 'background: #eab308; border-color: #facc15; color: #1e1b4b; font-weight: 700;' : ''}">
+              🟡 IOH Section
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     headers.forEach((h, colIdx) => {
       const isRemark = h.toLowerCase().includes('remark') || h.toLowerCase().includes('note');
+      const isDateCol = h.toLowerCase().includes('date') || h.toLowerCase() === 'start date' || h.toLowerCase() === 'end date' || h.toLowerCase().includes('date of');
+      const isTotalDays = h.toLowerCase().includes('total') && h.toLowerCase().includes('day');
+      const isDelayAhead = h.toLowerCase().includes('delay') || h.toLowerCase().includes('ahead');
+
       let placeholder = '';
       let defaultValue = '';
 
@@ -9872,19 +10246,52 @@
         placeholder = 'e.g. CPOH/RYP, STMRD/UBL, ZBD/YPR';
       } else if (h.toLowerCase().includes('month')) {
         placeholder = 'e.g. Dec26, Jan 27, Apr26';
-      } else if (h.toLowerCase().includes('date')) {
-        placeholder = 'DD-MM-YYYY (e.g. 15-01-2027)';
+      } else if (isDateCol) {
+        placeholder = 'DD-MM-YYYY (or click 📅)';
+      } else if (isTotalDays) {
+        placeholder = 'Auto-calculated from Start & End Date';
+      } else if (isDelayAhead) {
+        placeholder = 'Auto-calculated vs Nominated Days';
       } else if (h.toLowerCase().includes('days') || h.toLowerCase().includes('engine')) {
         placeholder = 'e.g. 60, 75, 12500';
       } else if (isRemark) {
-        placeholder = 'e.g. 1st POH, 2nd POH, Planned for FY2026-27';
+        defaultValue = !isDurationSheet ? (targetSection === 'POH' ? 'POH' : 'IOH') : '';
+        placeholder = 'e.g. 1st POH, 2nd IOH, Planned for FY2026-27';
       }
 
       if (isRemark) {
         fieldsHtml += `
           <div class="form-group" style="grid-column: 1 / -1;">
             <label class="form-label">${escapeHtml(h)}</label>
-            <textarea class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" rows="2" style="font-size: 12.5px;" placeholder="${escapeHtml(placeholder)}"></textarea>
+            <textarea class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" rows="2" style="font-size: 12.5px;" placeholder="${escapeHtml(placeholder)}">${escapeHtml(defaultValue)}</textarea>
+          </div>
+        `;
+      } else if (isDateCol) {
+        fieldsHtml += `
+          <div class="form-group" id="iohPohGroup_${colIdx}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label class="form-label" style="margin-bottom: 0;">${escapeHtml(h)}</label>
+              <span style="font-size: 11px; color: #38bdf8; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
+                📅 Calendar
+              </span>
+            </div>
+            <div class="ioh-poh-date-wrap">
+              <input type="text" class="form-control ioh-poh-date-input" name="col_${colIdx}" id="iohPohField_${colIdx}" 
+                     value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" 
+                     autocomplete="off" style="font-size: 12.5px;">
+              <div class="ioh-poh-cal-btn-wrap" onclick="window.TM_APP.triggerIohPohCalendar(${colIdx})" title="Click to choose date from calendar">
+                <input type="date" id="iohPohCalPicker_${colIdx}" class="ioh-poh-native-date-picker" value="" tabindex="-1">
+                <span class="ioh-poh-cal-icon">📅</span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (isTotalDays || isDelayAhead) {
+        fieldsHtml += `
+          <div class="form-group" id="iohPohGroup_${colIdx}">
+            <label class="form-label">${escapeHtml(h)}</label>
+            <input type="text" class="form-control" name="col_${colIdx}" id="iohPohField_${colIdx}" value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" style="font-size: 12.5px;">
+            <div id="iohPohCalcBadge_${colIdx}" style="display: none; margin-top: 4px;"></div>
           </div>
         `;
       } else {
@@ -9903,6 +10310,8 @@
       modal.style.display = 'flex';
       modal.classList.add('active');
     }
+
+    attachIohPohModalListeners(headers);
 
     // Auto-focus the first editable input (col 1 if col 0 is S.No., else col 0)
     setTimeout(() => {
@@ -9930,17 +10339,23 @@
 
     const cfg = getIohPohConfig(sheetKey);
     const headers = getEffectiveIohPohHeaders(sheet, cfg);
+    const isDurationSheet = sheetKey === 'IOH POH Duration';
     const form = document.getElementById('iohPohModalForm');
     if (!form) return;
+
+    // Run final calculation pass to ensure Total Days and Delay are refreshed before saving
+    recalcIohPohModalCalculations();
 
     const newValues = [];
     headers.forEach((h, colIdx) => {
       const input = form.querySelector(`[name="col_${colIdx}"]`);
       let val = input ? input.value.trim() : '';
-      if (val !== '' && !isNaN(val) && !val.includes('-') && !val.includes('/') && !val.includes('.')) {
-        val = Number(val);
-      } else if (val !== '' && !isNaN(val) && val.includes('.') && val.split('.').length === 2 && !val.includes(' ') && val.split('.')[1].length <= 4) {
-        val = parseFloat(val);
+      if (val !== '') {
+        if (/^[+-]?\d+$/.test(val)) {
+          val = parseInt(val, 10);
+        } else if (/^[+-]?\d+\.\d+$/.test(val)) {
+          val = parseFloat(val);
+        }
       }
       newValues.push(val);
     });
@@ -9963,9 +10378,44 @@
       if (!Array.isArray(sheet.rawRows)) {
         sheet.rawRows = [];
       }
-      sheet.rawRows.push(newValues);
+
+      const targetSection = IohPohState.addingSection || 'POH';
+
+      if (isDurationSheet) {
+        sheet.rawRows.push(newValues);
+      } else if (targetSection === 'POH') {
+        // Find index of first IOH divider row to insert new POH row before it
+        let iohDividerIdx = -1;
+        for (let r = 0; r < sheet.rawRows.length; r++) {
+          const row = sheet.rawRows[r] || [];
+          if (isIohPohDividerRow(row) && getDividerSectionType(row) === 'IOH') {
+            iohDividerIdx = r;
+            break;
+          }
+        }
+        if (iohDividerIdx >= 0) {
+          sheet.rawRows.splice(iohDividerIdx, 0, newValues);
+        } else {
+          sheet.rawRows.push(newValues);
+        }
+      } else {
+        // Target is IOH: check if IOH divider row exists
+        let iohDividerIdx = -1;
+        for (let r = 0; r < sheet.rawRows.length; r++) {
+          const row = sheet.rawRows[r] || [];
+          if (isIohPohDividerRow(row) && getDividerSectionType(row) === 'IOH') {
+            iohDividerIdx = r;
+            break;
+          }
+        }
+        if (iohDividerIdx < 0) {
+          sheet.rawRows.push(['IOH of Machines during year ' + sheetKey]);
+        }
+        sheet.rawRows.push(newValues);
+      }
+
       sheet.rowCount = sheet.rawRows.length;
-      showToast(`New record added successfully to ${cfg.label}.`);
+      showToast(`New ${targetSection} record added successfully to ${cfg.label}.`);
     }
 
     try {
@@ -11476,21 +11926,41 @@
         }
 
         if (isMatch) {
+          const hdrs = (cfg.headers || []).map(h => String(h).toLowerCase());
+          function getColVal(rx, defIdx) {
+            const foundIdx = hdrs.findIndex(h => rx.test(h));
+            const idx = foundIdx >= 0 ? foundIdx : defIdx;
+            return idx < row.length ? row[idx] : '';
+          }
+
+          const rawStart = getColVal(/start\s*date/i, 5);
+          const rawEnd = getColVal(/end\s*date/i, 6);
+          const rawTotalDays = getColVal(/total\s*days/i, 7);
+          const rawActualWorkDays = getColVal(/actual\s*working|working\s*days/i, -1);
+          const rawNomDays = getColVal(/nominated/i, 8);
+          const rawDelay = getColVal(/delay|ahead/i, 9);
+          const rawEh = getColVal(/engine\s*h/i, 10);
+          const rawRem = getColVal(/remark|note|status/i, 11);
+          const rawDiv = getColVal(/divn/i, 2);
+          const rawWs = getColVal(/workshop|carried/i, 3);
+          const rawMonth = getColVal(/month/i, 4);
+
           iohPohRows.push({
             'Schedule Sheet / FY': sheetKey,
             'Schedule Section': currentSection,
             'Sl No': row[0] !== undefined && row[0] !== null ? String(row[0]) : '',
             'Machine in Schedule': String(row[1] || ''),
-            'Division': String(row[2] || ''),
-            'Carried Out At / Workshop': String(row[3] || ''),
-            'Tentative / Nominated Month': String(row[4] || ''),
-            'Schedule Start Date': formatIohPohCell(row[5], 'Start Date'),
-            'Schedule End Date': formatIohPohCell(row[6], 'End Date'),
-            'Total Days Taken': row[7] !== undefined && row[7] !== null ? row[7] : '',
-            'Nominated Days': row[8] !== undefined && row[8] !== null ? row[8] : '',
-            'Delay (+) or Ahead (-) Days': row[9] !== undefined && row[9] !== null ? row[9] : '',
-            'Engine Hours @ Overhaul': row[10] !== undefined && row[10] !== null ? row[10] : '',
-            'Technical Remarks / Overhaul Notes': row[11] !== undefined && row[11] !== null ? String(row[11]) : ''
+            'Division': String(rawDiv || ''),
+            'Carried Out At / Workshop': String(rawWs || ''),
+            'Tentative / Nominated Month': String(rawMonth || ''),
+            'Schedule Start Date': rawStart ? formatIohPohCell(rawStart, 'Start Date') : '',
+            'Schedule End Date': rawEnd ? formatIohPohCell(rawEnd, 'End Date') : '',
+            'Total Days Taken': rawTotalDays !== undefined && rawTotalDays !== null ? rawTotalDays : '',
+            'Actual Working Days': rawActualWorkDays !== undefined && rawActualWorkDays !== null ? rawActualWorkDays : '',
+            'Nominated Days': rawNomDays !== undefined && rawNomDays !== null ? rawNomDays : '',
+            'Delay (+) or Ahead (-) Days': rawDelay !== undefined && rawDelay !== null ? rawDelay : '',
+            'Engine Hours @ Overhaul': rawEh !== undefined && rawEh !== null ? rawEh : '',
+            'Technical Remarks / Overhaul Notes': rawRem !== undefined && rawRem !== null ? String(rawRem) : ''
           });
         }
       }
@@ -13017,6 +13487,14 @@
     syncIohPohUpdatesToHrm,
     getIohPohState: () => IohPohState,
     exportCompleteMachineReport,
+    closeModal,
+    closeIohPohEditModal: () => closeModal('iohPohEditModal'),
+    triggerIohPohCalendar,
+    recalcIohPohModalCalculations,
+    calculateTurnaroundTotalDays,
+    parseAnyDateToDateObj,
+    toDdmmyyyy,
+    toIsoDateInputVal,
     switchTab
   };
 

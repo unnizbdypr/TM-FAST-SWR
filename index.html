@@ -1285,8 +1285,11 @@
               <input type="text" id="iohPohSearchInput" class="form-control" placeholder="Search machine, depot, remark..." oninput="window.TM_APP.onIohPohSearch(this.value)">
               <button type="button" class="search-clear-btn" id="iohPohSearchClear" onclick="window.TM_APP.clearIohPohSearch()" style="display: none;">&times;</button>
             </div>
-            <button type="button" class="btn btn-secondary-pista" id="btnIohPohAddEntry" onclick="window.TM_APP.openIohPohAddModal()" title="Add new row entry to the active sheet">
-              <span>&#10133; Add Entry</span>
+            <button type="button" class="btn btn-add-poh" id="btnIohPohAddPohEntry" onclick="window.TM_APP.openIohPohAddModal('POH')" title="Add new POH overhaul entry to the active sheet">
+              <span>🟣 + Add POH Entry</span>
+            </button>
+            <button type="button" class="btn btn-add-ioh" id="btnIohPohAddIohEntry" onclick="window.TM_APP.openIohPohAddModal('IOH')" title="Add new IOH overhaul entry to the active sheet">
+              <span>🟡 + Add IOH Entry</span>
             </button>
             <button type="button" class="btn btn-dim" onclick="window.TM_APP.exportIohPohToExcel()" title="Export current sheet or full workbook to Excel (.xlsx)">
               <span>&#128229; Export Sheet (.xlsx)</span>

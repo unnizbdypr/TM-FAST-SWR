@@ -1652,6 +1652,67 @@ body {
   background: #f1f5f9;
 }
 
+/* Dedicated Add POH & Add IOH Entry Buttons */
+.btn-add-poh {
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
+  border: 1px solid #a855f7;
+  color: #ffffff !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12.5px;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+}
+
+.btn-add-poh:hover {
+  background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  border-color: #c084fc;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.btn-add-ioh {
+  background: linear-gradient(135deg, #ca8a04, #eab308);
+  border: 1px solid #facc15;
+  color: #1e1b4b !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12.5px;
+  box-shadow: 0 2px 6px rgba(234, 179, 8, 0.25);
+}
+
+.btn-add-ioh:hover {
+  background: linear-gradient(135deg, #a16207, #ca8a04);
+  border-color: #fde047;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.45);
+  color: #0f172a !important;
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-add-poh {
+  background: #9333ea;
+  border-color: #7e22ce;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .btn-add-ioh {
+  background: #eab308;
+  border-color: #ca8a04;
+  color: #1e1b4b !important;
+}
+
 /* ==========================================================================
    LEGACY ALERT PANEL: REPETITIVE FAILURES & SURVEILLANCE
    ========================================================================== */
@@ -5437,6 +5498,154 @@ body.cloud-sync-forbidden #cloudSyncModal {
   margin-left: 4px;
   vertical-align: middle;
 }
+
+/* ==========================================================================
+   IOH POH MODAL: INTERACTIVE CALENDAR SELECTION & REAL-TIME AUTO-CALCULATION
+   ========================================================================== */
+.ioh-poh-date-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  background: rgba(8, 14, 10, 0.9);
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.ioh-poh-date-wrap:focus-within {
+  border-color: var(--pista-400);
+  box-shadow: 0 0 10px var(--pista-glow);
+}
+
+.ioh-poh-date-input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 9px 12px !important;
+  font-size: 12.5px !important;
+  color: var(--text-primary);
+}
+
+.ioh-poh-cal-btn-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  background: rgba(56, 189, 248, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ioh-poh-cal-btn-wrap:hover {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.ioh-poh-native-date-picker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+}
+
+.ioh-poh-cal-icon {
+  font-size: 15px;
+  line-height: 1;
+  color: #38bdf8;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Light mode overrides */
+[data-theme="light"] .ioh-poh-date-wrap {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .ioh-poh-date-wrap:focus-within {
+  border-color: #2e7d32;
+  box-shadow: 0 0 8px rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="light"] .ioh-poh-cal-btn-wrap {
+  background: rgba(2, 132, 199, 0.08);
+  border-left-color: #e2e8f0;
+}
+
+[data-theme="light"] .ioh-poh-cal-btn-wrap:hover {
+  background: rgba(2, 132, 199, 0.16);
+}
+
+/* Auto-calculation feedback pills */
+.ioh-poh-calc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  font-weight: 600;
+  animation: fadeIn 0.2s ease;
+}
+
+.ioh-poh-calc-pill-green {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.ioh-poh-calc-pill-red {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.ioh-poh-calc-pill-yellow {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.ioh-poh-calc-pill-info {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+[data-theme="light"] .ioh-poh-calc-pill-green {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+[data-theme="light"] .ioh-poh-calc-pill-red {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .ioh-poh-calc-pill-yellow {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+[data-theme="light"] .ioh-poh-calc-pill-info {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
 
 
 
